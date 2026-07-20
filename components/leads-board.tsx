@@ -1,0 +1,71 @@
+"use client";
+
+import { useState } from "react";
+import { Target } from "lucide-react";
+import type { Lead } from "@/lib/types";
+import { LeadCard } from "@/components/lead-card";
+import { NewLeadDialog } from "@/components/new-lead-dialog";
+
+export function LeadsBoard({ leads }: { leads: Lead[] }) {
+  const [tab, setTab] = useState<"abordar" | "abordado">("abordar");
+
+  const aAbordar = leads.filter((lead) => lead.status === "abordar");
+  const abordados = leads.filter((lead) => lead.status === "abordado");
+  const list = tab === "abordar" ? aAbordar : abordados;
+
+  return (
+    <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-zinc-100">Leads</h1>
+          <p className="text-sm text-zinc-500">
+            {leads.length} lead(s) no total
+          </p>
+        </div>
+        <NewLeadDialog />
+      </div>
+
+      <div className="mb-6 inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+        <button
+          type="button"
+          onClick={() => setTab("abordar")}
+          className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            tab === "abordar"
+              ? "bg-indigo-600 text-white"
+              : "text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          A abordar ({aAbordar.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("abordado")}
+          className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            tab === "abordado"
+              ? "bg-indigo-600 text-white"
+              : "text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          Abordados ({abordados.length})
+        </button>
+      </div>
+
+      {list.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {list.map((lead) => (
+            <LeadCard key={lead.id} lead={lead} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-zinc-800 py-20 text-center">
+          <Target className="h-8 w-8 text-zinc-700" />
+          <p className="text-sm text-zinc-500">
+            {tab === "abordar"
+              ? "Nenhum lead para abordar."
+              : "Nenhum lead abordado ainda."}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

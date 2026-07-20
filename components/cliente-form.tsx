@@ -58,10 +58,23 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Contato</label>
+            <label className="text-xs font-medium text-zinc-400">
+              Telefone
+            </label>
             <input
-              name="contato"
-              defaultValue={cliente.contato ?? ""}
+              name="telefone"
+              defaultValue={cliente.telefone ?? ""}
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">
+              E-mail
+            </label>
+            <input
+              name="email"
+              type="email"
+              defaultValue={cliente.email ?? ""}
               className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
           </div>
@@ -97,8 +110,10 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
               defaultValue={cliente.status}
               className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             >
-              <option value="pendente">Pendente</option>
-              <option value="finalizado">Finalizado</option>
+              <option value="ativo">Ativo</option>
+              <option value="em_andamento">Em andamento</option>
+              <option value="pausado">Pausado</option>
+              <option value="encerrado">Encerrado</option>
             </select>
           </div>
           <div className="space-y-1.5">
@@ -110,40 +125,6 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
               defaultValue={cliente.abordado_por ?? ""}
               className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-          <label className="flex items-center gap-2 text-sm text-zinc-200">
-            <input
-              type="checkbox"
-              name="assinatura_ativa"
-              defaultChecked={cliente.assinatura_ativa}
-              className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-indigo-600"
-            />
-            Assinatura ativa
-          </label>
-
-          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">Plano</label>
-              <input
-                name="assinatura_plano"
-                defaultValue={cliente.assinatura_plano ?? ""}
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">
-                Vencimento
-              </label>
-              <input
-                type="date"
-                name="assinatura_vencimento"
-                defaultValue={cliente.assinatura_vencimento ?? ""}
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
           </div>
         </div>
 

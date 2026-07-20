@@ -32,8 +32,8 @@ const DASHBOARD_ITEMS: NavItem[] = [
 
 const GESTAO_ITEMS: NavItem[] = [
   { label: "Clientes", href: "/clientes", icon: Users, enabled: true },
-  { label: "Leads", href: "/leads", icon: Target },
-  { label: "Renegados", href: "/renegados", icon: UserX },
+  { label: "Leads", href: "/leads", icon: Target, enabled: true },
+  { label: "Renegados", href: "/renegados", icon: UserX, enabled: true },
   { label: "Assinantes", href: "/assinantes", icon: BadgeCheck },
   { label: "Calendário", href: "/calendario", icon: CalendarClock },
   { label: "Gastos", href: "/gastos", icon: Receipt },

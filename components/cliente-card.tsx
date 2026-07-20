@@ -1,11 +1,24 @@
 import Link from "next/link";
-import { FolderClosed, BadgeCheck } from "lucide-react";
-import type { Cliente } from "@/lib/types";
-import { StatusChip } from "@/components/status-chip";
-import { formatDate } from "@/lib/format";
+import { FolderClosed } from "lucide-react";
+import type { Cliente, ClienteStatus } from "@/lib/types";
+import { StatusChip, type ChipTone } from "@/components/status-chip";
+
+const STATUS_LABEL: Record<ClienteStatus, string> = {
+  ativo: "Ativo",
+  em_andamento: "Em andamento",
+  pausado: "Pausado",
+  encerrado: "Encerrado",
+};
+
+const STATUS_TONE: Record<ClienteStatus, ChipTone> = {
+  ativo: "emerald",
+  em_andamento: "sky",
+  pausado: "amber",
+  encerrado: "zinc",
+};
 
 export function ClienteCard({ cliente }: { cliente: Cliente }) {
-  const isPendente = cliente.status === "pendente";
+  const contato = cliente.telefone ?? cliente.email;
 
   return (
     <Link
@@ -21,15 +34,13 @@ export function ClienteCard({ cliente }: { cliente: Cliente }) {
             <h3 className="truncate text-sm font-semibold text-zinc-100">
               {cliente.nome}
             </h3>
-            {cliente.contato && (
-              <p className="truncate text-xs text-zinc-500">
-                {cliente.contato}
-              </p>
+            {contato && (
+              <p className="truncate text-xs text-zinc-500">{contato}</p>
             )}
           </div>
         </div>
-        <StatusChip tone={isPendente ? "amber" : "emerald"}>
-          {isPendente ? "Pendente" : "Finalizado"}
+        <StatusChip tone={STATUS_TONE[cliente.status]}>
+          {STATUS_LABEL[cliente.status]}
         </StatusChip>
       </div>
 
@@ -38,20 +49,6 @@ export function ClienteCard({ cliente }: { cliente: Cliente }) {
           {cliente.resumo}
         </p>
       )}
-
-      <div className="mt-auto flex items-center justify-between border-t border-zinc-800/80 pt-3 text-xs text-zinc-500">
-        {cliente.assinatura_ativa ? (
-          <span className="flex items-center gap-1.5 text-emerald-400">
-            <BadgeCheck className="h-3.5 w-3.5" />
-            {cliente.assinatura_plano ?? "Assinante"}
-          </span>
-        ) : (
-          <span>Sem assinatura</span>
-        )}
-        {cliente.assinatura_ativa && cliente.assinatura_vencimento && (
-          <span>vence {formatDate(cliente.assinatura_vencimento)}</span>
-        )}
-      </div>
     </Link>
   );
 }

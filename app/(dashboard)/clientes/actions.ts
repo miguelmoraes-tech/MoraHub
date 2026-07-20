@@ -23,14 +23,11 @@ async function requireUser() {
 function parseClienteForm(formData: FormData) {
   return ClienteSchema.safeParse({
     nome: formData.get("nome"),
-    contato: textOrNull(formData.get("contato")) ?? undefined,
+    telefone: textOrNull(formData.get("telefone")) ?? undefined,
+    email: textOrNull(formData.get("email")) ?? undefined,
     resumo: textOrNull(formData.get("resumo")) ?? undefined,
     site_link: textOrNull(formData.get("site_link")) ?? undefined,
-    status: formData.get("status") ?? "pendente",
-    assinatura_ativa: formData.get("assinatura_ativa") === "on",
-    assinatura_plano: textOrNull(formData.get("assinatura_plano")) ?? undefined,
-    assinatura_vencimento:
-      textOrNull(formData.get("assinatura_vencimento")) ?? undefined,
+    status: formData.get("status") ?? "em_andamento",
     abordado_por: textOrNull(formData.get("abordado_por")) ?? undefined,
   });
 }
@@ -49,13 +46,11 @@ export async function createCliente(
 
   const { error } = await supabase.from("clientes").insert({
     nome: parsed.data.nome,
-    contato: parsed.data.contato ?? null,
+    telefone: parsed.data.telefone ?? null,
+    email: parsed.data.email ?? null,
     resumo: parsed.data.resumo ?? null,
     site_link: parsed.data.site_link ?? null,
     status: parsed.data.status,
-    assinatura_ativa: parsed.data.assinatura_ativa,
-    assinatura_plano: parsed.data.assinatura_plano ?? null,
-    assinatura_vencimento: parsed.data.assinatura_vencimento ?? null,
     abordado_por: parsed.data.abordado_por ?? null,
     user_id: user.id,
   });
@@ -83,13 +78,11 @@ export async function updateCliente(
     .from("clientes")
     .update({
       nome: parsed.data.nome,
-      contato: parsed.data.contato ?? null,
+      telefone: parsed.data.telefone ?? null,
+      email: parsed.data.email ?? null,
       resumo: parsed.data.resumo ?? null,
       site_link: parsed.data.site_link ?? null,
       status: parsed.data.status,
-      assinatura_ativa: parsed.data.assinatura_ativa,
-      assinatura_plano: parsed.data.assinatura_plano ?? null,
-      assinatura_vencimento: parsed.data.assinatura_vencimento ?? null,
       abordado_por: parsed.data.abordado_por ?? null,
     })
     .eq("id", clienteId);

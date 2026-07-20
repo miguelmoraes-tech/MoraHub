@@ -1,7 +1,14 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { Receipt, Plus, Pencil, Trash2, ExternalLink } from "lucide-react";
+import {
+  Receipt,
+  Plus,
+  Pencil,
+  Trash2,
+  ExternalLink,
+  Paperclip,
+} from "lucide-react";
 import type { Comprovante } from "@/lib/types";
 import {
   createComprovante,
@@ -10,6 +17,8 @@ import {
 } from "@/app/(dashboard)/clientes/[id]/actions";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
+
+export type ComprovanteComArquivo = Comprovante & { arquivoUrl: string | null };
 
 function ComprovanteFields({ comprovante }: { comprovante?: Comprovante }) {
   return (
@@ -52,6 +61,16 @@ function ComprovanteFields({ comprovante }: { comprovante?: Comprovante }) {
           name="link"
           defaultValue={comprovante?.link ?? ""}
           className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+        />
+      </div>
+      <div className="col-span-2 space-y-1 sm:col-span-4">
+        <label className="text-xs font-medium text-zinc-400">
+          Arquivo {comprovante?.arquivo_path ? "(substituir)" : ""}
+        </label>
+        <input
+          name="arquivo"
+          type="file"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-400 outline-none file:mr-3 file:rounded-md file:border-0 file:bg-zinc-800 file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
         />
       </div>
     </div>
@@ -118,7 +137,7 @@ function ComprovanteRow({
   comprovante,
 }: {
   clienteId: string;
-  comprovante: Comprovante;
+  comprovante: ComprovanteComArquivo;
 }) {
   const [editing, setEditing] = useState(false);
   const action = updateComprovante.bind(null, clienteId, comprovante.id);
@@ -178,6 +197,16 @@ function ComprovanteRow({
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
         )}
+        {comprovante.arquivoUrl && (
+          <a
+            href={comprovante.arquivoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+          >
+            <Paperclip className="h-3.5 w-3.5" />
+          </a>
+        )}
         <button
           type="button"
           onClick={() => setEditing(true)}
@@ -203,7 +232,7 @@ export function ComprovantesSection({
   comprovantes,
 }: {
   clienteId: string;
-  comprovantes: Comprovante[];
+  comprovantes: ComprovanteComArquivo[];
 }) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
