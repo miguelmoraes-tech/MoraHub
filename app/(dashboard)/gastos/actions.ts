@@ -2,9 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { GastoFixoSchema } from "@/lib/validations/gasto-fixo";
-import { GastoClienteSchema } from "@/lib/validations/gasto-cliente";
+import { GastoSchema } from "@/lib/validations/gasto";
 import type { ActionState } from "@/lib/actions/types";
+
+function textOrNull(value: FormDataEntryValue | null) {
+  if (value === null) return null;
+  const str = value.toString().trim();
+  return str === "" ? null : str;
+}
 
 async function requireUser() {
   const supabase = await createClient();
@@ -14,18 +19,22 @@ async function requireUser() {
   return { supabase, user };
 }
 
-// ---------- Gastos fixos ----------
+function parseGastoForm(formData: FormData) {
+  return GastoSchema.safeParse({
+    nome: formData.get("nome"),
+    valor: formData.get("valor"),
+    tipo: formData.get("tipo") ?? "pontual",
+    recorrencia: textOrNull(formData.get("recorrencia")) ?? undefined,
+    cliente_id: textOrNull(formData.get("cliente_id")) ?? undefined,
+    data: formData.get("data"),
+  });
+}
 
-export async function createGastoFixo(
+export async function createGasto(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const parsed = GastoFixoSchema.safeParse({
-    nome: formData.get("nome"),
-    valor: formData.get("valor"),
-    recorrencia: formData.get("recorrencia") ?? "Mensal",
-    data: formData.get("data"),
-  });
+  const parsed = parseGastoForm(formData);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
@@ -33,11 +42,13 @@ export async function createGastoFixo(
   const { supabase, user } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
 
-  const { error } = await supabase.from("gastos_fixos").insert({
+  const { error } = await supabase.from("gastos").insert({
     user_id: user.id,
     nome: parsed.data.nome,
     valor: parsed.data.valor,
-    recorrencia: parsed.data.recorrencia,
+    tipo: parsed.data.tipo,
+    recorrencia: parsed.data.recorrencia ?? null,
+    cliente_id: parsed.data.cliente_id ?? null,
     data: parsed.data.data,
   });
   if (error) return { error: "Não foi possível salvar o gasto." };
@@ -46,28 +57,25 @@ export async function createGastoFixo(
   return { ok: true };
 }
 
-export async function updateGastoFixo(
+export async function updateGasto(
   gastoId: string,
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const parsed = GastoFixoSchema.safeParse({
-    nome: formData.get("nome"),
-    valor: formData.get("valor"),
-    recorrencia: formData.get("recorrencia") ?? "Mensal",
-    data: formData.get("data"),
-  });
+  const parsed = parseGastoForm(formData);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
   const { supabase } = await requireUser();
   const { error } = await supabase
-    .from("gastos_fixos")
+    .from("gastos")
     .update({
       nome: parsed.data.nome,
       valor: parsed.data.valor,
-      recorrencia: parsed.data.recorrencia,
+      tipo: parsed.data.tipo,
+      recorrencia: parsed.data.recorrencia ?? null,
+      cliente_id: parsed.data.cliente_id ?? null,
       data: parsed.data.data,
     })
     .eq("id", gastoId);
@@ -77,77 +85,8 @@ export async function updateGastoFixo(
   return { ok: true };
 }
 
-export async function deleteGastoFixo(gastoId: string) {
+export async function deleteGasto(gastoId: string) {
   const { supabase } = await requireUser();
-  await supabase.from("gastos_fixos").delete().eq("id", gastoId);
-  revalidatePath("/gastos");
-}
-
-// ---------- Gastos por cliente ----------
-
-export async function createGastoCliente(
-  _prevState: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const parsed = GastoClienteSchema.safeParse({
-    cliente_id: formData.get("cliente_id"),
-    descricao: formData.get("descricao"),
-    valor: formData.get("valor"),
-    data: formData.get("data"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
-  }
-
-  const { supabase, user } = await requireUser();
-  if (!user) return { error: "Sessão expirada. Faça login novamente." };
-
-  const { error } = await supabase.from("gastos_clientes").insert({
-    user_id: user.id,
-    cliente_id: parsed.data.cliente_id,
-    descricao: parsed.data.descricao,
-    valor: parsed.data.valor,
-    data: parsed.data.data,
-  });
-  if (error) return { error: "Não foi possível salvar o gasto." };
-
-  revalidatePath("/gastos");
-  return { ok: true };
-}
-
-export async function updateGastoCliente(
-  gastoId: string,
-  _prevState: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const parsed = GastoClienteSchema.safeParse({
-    cliente_id: formData.get("cliente_id"),
-    descricao: formData.get("descricao"),
-    valor: formData.get("valor"),
-    data: formData.get("data"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
-  }
-
-  const { supabase } = await requireUser();
-  const { error } = await supabase
-    .from("gastos_clientes")
-    .update({
-      cliente_id: parsed.data.cliente_id,
-      descricao: parsed.data.descricao,
-      valor: parsed.data.valor,
-      data: parsed.data.data,
-    })
-    .eq("id", gastoId);
-  if (error) return { error: "Não foi possível atualizar o gasto." };
-
-  revalidatePath("/gastos");
-  return { ok: true };
-}
-
-export async function deleteGastoCliente(gastoId: string) {
-  const { supabase } = await requireUser();
-  await supabase.from("gastos_clientes").delete().eq("id", gastoId);
+  await supabase.from("gastos").delete().eq("id", gastoId);
   revalidatePath("/gastos");
 }

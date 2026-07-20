@@ -1,32 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
-import { GastosBoard } from "@/components/gastos-board";
-import type { GastoFixo, GastoCliente, Cliente } from "@/lib/types";
+import { GastosSection } from "@/components/gastos-section";
+import type { Gasto, Cliente } from "@/lib/types";
 
 export default async function GastosPage() {
   const supabase = await createClient();
 
-  const [{ data: gastosFixos }, { data: gastosClientes }, { data: clientes }] =
-    (await Promise.all([
-      supabase
-        .from("gastos_fixos")
-        .select("*")
-        .order("data", { ascending: false }),
-      supabase
-        .from("gastos_clientes")
-        .select("*")
-        .order("data", { ascending: false }),
-      supabase.from("clientes").select("*").order("nome"),
-    ])) as [
-      { data: GastoFixo[] | null },
-      { data: GastoCliente[] | null },
-      { data: Cliente[] | null },
-    ];
+  const [{ data: gastos }, { data: clientes }] = (await Promise.all([
+    supabase.from("gastos").select("*").order("data", { ascending: false }),
+    supabase.from("clientes").select("*").order("nome"),
+  ])) as [{ data: Gasto[] | null }, { data: Cliente[] | null }];
 
-  return (
-    <GastosBoard
-      gastosFixos={gastosFixos ?? []}
-      gastosClientes={gastosClientes ?? []}
-      clientes={clientes ?? []}
-    />
-  );
+  return <GastosSection gastos={gastos ?? []} clientes={clientes ?? []} />;
 }

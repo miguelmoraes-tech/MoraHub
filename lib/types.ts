@@ -181,24 +181,17 @@ export interface Renegado {
 }
 
 export type Recorrencia = "Mensal" | "Anual" | "Único";
+export type GastoTipo = "fixo" | "pontual";
 
-export interface GastoFixo {
+export interface Gasto {
   id: string;
   user_id: string;
   nome: string;
   valor: number;
-  recorrencia: Recorrencia;
-  data: string | null;
-  created_at: string;
-}
-
-export interface GastoCliente {
-  id: string;
-  user_id: string;
-  cliente_id: string;
-  descricao: string;
-  valor: number;
-  data: string | null;
+  tipo: GastoTipo;
+  recorrencia: Recorrencia | null;
+  cliente_id: string | null;
+  data: string;
   created_at: string;
 }
 

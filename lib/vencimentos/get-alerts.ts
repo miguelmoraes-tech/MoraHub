@@ -24,7 +24,7 @@ type AssinaturaRow = {
   plano: string;
   proxima_cobranca: string;
 };
-type GastoFixoRow = {
+type GastoRecorrenteRow = {
   id: string;
   nome: string;
   data: string;
@@ -58,10 +58,10 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
       .eq("status", "ativa")
       .not("proxima_cobranca", "is", null),
     supabase
-      .from("gastos_fixos")
+      .from("gastos")
       .select("id, nome, data, recorrencia")
-      .in("recorrencia", ["Mensal", "Anual"])
-      .not("data", "is", null),
+      .eq("tipo", "fixo")
+      .in("recorrencia", ["Mensal", "Anual"]),
     supabase.from("vencimentos").select("id, titulo, data"),
     supabase
       .from("contratos")
@@ -75,7 +75,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
     supabase.from("clientes").select("id, nome"),
   ])) as [
     { data: AssinaturaRow[] | null },
-    { data: GastoFixoRow[] | null },
+    { data: GastoRecorrenteRow[] | null },
     { data: VencimentoRow[] | null },
     { data: ContratoRow[] | null },
     { data: JuridicoRow[] | null },
