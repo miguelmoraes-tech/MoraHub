@@ -36,7 +36,7 @@ const GESTAO_ITEMS: NavItem[] = [
   { label: "Renegados", href: "/renegados", icon: UserX, enabled: true },
   { label: "Assinantes", href: "/assinantes", icon: BadgeCheck },
   { label: "Calendário", href: "/calendario", icon: CalendarClock },
-  { label: "Gastos", href: "/gastos", icon: Receipt },
+  { label: "Gastos", href: "/gastos", icon: Receipt, enabled: true },
   { label: "Jurídico & Contábil", href: "/juridico", icon: Scale },
   { label: "Documentos", href: "/documentos", icon: FileText },
 ];
