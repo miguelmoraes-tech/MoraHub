@@ -9,6 +9,7 @@ import {
 } from "@/app/(dashboard)/renegados/actions";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { RenegadoFields } from "@/components/renegado-fields";
+import { StatusChip } from "@/components/status-chip";
 import { formatDate } from "@/lib/format";
 
 export function RenegadoCard({ renegado }: { renegado: Renegado }) {
@@ -65,6 +66,8 @@ export function RenegadoCard({ renegado }: { renegado: Renegado }) {
           {renegado.descricao}
         </p>
       )}
+
+      {renegado.nicho && <StatusChip tone="indigo">{renegado.nicho}</StatusChip>}
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
         {renegado.tem_site && (

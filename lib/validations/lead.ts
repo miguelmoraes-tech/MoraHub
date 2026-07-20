@@ -9,6 +9,7 @@ export const LeadSchema = z.object({
   insta_link: z.string().optional(),
   descricao: z.string().optional(),
   abordado_por: z.string().optional(),
+  nicho: z.string().optional(),
 });
 
 export type LeadInput = z.infer<typeof LeadSchema>;

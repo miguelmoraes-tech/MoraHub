@@ -49,6 +49,10 @@ export function ClienteCard({ cliente }: { cliente: Cliente }) {
           {cliente.resumo}
         </p>
       )}
+
+      {cliente.segmento && (
+        <StatusChip tone="indigo">{cliente.segmento}</StatusChip>
+      )}
     </Link>
   );
 }

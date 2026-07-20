@@ -28,6 +28,7 @@ function parseClienteForm(formData: FormData) {
     resumo: textOrNull(formData.get("resumo")) ?? undefined,
     site_link: textOrNull(formData.get("site_link")) ?? undefined,
     status: formData.get("status") ?? "em_andamento",
+    segmento: textOrNull(formData.get("segmento")) ?? undefined,
     abordado_por: textOrNull(formData.get("abordado_por")) ?? undefined,
   });
 }
@@ -51,6 +52,7 @@ export async function createCliente(
     resumo: parsed.data.resumo ?? null,
     site_link: parsed.data.site_link ?? null,
     status: parsed.data.status,
+    segmento: parsed.data.segmento ?? null,
     abordado_por: parsed.data.abordado_por ?? null,
     user_id: user.id,
   });
@@ -83,6 +85,7 @@ export async function updateCliente(
       resumo: parsed.data.resumo ?? null,
       site_link: parsed.data.site_link ?? null,
       status: parsed.data.status,
+      segmento: parsed.data.segmento ?? null,
       abordado_por: parsed.data.abordado_por ?? null,
     })
     .eq("id", clienteId);

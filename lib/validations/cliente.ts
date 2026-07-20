@@ -9,6 +9,7 @@ export const ClienteSchema = z.object({
   status: z.enum(["ativo", "em_andamento", "pausado", "encerrado"], {
     error: "Selecione um status válido.",
   }),
+  segmento: z.string().optional(),
   abordado_por: z.string().optional(),
 });
 

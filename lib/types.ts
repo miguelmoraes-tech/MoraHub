@@ -9,6 +9,7 @@ export interface Cliente {
   resumo: string | null;
   site_link: string | null;
   status: ClienteStatus;
+  segmento: string | null;
   abordado_por: string | null;
   created_at: string;
 }
@@ -158,6 +159,7 @@ export interface Lead {
   resultado: LeadResultado | null;
   motivo_negou: string | null;
   abordado_por: string | null;
+  nicho: string | null;
   created_at: string;
 }
 
@@ -174,6 +176,7 @@ export interface Renegado {
   abordado_por: string;
   motivo_negou: string | null;
   data_abordagem: string | null;
+  nicho: string | null;
   created_at: string;
 }
 

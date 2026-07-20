@@ -102,7 +102,7 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-zinc-400">Status</label>
             <select
@@ -115,6 +115,17 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
               <option value="pausado">Pausado</option>
               <option value="encerrado">Encerrado</option>
             </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">
+              Segmento
+            </label>
+            <input
+              name="segmento"
+              placeholder="Ex: Saúde, Varejo, Educação..."
+              defaultValue={cliente.segmento ?? ""}
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-zinc-400">

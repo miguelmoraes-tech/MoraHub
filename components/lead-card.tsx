@@ -129,6 +129,8 @@ export function LeadCard({ lead }: { lead: Lead }) {
         </p>
       )}
 
+      {lead.nicho && <StatusChip tone="indigo">{lead.nicho}</StatusChip>}
+
       <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
         {lead.tem_site && (
           <span className="flex items-center gap-1">

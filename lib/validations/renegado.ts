@@ -11,6 +11,7 @@ export const RenegadoSchema = z.object({
   abordado_por: z.string().min(1, { error: "Informe quem abordou." }),
   motivo_negou: z.string().optional(),
   data_abordagem: z.string().optional(),
+  nicho: z.string().optional(),
 });
 
 export type RenegadoInput = z.infer<typeof RenegadoSchema>;

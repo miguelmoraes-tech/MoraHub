@@ -112,15 +112,26 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
         </div>
       </div>
 
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-zinc-400">
-          Motivo da negativa
-        </label>
-        <input
-          name="motivo_negou"
-          defaultValue={renegado?.motivo_negou ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-        />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-zinc-400">
+            Motivo da negativa
+          </label>
+          <input
+            name="motivo_negou"
+            defaultValue={renegado?.motivo_negou ?? ""}
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-zinc-400">Nicho</label>
+          <input
+            name="nicho"
+            placeholder="Ex: Saúde, Varejo, Educação..."
+            defaultValue={renegado?.nicho ?? ""}
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
       </div>
     </div>
   );

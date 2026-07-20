@@ -29,6 +29,7 @@ function parseLeadForm(formData: FormData) {
     insta_link: textOrNull(formData.get("insta_link")) ?? undefined,
     descricao: textOrNull(formData.get("descricao")) ?? undefined,
     abordado_por: textOrNull(formData.get("abordado_por")) ?? undefined,
+    nicho: textOrNull(formData.get("nicho")) ?? undefined,
   });
 }
 
@@ -54,6 +55,7 @@ export async function createLead(
     insta_link: parsed.data.insta_link ?? null,
     descricao: parsed.data.descricao ?? null,
     abordado_por: parsed.data.abordado_por ?? null,
+    nicho: parsed.data.nicho ?? null,
     status: "abordar",
   });
   if (error) return { error: "Não foi possível criar o lead." };
@@ -81,6 +83,7 @@ export async function updateLead(
     insta_link: parsed.data.insta_link ?? null,
     descricao: parsed.data.descricao ?? null,
     abordado_por: parsed.data.abordado_por ?? null,
+    nicho: parsed.data.nicho ?? null,
   };
 
   if (formData.has("resultado")) {

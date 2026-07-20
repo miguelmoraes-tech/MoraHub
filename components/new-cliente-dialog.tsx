@@ -131,6 +131,17 @@ export function NewClienteDialog() {
               </div>
             </div>
 
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-400">
+                Segmento
+              </label>
+              <input
+                name="segmento"
+                placeholder="Ex: Saúde, Varejo, Educação..."
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+
             {state && "error" in state && (
               <p className="rounded-lg border border-rose-900/50 bg-rose-950/40 px-3 py-2 text-sm text-rose-300">
                 {state.error}

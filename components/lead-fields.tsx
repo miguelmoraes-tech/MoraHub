@@ -88,15 +88,26 @@ export function LeadFields({ lead }: { lead?: Lead }) {
         />
       </div>
 
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-zinc-400">
-          Abordado por
-        </label>
-        <input
-          name="abordado_por"
-          defaultValue={lead?.abordado_por ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-        />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-zinc-400">
+            Abordado por
+          </label>
+          <input
+            name="abordado_por"
+            defaultValue={lead?.abordado_por ?? ""}
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-zinc-400">Nicho</label>
+          <input
+            name="nicho"
+            placeholder="Ex: Saúde, Varejo, Educação..."
+            defaultValue={lead?.nicho ?? ""}
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
       </div>
     </div>
   );

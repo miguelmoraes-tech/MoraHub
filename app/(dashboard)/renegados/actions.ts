@@ -31,6 +31,7 @@ function parseRenegadoForm(formData: FormData) {
     abordado_por: formData.get("abordado_por") || "Miguel (Fundador)",
     motivo_negou: textOrNull(formData.get("motivo_negou")) ?? undefined,
     data_abordagem: textOrNull(formData.get("data_abordagem")) ?? undefined,
+    nicho: textOrNull(formData.get("nicho")) ?? undefined,
   });
 }
 
@@ -58,6 +59,7 @@ export async function createRenegado(
     abordado_por: parsed.data.abordado_por,
     motivo_negou: parsed.data.motivo_negou ?? null,
     data_abordagem: parsed.data.data_abordagem ?? null,
+    nicho: parsed.data.nicho ?? null,
   });
   if (error) return { error: "Não foi possível criar o renegado." };
 
@@ -89,6 +91,7 @@ export async function updateRenegado(
       abordado_por: parsed.data.abordado_por,
       motivo_negou: parsed.data.motivo_negou ?? null,
       data_abordagem: parsed.data.data_abordagem ?? null,
+      nicho: parsed.data.nicho ?? null,
     })
     .eq("id", renegadoId);
   if (error) return { error: "Não foi possível atualizar o renegado." };
