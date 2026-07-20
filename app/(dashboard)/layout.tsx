@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/sidebar";
+import { VencimentosBanner } from "@/components/vencimentos-banner";
+import { getVencimentoAlertas } from "@/lib/vencimentos/get-alerts";
 
 export default async function DashboardLayout({
   children,
@@ -16,10 +18,15 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  const alertas = await getVencimentoAlertas();
+
   return (
     <div className="flex flex-1">
       <Sidebar userEmail={user.email ?? ""} />
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      <main className="flex flex-1 flex-col overflow-y-auto">
+        <VencimentosBanner alertas={alertas} />
+        {children}
+      </main>
     </div>
   );
 }
