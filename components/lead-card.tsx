@@ -19,6 +19,7 @@ import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { LeadFields } from "@/components/lead-fields";
 import { ResultadoFields } from "@/components/resultado-fields";
 import { StatusChip } from "@/components/status-chip";
+import { LeadDetailDialog } from "@/components/lead-detail-dialog";
 
 const RESULTADO_LABEL = {
   sem_resposta: "Sem resposta",
@@ -118,9 +119,12 @@ export function LeadCard({ lead }: { lead: Lead }) {
             <p className="truncate text-xs text-zinc-500">{lead.contato}</p>
           )}
         </div>
-        <StatusChip tone={lead.status === "abordado" ? "emerald" : "amber"}>
-          {lead.status === "abordado" ? "Abordado" : "A abordar"}
-        </StatusChip>
+        <div className="flex shrink-0 items-center gap-1">
+          <LeadDetailDialog lead={lead} />
+          <StatusChip tone={lead.status === "abordado" ? "emerald" : "amber"}>
+            {lead.status === "abordado" ? "Abordado" : "A abordar"}
+          </StatusChip>
+        </div>
       </div>
 
       {lead.descricao && (
