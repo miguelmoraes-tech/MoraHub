@@ -160,6 +160,8 @@ export interface Lead {
   motivo_negou: string | null;
   abordado_por: string | null;
   nicho: string | null;
+  previa_enviada: boolean;
+  data_previa: string | null;
   created_at: string;
 }
 

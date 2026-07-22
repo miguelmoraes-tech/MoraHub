@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { LeadSchema, LeadResultadoSchema } from "@/lib/validations/lead";
+import {
+  LeadSchema,
+  LeadResultadoSchema,
+  LeadPreviaSchema,
+} from "@/lib/validations/lead";
 import type { ActionState } from "@/lib/actions/types";
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -107,6 +111,22 @@ export async function updateLead(
       parsedResultado.data.resultado === "negou"
         ? parsedResultado.data.motivo_negou
         : null;
+  }
+
+  if (formData.has("previa_section")) {
+    const parsedPrevia = LeadPreviaSchema.safeParse({
+      previa_enviada: formData.get("previa_enviada") === "on",
+      data_previa: textOrNull(formData.get("data_previa")) ?? undefined,
+    });
+    if (!parsedPrevia.success) {
+      return {
+        error: parsedPrevia.error.issues[0]?.message ?? "Dados inválidos.",
+      };
+    }
+    update.previa_enviada = parsedPrevia.data.previa_enviada;
+    update.data_previa = parsedPrevia.data.previa_enviada
+      ? parsedPrevia.data.data_previa ?? null
+      : null;
   }
 
   const { supabase } = await requireUser();

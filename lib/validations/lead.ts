@@ -22,3 +22,10 @@ export const LeadResultadoSchema = z.object({
 });
 
 export type LeadResultadoInput = z.infer<typeof LeadResultadoSchema>;
+
+export const LeadPreviaSchema = z.object({
+  previa_enviada: z.boolean(),
+  data_previa: z.string().optional(),
+});
+
+export type LeadPreviaInput = z.infer<typeof LeadPreviaSchema>;

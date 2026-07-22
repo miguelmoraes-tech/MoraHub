@@ -8,9 +8,14 @@ import { NewLeadDialog } from "@/components/new-lead-dialog";
 import { ExportButton } from "@/components/export-button";
 import { SegmentFilter } from "@/components/segment-filter";
 
+const PREVIA_OPTIONS = ["Prévia enviada", "Prévia pendente"];
+
 export function LeadsBoard({ leads }: { leads: Lead[] }) {
   const [tab, setTab] = useState<"abordar" | "abordado">("abordar");
   const [nicho, setNicho] = useState("");
+  const [previaFiltro, setPreviaFiltro] = useState<"" | "enviada" | "pendente">(
+    ""
+  );
 
   const nichos = useMemo(
     () =>
@@ -23,7 +28,12 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
   const porNicho = nicho ? leads.filter((l) => l.nicho === nicho) : leads;
   const aAbordar = porNicho.filter((lead) => lead.status === "abordar");
   const abordados = porNicho.filter((lead) => lead.status === "abordado");
-  const list = tab === "abordar" ? aAbordar : abordados;
+  const abordadosFiltrados = previaFiltro
+    ? abordados.filter((lead) =>
+        previaFiltro === "enviada" ? lead.previa_enviada : !lead.previa_enviada
+      )
+    : abordados;
+  const list = tab === "abordar" ? aAbordar : abordadosFiltrados;
 
   const exportHref = nicho
     ? `/api/export/leads?nicho=${encodeURIComponent(nicho)}`
@@ -76,6 +86,29 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
             options={nichos}
             allLabel="Todos os nichos"
             onChange={setNicho}
+          />
+        )}
+
+        {tab === "abordado" && abordados.length > 0 && (
+          <SegmentFilter
+            value={
+              previaFiltro === "enviada"
+                ? "Prévia enviada"
+                : previaFiltro === "pendente"
+                  ? "Prévia pendente"
+                  : ""
+            }
+            options={PREVIA_OPTIONS}
+            allLabel="Todas as prévias"
+            onChange={(value) =>
+              setPreviaFiltro(
+                value === "Prévia enviada"
+                  ? "enviada"
+                  : value === "Prévia pendente"
+                    ? "pendente"
+                    : ""
+              )
+            }
           />
         )}
       </div>

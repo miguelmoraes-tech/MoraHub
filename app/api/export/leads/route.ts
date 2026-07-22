@@ -34,6 +34,11 @@ const COLUMNS: ExportColumn<Lead>[] = [
   { header: "Motivo da negativa", value: (l) => l.motivo_negou },
   { header: "Abordado por", value: (l) => l.abordado_por },
   { header: "Nicho", value: (l) => l.nicho },
+  { header: "Prévia enviada", value: (l) => simNao(l.previa_enviada) },
+  {
+    header: "Data da prévia",
+    value: (l) => (l.data_previa ? formatDate(l.data_previa) : null),
+  },
   { header: "Criado em", value: (l) => formatDate(l.created_at.slice(0, 10)) },
 ];
 

@@ -8,8 +8,10 @@ import {
   Globe,
   AtSign,
   ExternalLink,
+  Send,
 } from "lucide-react";
 import type { Lead } from "@/lib/types";
+import { formatDate } from "@/lib/format";
 import {
   updateLead,
   marcarAbordado,
@@ -18,6 +20,7 @@ import {
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { LeadFields } from "@/components/lead-fields";
 import { ResultadoFields } from "@/components/resultado-fields";
+import { PreviaFields } from "@/components/previa-fields";
 import { StatusChip } from "@/components/status-chip";
 import { LeadDetailDialog } from "@/components/lead-detail-dialog";
 
@@ -51,7 +54,12 @@ export function LeadCard({ lead }: { lead: Lead }) {
         className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4"
       >
         <LeadFields lead={lead} />
-        {lead.status === "abordado" && <ResultadoFields lead={lead} />}
+        {lead.status === "abordado" && (
+          <>
+            <ResultadoFields lead={lead} />
+            <PreviaFields lead={lead} />
+          </>
+        )}
         {updateState && "error" in updateState && (
           <p className="text-xs text-rose-400">{updateState.error}</p>
         )}
@@ -133,7 +141,16 @@ export function LeadCard({ lead }: { lead: Lead }) {
         </p>
       )}
 
-      {lead.nicho && <StatusChip tone="copper">{lead.nicho}</StatusChip>}
+      <div className="flex flex-wrap items-center gap-2">
+        {lead.nicho && <StatusChip tone="copper">{lead.nicho}</StatusChip>}
+        {lead.previa_enviada && (
+          <StatusChip tone="sky">
+            <Send className="h-3 w-3" />
+            Prévia enviada
+            {lead.data_previa && ` · ${formatDate(lead.data_previa)}`}
+          </StatusChip>
+        )}
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
         {lead.tem_site && (

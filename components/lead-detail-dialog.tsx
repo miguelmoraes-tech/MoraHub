@@ -9,13 +9,16 @@ import {
   Globe,
   AtSign,
   ExternalLink,
+  Send,
 } from "lucide-react";
 import type { Lead } from "@/lib/types";
 import { updateLead, deleteLead } from "@/app/(dashboard)/leads/actions";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { LeadFields } from "@/components/lead-fields";
 import { ResultadoFields } from "@/components/resultado-fields";
+import { PreviaFields } from "@/components/previa-fields";
 import { StatusChip } from "@/components/status-chip";
+import { formatDate } from "@/lib/format";
 
 const RESULTADO_LABEL = {
   sem_resposta: "Sem resposta",
@@ -73,7 +76,12 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
             {mode === "edit" ? (
               <form action={updateFormAction} className="space-y-4">
                 <LeadFields lead={lead} />
-                {lead.status === "abordado" && <ResultadoFields lead={lead} />}
+                {lead.status === "abordado" && (
+                  <>
+                    <ResultadoFields lead={lead} />
+                    <PreviaFields lead={lead} />
+                  </>
+                )}
                 {updateState && "error" in updateState && (
                   <p className="rounded-lg border border-rose-900/50 bg-rose-950/40 px-3 py-2 text-sm text-rose-300">
                     {updateState.error}
@@ -106,6 +114,13 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
                   </StatusChip>
                   {lead.nicho && (
                     <StatusChip tone="copper">{lead.nicho}</StatusChip>
+                  )}
+                  {lead.previa_enviada && (
+                    <StatusChip tone="sky">
+                      <Send className="h-3 w-3" />
+                      Prévia enviada
+                      {lead.data_previa && ` · ${formatDate(lead.data_previa)}`}
+                    </StatusChip>
                   )}
                 </div>
 
