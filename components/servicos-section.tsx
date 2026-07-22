@@ -27,7 +27,7 @@ function NewServicoForm({ clienteId }: { clienteId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300"
+        className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
       >
         <Plus className="h-3.5 w-3.5" />
         Adicionar serviço
@@ -46,7 +46,7 @@ function NewServicoForm({ clienteId }: { clienteId: string }) {
         required
         autoFocus
         placeholder="Nome do serviço"
-        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
       />
       <button
         type="button"
@@ -58,7 +58,7 @@ function NewServicoForm({ clienteId }: { clienteId: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+        className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
       >
         {pending ? "Salvando..." : "Salvar"}
       </button>
@@ -93,7 +93,7 @@ function ServicoRow({
           required
           autoFocus
           defaultValue={servico.nome}
-          className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
         <button
           type="button"
@@ -105,7 +105,7 @@ function ServicoRow({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
         >
           {pending ? "Salvando..." : "Salvar"}
         </button>

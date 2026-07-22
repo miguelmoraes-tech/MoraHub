@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState } from "react";
 import { login } from "@/lib/actions/auth";
 
@@ -10,8 +11,16 @@ export default function LoginPage() {
     <div className="flex flex-1 items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
+          <Image
+            src="/logo.png"
+            alt="Mora HUB"
+            width={80}
+            height={40}
+            className="mx-auto mb-4 h-10 w-auto object-contain"
+            priority
+          />
           <h1 className="text-xl font-semibold tracking-tight text-zinc-50">
-            Hub Empresarial
+            Mora <span className="text-copper-400">HUB</span>
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
             Entre com sua conta para continuar
@@ -36,7 +45,7 @@ export default function LoginPage() {
               required
               autoComplete="email"
               placeholder="voce@empresa.com"
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
             />
           </div>
 
@@ -54,7 +63,7 @@ export default function LoginPage() {
               required
               autoComplete="current-password"
               placeholder="••••••••"
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
             />
           </div>
 
@@ -67,7 +76,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={pending}
-            className="w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg bg-copper-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {pending ? "Entrando..." : "Entrar"}
           </button>

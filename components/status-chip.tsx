@@ -4,7 +4,7 @@ const TONES = {
   rose: "bg-rose-500/10 text-rose-400 border-rose-500/20",
   sky: "bg-sky-500/10 text-sky-400 border-sky-500/20",
   zinc: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
-  indigo: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+  copper: "bg-copper-500/10 text-copper-400 border-copper-500/20",
 } as const;
 
 export type ChipTone = keyof typeof TONES;

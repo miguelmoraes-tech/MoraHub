@@ -25,7 +25,7 @@ export function NewRenegadoDialog() {
       <button
         type="button"
         onClick={() => dialogRef.current?.showModal()}
-        className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+        className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
       >
         <Plus className="h-4 w-4" />
         Novo renegado
@@ -72,7 +72,7 @@ export function NewRenegadoDialog() {
               <button
                 type="submit"
                 disabled={pending}
-                className="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+                className="rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-copper-500 disabled:opacity-60"
               >
                 {pending ? "Salvando..." : "Criar renegado"}
               </button>

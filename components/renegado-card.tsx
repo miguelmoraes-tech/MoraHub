@@ -41,7 +41,7 @@ export function RenegadoCard({ renegado }: { renegado: Renegado }) {
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
           >
             {pending ? "Salvando..." : "Salvar"}
           </button>
@@ -67,7 +67,7 @@ export function RenegadoCard({ renegado }: { renegado: Renegado }) {
         </p>
       )}
 
-      {renegado.nicho && <StatusChip tone="indigo">{renegado.nicho}</StatusChip>}
+      {renegado.nicho && <StatusChip tone="copper">{renegado.nicho}</StatusChip>}
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
         {renegado.tem_site && (

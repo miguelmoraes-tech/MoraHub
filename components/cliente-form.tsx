@@ -54,7 +54,7 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
               name="nome"
               defaultValue={cliente.nome}
               required
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
             />
           </div>
           <div className="space-y-1.5">
@@ -64,7 +64,7 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
             <input
               name="telefone"
               defaultValue={cliente.telefone ?? ""}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
             />
           </div>
           <div className="space-y-1.5">
@@ -75,7 +75,7 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
               name="email"
               type="email"
               defaultValue={cliente.email ?? ""}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
             />
           </div>
         </div>
@@ -86,7 +86,7 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
             name="resumo"
             rows={2}
             defaultValue={cliente.resumo ?? ""}
-            className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         </div>
 
@@ -98,7 +98,7 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
             name="site_link"
             defaultValue={cliente.site_link ?? ""}
             placeholder="https://..."
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         </div>
 
@@ -108,7 +108,7 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
             <select
               name="status"
               defaultValue={cliente.status}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
             >
               <option value="ativo">Ativo</option>
               <option value="em_andamento">Em andamento</option>
@@ -124,7 +124,7 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
               name="segmento"
               placeholder="Ex: Saúde, Varejo, Educação..."
               defaultValue={cliente.segmento ?? ""}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
             />
           </div>
           <div className="space-y-1.5">
@@ -134,7 +134,7 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
             <input
               name="abordado_por"
               defaultValue={cliente.abordado_por ?? ""}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
             />
           </div>
         </div>
@@ -149,7 +149,7 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
           <button
             type="submit"
             disabled={pending}
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-copper-500 disabled:opacity-60"
           >
             {pending ? "Salvando..." : "Salvar alterações"}
           </button>

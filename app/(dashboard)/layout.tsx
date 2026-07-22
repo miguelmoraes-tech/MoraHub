@@ -21,7 +21,7 @@ export default async function DashboardLayout({
   const alertas = await getVencimentoAlertas();
 
   return (
-    <div className="flex flex-1">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar userEmail={user.email ?? ""} />
       <main className="flex flex-1 flex-col overflow-y-auto">
         <VencimentosBanner alertas={alertas} />

@@ -90,7 +90,7 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
                   <button
                     type="submit"
                     disabled={updatePending}
-                    className="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+                    className="rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-copper-500 disabled:opacity-60"
                   >
                     {updatePending ? "Salvando..." : "Salvar"}
                   </button>
@@ -105,7 +105,7 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
                     {lead.status === "abordado" ? "Abordado" : "A abordar"}
                   </StatusChip>
                   {lead.nicho && (
-                    <StatusChip tone="indigo">{lead.nicho}</StatusChip>
+                    <StatusChip tone="copper">{lead.nicho}</StatusChip>
                   )}
                 </div>
 
@@ -136,7 +136,7 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
                           href={lead.site_link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-0.5 text-indigo-400 hover:text-indigo-300"
+                          className="flex items-center gap-0.5 text-copper-400 hover:text-copper-300"
                         >
                           <ExternalLink className="h-3 w-3" />
                         </a>
@@ -155,7 +155,7 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
                           href={lead.insta_link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-0.5 text-indigo-400 hover:text-indigo-300"
+                          className="flex items-center gap-0.5 text-copper-400 hover:text-copper-300"
                         >
                           <ExternalLink className="h-3 w-3" />
                         </a>
@@ -225,7 +225,7 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
                   <button
                     type="button"
                     onClick={() => setMode("edit")}
-                    className="flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300"
+                    className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                     Editar

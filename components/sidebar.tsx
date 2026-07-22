@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -76,7 +77,7 @@ function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
                 href={item.href}
                 className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-indigo-600/15 text-indigo-300"
+                    ? "bg-copper-600/15 text-copper-300"
                     : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
                 }`}
               >
@@ -94,12 +95,17 @@ function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
 export function Sidebar({ userEmail }: { userEmail: string }) {
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
-      <div className="flex items-center gap-2 px-5 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
-          H
-        </div>
-        <span className="text-sm font-semibold text-zinc-100">
-          Hub Empresarial
+      <div className="flex items-center gap-2.5 px-5 py-6">
+        <Image
+          src="/logo.png"
+          alt="Mora HUB"
+          width={56}
+          height={28}
+          className="h-7 w-auto shrink-0 object-contain"
+          priority
+        />
+        <span className="text-[15px] font-semibold tracking-tight text-zinc-50">
+          Mora <span className="text-copper-400">HUB</span>
         </span>
       </div>
 

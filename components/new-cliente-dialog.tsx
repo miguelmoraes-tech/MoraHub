@@ -21,7 +21,7 @@ export function NewClienteDialog() {
       <button
         type="button"
         onClick={() => dialogRef.current?.showModal()}
-        className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+        className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
       >
         <Plus className="h-4 w-4" />
         Novo cliente
@@ -65,7 +65,7 @@ export function NewClienteDialog() {
               <input
                 name="nome"
                 required
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
               />
             </div>
 
@@ -77,7 +77,7 @@ export function NewClienteDialog() {
                 <input
                   name="telefone"
                   placeholder="(00) 00000-0000"
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
                 />
               </div>
               <div className="space-y-1.5">
@@ -88,7 +88,7 @@ export function NewClienteDialog() {
                   name="email"
                   type="email"
                   placeholder="contato@empresa.com"
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
                 />
               </div>
             </div>
@@ -100,7 +100,7 @@ export function NewClienteDialog() {
               <textarea
                 name="resumo"
                 rows={2}
-                className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
               />
             </div>
 
@@ -112,7 +112,7 @@ export function NewClienteDialog() {
                 <select
                   name="status"
                   defaultValue="em_andamento"
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
                 >
                   <option value="ativo">Ativo</option>
                   <option value="em_andamento">Em andamento</option>
@@ -126,7 +126,7 @@ export function NewClienteDialog() {
                 </label>
                 <input
                   name="abordado_por"
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
                 />
               </div>
             </div>
@@ -138,7 +138,7 @@ export function NewClienteDialog() {
               <input
                 name="segmento"
                 placeholder="Ex: Saúde, Varejo, Educação..."
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
               />
             </div>
 
@@ -159,7 +159,7 @@ export function NewClienteDialog() {
               <button
                 type="submit"
                 disabled={pending}
-                className="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+                className="rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-copper-500 disabled:opacity-60"
               >
                 {pending ? "Salvando..." : "Criar cliente"}
               </button>

@@ -26,7 +26,7 @@ function GastoFields({
           name="nome"
           required
           defaultValue={gasto?.nome}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -38,7 +38,7 @@ function GastoFields({
           min="0"
           required
           defaultValue={gasto?.valor}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -48,7 +48,7 @@ function GastoFields({
           type="date"
           required
           defaultValue={gasto?.data ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -56,7 +56,7 @@ function GastoFields({
         <select
           name="tipo"
           defaultValue={gasto?.tipo ?? "pontual"}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         >
           <option value="fixo">Fixo</option>
           <option value="pontual">Pontual</option>
@@ -69,7 +69,7 @@ function GastoFields({
         <select
           name="recorrencia"
           defaultValue={gasto?.recorrencia ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         >
           <option value="">Nenhuma</option>
           <option value="Mensal">Mensal</option>
@@ -84,7 +84,7 @@ function GastoFields({
         <select
           name="cliente_id"
           defaultValue={gasto?.cliente_id ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         >
           <option value="">Nenhum</option>
           {clientes.map((cliente) => (
@@ -114,7 +114,7 @@ function NewGastoForm({ clientes }: { clientes: Cliente[] }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+        className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
       >
         <Plus className="h-4 w-4" />
         Novo gasto
@@ -143,7 +143,7 @@ function NewGastoForm({ clientes }: { clientes: Cliente[] }) {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
         >
           {pending ? "Salvando..." : "Salvar"}
         </button>
@@ -180,7 +180,7 @@ function GastoRow({ gasto, clientes }: { gasto: Gasto; clientes: Cliente[] }) {
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
           >
             {pending ? "Salvando..." : "Salvar"}
           </button>

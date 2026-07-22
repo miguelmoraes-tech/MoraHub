@@ -8,8 +8,14 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-space-grotesk);
   --font-mono: var(--font-geist-mono);
+
+  /* Burnt copper — brand accent (forge / transformation) */
+  --color-copper-300: #eab48c;
+  --color-copper-400: #e0873f;
+  --color-copper-500: #cc5a1f;
+  --color-copper-600: #a83e18;
 }
 
 body {
@@ -19,6 +25,6 @@ body {
 }
 
 ::selection {
-  background: #6366f1;
+  background: #a83e18;
   color: #fff;
 }

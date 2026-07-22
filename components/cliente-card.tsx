@@ -27,7 +27,7 @@ export function ClienteCard({ cliente }: { cliente: Cliente }) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-400 group-hover:bg-zinc-800/80 group-hover:text-indigo-400">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-400 group-hover:bg-zinc-800/80 group-hover:text-copper-400">
             <FolderClosed className="h-4.5 w-4.5" />
           </div>
           <div className="min-w-0">
@@ -51,7 +51,7 @@ export function ClienteCard({ cliente }: { cliente: Cliente }) {
       )}
 
       {cliente.segmento && (
-        <StatusChip tone="indigo">{cliente.segmento}</StatusChip>
+        <StatusChip tone="copper">{cliente.segmento}</StatusChip>
       )}
     </Link>
   );

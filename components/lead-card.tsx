@@ -66,7 +66,7 @@ export function LeadCard({ lead }: { lead: Lead }) {
           <button
             type="submit"
             disabled={updatePending}
-            className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
           >
             {updatePending ? "Salvando..." : "Salvar"}
           </button>
@@ -99,7 +99,7 @@ export function LeadCard({ lead }: { lead: Lead }) {
           <button
             type="submit"
             disabled={marcarPending}
-            className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
           >
             {marcarPending ? "Salvando..." : "Confirmar"}
           </button>
@@ -133,7 +133,7 @@ export function LeadCard({ lead }: { lead: Lead }) {
         </p>
       )}
 
-      {lead.nicho && <StatusChip tone="indigo">{lead.nicho}</StatusChip>}
+      {lead.nicho && <StatusChip tone="copper">{lead.nicho}</StatusChip>}
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
         {lead.tem_site && (
@@ -230,7 +230,7 @@ export function LeadCard({ lead }: { lead: Lead }) {
           <button
             type="button"
             onClick={() => setMode("marcar")}
-            className="flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300"
+            className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
             Marcar como abordado

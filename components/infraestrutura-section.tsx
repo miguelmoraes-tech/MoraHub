@@ -22,7 +22,7 @@ function InfraestruturaFields({ infra }: { infra?: Infraestrutura }) {
           name="dominio"
           required
           defaultValue={infra?.dominio}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -32,7 +32,7 @@ function InfraestruturaFields({ infra }: { infra?: Infraestrutura }) {
         <input
           name="hospedagem"
           defaultValue={infra?.hospedagem ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -40,7 +40,7 @@ function InfraestruturaFields({ infra }: { infra?: Infraestrutura }) {
         <input
           name="servidor"
           defaultValue={infra?.servidor ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -48,7 +48,7 @@ function InfraestruturaFields({ infra }: { infra?: Infraestrutura }) {
         <input
           name="dns"
           defaultValue={infra?.dns ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -56,7 +56,7 @@ function InfraestruturaFields({ infra }: { infra?: Infraestrutura }) {
         <input
           name="ssl"
           defaultValue={infra?.ssl ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -64,7 +64,7 @@ function InfraestruturaFields({ infra }: { infra?: Infraestrutura }) {
         <input
           name="cdn"
           defaultValue={infra?.cdn ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="col-span-2 space-y-1">
@@ -74,7 +74,7 @@ function InfraestruturaFields({ infra }: { infra?: Infraestrutura }) {
         <input
           name="contas_email"
           defaultValue={infra?.contas_email ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="col-span-2 space-y-1">
@@ -84,7 +84,7 @@ function InfraestruturaFields({ infra }: { infra?: Infraestrutura }) {
         <input
           name="tecnologias"
           defaultValue={infra?.tecnologias ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -95,7 +95,7 @@ function InfraestruturaFields({ infra }: { infra?: Infraestrutura }) {
           name="data_renovacao"
           type="date"
           defaultValue={infra?.data_renovacao ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="col-span-2 space-y-1 sm:col-span-4">
@@ -106,7 +106,7 @@ function InfraestruturaFields({ infra }: { infra?: Infraestrutura }) {
           name="observacoes"
           rows={2}
           defaultValue={infra?.observacoes ?? ""}
-          className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
     </div>
@@ -130,7 +130,7 @@ function NewInfraestruturaForm({ clienteId }: { clienteId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300"
+        className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
       >
         <Plus className="h-3.5 w-3.5" />
         Adicionar infraestrutura
@@ -159,7 +159,7 @@ function NewInfraestruturaForm({ clienteId }: { clienteId: string }) {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
         >
           {pending ? "Salvando..." : "Salvar"}
         </button>
@@ -202,7 +202,7 @@ function InfraestruturaRow({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
           >
             {pending ? "Salvando..." : "Salvar"}
           </button>

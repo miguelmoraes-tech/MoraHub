@@ -51,7 +51,7 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
             onClick={() => setTab("abordar")}
             className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
               tab === "abordar"
-                ? "bg-indigo-600 text-white"
+                ? "bg-copper-600 text-white"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
@@ -62,7 +62,7 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
             onClick={() => setTab("abordado")}
             className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
               tab === "abordado"
-                ? "bg-indigo-600 text-white"
+                ? "bg-copper-600 text-white"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >

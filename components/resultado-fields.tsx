@@ -19,7 +19,7 @@ export function ResultadoFields({ lead }: { lead?: Lead }) {
           onChange={(e) =>
             setResultado(e.target.value as "sem_resposta" | "negou")
           }
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         >
           <option value="sem_resposta">Sem resposta</option>
           <option value="negou">Negou</option>
@@ -34,7 +34,7 @@ export function ResultadoFields({ lead }: { lead?: Lead }) {
             name="motivo_negou"
             required
             defaultValue={lead?.motivo_negou ?? ""}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         </div>
       )}

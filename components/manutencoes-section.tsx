@@ -27,7 +27,7 @@ function ManutencaoFields({
           type="date"
           required
           defaultValue={manutencao?.data}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -37,7 +37,7 @@ function ManutencaoFields({
         <input
           name="responsavel"
           defaultValue={manutencao?.responsavel ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -48,7 +48,7 @@ function ManutencaoFields({
           name="tempo_gasto"
           placeholder="Ex: 2h"
           defaultValue={manutencao?.tempo_gasto ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="space-y-1">
@@ -56,7 +56,7 @@ function ManutencaoFields({
         <select
           name="projeto_id"
           defaultValue={manutencao?.projeto_id ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         >
           <option value="">Nenhum</option>
           {projetos.map((projeto) => (
@@ -74,7 +74,7 @@ function ManutencaoFields({
           name="descricao"
           required
           defaultValue={manutencao?.descricao}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
       <div className="col-span-2 space-y-1 sm:col-span-4">
@@ -85,7 +85,7 @@ function ManutencaoFields({
           name="observacoes"
           rows={2}
           defaultValue={manutencao?.observacoes ?? ""}
-          className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
     </div>
@@ -115,7 +115,7 @@ function NewManutencaoForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300"
+        className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
       >
         <Plus className="h-3.5 w-3.5" />
         Adicionar manutenção
@@ -144,7 +144,7 @@ function NewManutencaoForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
         >
           {pending ? "Salvando..." : "Salvar"}
         </button>
@@ -189,7 +189,7 @@ function ManutencaoRow({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
           >
             {pending ? "Salvando..." : "Salvar"}
           </button>

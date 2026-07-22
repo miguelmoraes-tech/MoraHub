@@ -16,7 +16,7 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
             name="nome"
             required
             defaultValue={renegado?.nome}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         </div>
         <div className="col-span-2 space-y-1 sm:col-span-1">
@@ -27,7 +27,7 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
             name="contato"
             placeholder="Telefone, e-mail..."
             defaultValue={renegado?.contato ?? ""}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         </div>
       </div>
@@ -40,7 +40,7 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
               name="tem_site"
               checked={temSite}
               onChange={(e) => setTemSite(e.target.checked)}
-              className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-indigo-600"
+              className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-copper-600"
             />
             Tem site
           </label>
@@ -49,7 +49,7 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
               name="site_link"
               placeholder="https://..."
               defaultValue={renegado?.site_link ?? ""}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
             />
           )}
         </div>
@@ -60,7 +60,7 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
               name="tem_insta"
               checked={temInsta}
               onChange={(e) => setTemInsta(e.target.checked)}
-              className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-indigo-600"
+              className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-copper-600"
             />
             Tem Instagram
           </label>
@@ -69,7 +69,7 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
               name="insta_link"
               placeholder="https://instagram.com/..."
               defaultValue={renegado?.insta_link ?? ""}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
             />
           )}
         </div>
@@ -84,7 +84,7 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
           rows={2}
           placeholder="Ex: perfil no Google Business, Instagram..."
           defaultValue={renegado?.descricao ?? ""}
-          className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
 
@@ -96,7 +96,7 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
           <input
             name="abordado_por"
             defaultValue={renegado?.abordado_por ?? "Miguel (Fundador)"}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         </div>
         <div className="space-y-1">
@@ -107,7 +107,7 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
             name="data_abordagem"
             type="date"
             defaultValue={renegado?.data_abordagem ?? ""}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         </div>
       </div>
@@ -120,7 +120,7 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
           <input
             name="motivo_negou"
             defaultValue={renegado?.motivo_negou ?? ""}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         </div>
         <div className="space-y-1">
@@ -129,7 +129,7 @@ export function RenegadoFields({ renegado }: { renegado?: Renegado }) {
             name="nicho"
             placeholder="Ex: Saúde, Varejo, Educação..."
             defaultValue={renegado?.nicho ?? ""}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         </div>
       </div>
