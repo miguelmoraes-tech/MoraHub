@@ -7,7 +7,7 @@ export default async function LeadsPage() {
   const { data: leads } = (await supabase
     .from("leads")
     .select("*")
-    .order("created_at", { ascending: false })) as { data: Lead[] | null };
+    .order("nome")) as { data: Lead[] | null };
 
   return <LeadsBoard leads={leads ?? []} />;
 }

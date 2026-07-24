@@ -7,7 +7,7 @@ export default async function RenegadosPage() {
   const { data: renegados } = (await supabase
     .from("renegados")
     .select("*")
-    .order("created_at", { ascending: false })) as {
+    .order("nome")) as {
     data: Renegado[] | null;
   };
 

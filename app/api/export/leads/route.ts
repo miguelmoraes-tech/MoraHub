@@ -53,10 +53,7 @@ export async function GET(request: NextRequest) {
 
   const nicho = request.nextUrl.searchParams.get("nicho");
 
-  let query = supabase
-    .from("leads")
-    .select("*")
-    .order("created_at", { ascending: false });
+  let query = supabase.from("leads").select("*").order("nome");
   if (nicho) query = query.eq("nicho", nicho);
 
   const { data: leads } = (await query) as { data: Lead[] | null };
