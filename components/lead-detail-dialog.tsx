@@ -10,6 +10,7 @@ import {
   AtSign,
   ExternalLink,
   Send,
+  Phone,
 } from "lucide-react";
 import type { Lead } from "@/lib/types";
 import { updateLead, deleteLead } from "@/app/(dashboard)/leads/actions";
@@ -23,6 +24,12 @@ import { formatDate } from "@/lib/format";
 const RESULTADO_LABEL = {
   sem_resposta: "Sem resposta",
   negou: "Negou",
+} as const;
+
+const TIPO_CONTATO_LABEL = {
+  whatsapp: "WhatsApp",
+  ligacao: "Só ligação",
+  ambos: "Ambos",
 } as const;
 
 export function LeadDetailDialog({ lead }: { lead: Lead }) {
@@ -115,6 +122,12 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
                   {lead.nicho && (
                     <StatusChip tone="copper">{lead.nicho}</StatusChip>
                   )}
+                  {lead.tipo_contato === "ligacao" && (
+                    <StatusChip tone="amber">
+                      <Phone className="h-3 w-3" />
+                      Só ligação
+                    </StatusChip>
+                  )}
                   {lead.previa_enviada && (
                     <StatusChip tone="sky">
                       <Send className="h-3 w-3" />
@@ -131,6 +144,14 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
                     </dt>
                     <dd className="text-sm text-zinc-200">
                       {lead.contato || "Não informado"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-zinc-500">
+                      Tipo de contato
+                    </dt>
+                    <dd className="text-sm text-zinc-200">
+                      {TIPO_CONTATO_LABEL[lead.tipo_contato]}
                     </dd>
                   </div>
                   <div>

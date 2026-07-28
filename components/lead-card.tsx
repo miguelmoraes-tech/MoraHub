@@ -9,6 +9,7 @@ import {
   AtSign,
   ExternalLink,
   Send,
+  Phone,
 } from "lucide-react";
 import type { Lead } from "@/lib/types";
 import { formatDate } from "@/lib/format";
@@ -143,6 +144,12 @@ export function LeadCard({ lead }: { lead: Lead }) {
 
       <div className="flex flex-wrap items-center gap-2">
         {lead.nicho && <StatusChip tone="copper">{lead.nicho}</StatusChip>}
+        {lead.tipo_contato === "ligacao" && (
+          <StatusChip tone="amber">
+            <Phone className="h-3 w-3" />
+            Só ligação
+          </StatusChip>
+        )}
         {lead.previa_enviada && (
           <StatusChip tone="sky">
             <Send className="h-3 w-3" />

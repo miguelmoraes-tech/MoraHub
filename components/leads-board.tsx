@@ -9,6 +9,7 @@ import { ExportButton } from "@/components/export-button";
 import { SegmentFilter } from "@/components/segment-filter";
 
 const PREVIA_OPTIONS = ["Prévia enviada", "Prévia pendente"];
+const CONTATO_OPTIONS = ["WhatsApp/Ambos", "Só ligação"];
 
 export function LeadsBoard({ leads }: { leads: Lead[] }) {
   const [tab, setTab] = useState<"abordar" | "abordado">("abordar");
@@ -16,6 +17,9 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
   const [previaFiltro, setPreviaFiltro] = useState<"" | "enviada" | "pendente">(
     ""
   );
+  const [contatoFiltro, setContatoFiltro] = useState<
+    "" | "whatsapp" | "ligacao"
+  >("");
 
   const nichos = useMemo(
     () =>
@@ -26,8 +30,15 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
   );
 
   const porNicho = nicho ? leads.filter((l) => l.nicho === nicho) : leads;
-  const aAbordar = porNicho.filter((lead) => lead.status === "abordar");
-  const abordados = porNicho.filter((lead) => lead.status === "abordado");
+  const porContato = contatoFiltro
+    ? porNicho.filter((l) =>
+        contatoFiltro === "ligacao"
+          ? l.tipo_contato === "ligacao"
+          : l.tipo_contato !== "ligacao"
+      )
+    : porNicho;
+  const aAbordar = porContato.filter((lead) => lead.status === "abordar");
+  const abordados = porContato.filter((lead) => lead.status === "abordado");
   const abordadosFiltrados = previaFiltro
     ? abordados.filter((lead) =>
         previaFiltro === "enviada" ? lead.previa_enviada : !lead.previa_enviada
@@ -45,7 +56,7 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
         <div>
           <h1 className="text-lg font-semibold text-zinc-100">Leads</h1>
           <p className="text-sm text-zinc-500">
-            {porNicho.length} lead(s) no total
+            {porContato.length} lead(s) no total
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -88,6 +99,27 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
             onChange={setNicho}
           />
         )}
+
+        <SegmentFilter
+          value={
+            contatoFiltro === "whatsapp"
+              ? "WhatsApp/Ambos"
+              : contatoFiltro === "ligacao"
+                ? "Só ligação"
+                : ""
+          }
+          options={CONTATO_OPTIONS}
+          allLabel="Todos os contatos"
+          onChange={(value) =>
+            setContatoFiltro(
+              value === "WhatsApp/Ambos"
+                ? "whatsapp"
+                : value === "Só ligação"
+                  ? "ligacao"
+                  : ""
+            )
+          }
+        />
 
         {tab === "abordado" && abordados.length > 0 && (
           <SegmentFilter

@@ -1,11 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import type { Lead } from "@/lib/types";
+import type { Lead, LeadTipoContato } from "@/lib/types";
+
+const TIPO_CONTATO_OPTIONS: { value: LeadTipoContato; label: string }[] = [
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "ligacao", label: "Só ligação" },
+  { value: "ambos", label: "Ambos" },
+];
 
 export function LeadFields({ lead }: { lead?: Lead }) {
   const [temSite, setTemSite] = useState(lead?.tem_site ?? false);
   const [temInsta, setTemInsta] = useState(lead?.tem_insta ?? false);
+  const [tipoContato, setTipoContato] = useState<LeadTipoContato>(
+    lead?.tipo_contato ?? "whatsapp"
+  );
 
   return (
     <div className="space-y-3">
@@ -29,6 +38,29 @@ export function LeadFields({ lead }: { lead?: Lead }) {
             defaultValue={lead?.contato ?? ""}
             className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-zinc-400">
+          Tipo de contato
+        </label>
+        <input type="hidden" name="tipo_contato" value={tipoContato} />
+        <div className="inline-flex w-full rounded-lg border border-zinc-800 bg-zinc-950 p-1">
+          {TIPO_CONTATO_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setTipoContato(option.value)}
+              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                tipoContato === option.value
+                  ? "bg-copper-600 text-white"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </div>
 

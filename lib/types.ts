@@ -144,6 +144,7 @@ export interface Manutencao {
 
 export type LeadStatus = "abordar" | "abordado";
 export type LeadResultado = "sem_resposta" | "negou";
+export type LeadTipoContato = "whatsapp" | "ligacao" | "ambos";
 
 export interface Lead {
   id: string;
@@ -162,6 +163,7 @@ export interface Lead {
   nicho: string | null;
   previa_enviada: boolean;
   data_previa: string | null;
+  tipo_contato: LeadTipoContato;
   created_at: string;
 }
 

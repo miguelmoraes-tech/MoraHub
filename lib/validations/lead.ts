@@ -10,6 +10,9 @@ export const LeadSchema = z.object({
   descricao: z.string().optional(),
   abordado_por: z.string().optional(),
   nicho: z.string().optional(),
+  tipo_contato: z.enum(["whatsapp", "ligacao", "ambos"], {
+    error: "Selecione o tipo de contato.",
+  }),
 });
 
 export type LeadInput = z.infer<typeof LeadSchema>;

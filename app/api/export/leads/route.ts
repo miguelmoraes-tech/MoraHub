@@ -14,6 +14,12 @@ const RESULTADO_LABEL: Record<NonNullable<Lead["resultado"]>, string> = {
   negou: "Negou",
 };
 
+const TIPO_CONTATO_LABEL: Record<Lead["tipo_contato"], string> = {
+  whatsapp: "WhatsApp",
+  ligacao: "Só ligação",
+  ambos: "Ambos",
+};
+
 function simNao(value: boolean) {
   return value ? "Sim" : "Não";
 }
@@ -34,6 +40,10 @@ const COLUMNS: ExportColumn<Lead>[] = [
   { header: "Motivo da negativa", value: (l) => l.motivo_negou },
   { header: "Abordado por", value: (l) => l.abordado_por },
   { header: "Nicho", value: (l) => l.nicho },
+  {
+    header: "Tipo de contato",
+    value: (l) => TIPO_CONTATO_LABEL[l.tipo_contato],
+  },
   { header: "Prévia enviada", value: (l) => simNao(l.previa_enviada) },
   {
     header: "Data da prévia",
