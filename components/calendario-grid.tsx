@@ -1,13 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import type { CalendarioItem } from "@/lib/vencimentos/types";
 import { todayISO, diffInDays } from "@/lib/vencimentos/dates";
 import { formatDate } from "@/lib/format";
 import { StatusChip } from "@/components/status-chip";
 import { TIPO_LABEL, TIPO_TONE } from "@/lib/vencimentos/labels";
+import { createVencimento } from "@/app/(dashboard)/calendario/actions";
+import { useActionSuccess } from "@/lib/hooks/use-action-success";
 
 const MESES = [
   "Janeiro",
@@ -77,6 +79,80 @@ function buildCells(year: number, monthIndex0: number): Cell[] {
   }
 
   return cells;
+}
+
+function AddLembreteForm({ data }: { data: string }) {
+  const [open, setOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [state, formAction, pending] = useActionState(
+    createVencimento,
+    undefined
+  );
+
+  useActionSuccess(state, () => setOpen(false));
+
+  useEffect(() => {
+    if (!open) formRef.current?.reset();
+  }, [open]);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        Adicionar lembrete nesta data
+      </button>
+    );
+  }
+
+  return (
+    <form
+      ref={formRef}
+      action={formAction}
+      className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-900 p-3"
+    >
+      <input type="hidden" name="data" value={data} />
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-zinc-400">Título *</label>
+        <input
+          name="titulo"
+          required
+          autoFocus
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-zinc-400">Nota</label>
+        <textarea
+          name="nota"
+          rows={2}
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+        />
+      </div>
+      {state && "error" in state && (
+        <p className="text-xs text-rose-400">{state.error}</p>
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="rounded-md px-2.5 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200"
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
+        >
+          {pending ? "Salvando..." : "Salvar"}
+        </button>
+      </div>
+    </form>
+  );
 }
 
 export function CalendarioGrid({ itens }: { itens: CalendarioItem[] }) {
@@ -211,26 +287,15 @@ export function CalendarioGrid({ itens }: { itens: CalendarioItem[] }) {
             </>
           );
 
-          if (count > 0) {
-            return (
-              <button
-                key={cell.iso}
-                type="button"
-                onClick={() => openDay(cell.iso)}
-                className={`flex min-h-[64px] flex-col items-start justify-between gap-1 rounded-lg border p-1.5 text-left transition-colors hover:border-copper-500/60 sm:min-h-[84px] ${cellClass}`}
-              >
-                {content}
-              </button>
-            );
-          }
-
           return (
-            <div
+            <button
               key={cell.iso}
-              className={`flex min-h-[64px] flex-col items-start justify-between gap-1 rounded-lg border p-1.5 sm:min-h-[84px] ${cellClass}`}
+              type="button"
+              onClick={() => openDay(cell.iso)}
+              className={`flex min-h-[64px] flex-col items-start justify-between gap-1 rounded-lg border p-1.5 text-left transition-colors hover:border-copper-500/60 sm:min-h-[84px] ${cellClass}`}
             >
               {content}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -285,6 +350,12 @@ export function CalendarioGrid({ itens }: { itens: CalendarioItem[] }) {
               <p className="text-xs text-zinc-600">
                 Nenhum vencimento nesta data.
               </p>
+            )}
+
+            {selectedDate && (
+              <div className="pt-1">
+                <AddLembreteForm key={selectedDate} data={selectedDate} />
+              </div>
             )}
           </div>
         </div>
