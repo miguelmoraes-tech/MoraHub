@@ -165,9 +165,11 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
         </span>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-2">
+      <div className="border-b border-zinc-900 px-3 pb-4">
         <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} />
+      </div>
 
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
         <div key={accent} className="hub-mode-fade-in space-y-6">
           {isPessoal ? (
             <>
