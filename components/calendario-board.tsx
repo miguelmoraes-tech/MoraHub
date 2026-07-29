@@ -2,8 +2,16 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarClock, Plus, Pencil, Trash2, ExternalLink } from "lucide-react";
-import type { CalendarioItem, CalendarioItemTipo } from "@/lib/vencimentos/types";
+import {
+  CalendarClock,
+  Plus,
+  Pencil,
+  Trash2,
+  ExternalLink,
+  List,
+  Grid3x3,
+} from "lucide-react";
+import type { CalendarioItem } from "@/lib/vencimentos/types";
 import {
   createVencimento,
   updateVencimento,
@@ -12,23 +20,9 @@ import {
 import { formatDate } from "@/lib/format";
 import { todayISO, diffInDays } from "@/lib/vencimentos/dates";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
-import { StatusChip, type ChipTone } from "@/components/status-chip";
-
-const TIPO_LABEL: Record<CalendarioItemTipo, string> = {
-  vencimento: "Vencimento",
-  assinatura_cliente: "Assinatura (cliente)",
-  contrato: "Contrato",
-  juridico: "Jurídico",
-  assinatura: "Assinatura",
-};
-
-const TIPO_TONE: Record<CalendarioItemTipo, ChipTone> = {
-  vencimento: "copper",
-  assinatura_cliente: "sky",
-  contrato: "sky",
-  juridico: "sky",
-  assinatura: "sky",
-};
+import { StatusChip } from "@/components/status-chip";
+import { CalendarioGrid } from "@/components/calendario-grid";
+import { TIPO_LABEL, TIPO_TONE } from "@/lib/vencimentos/labels";
 
 function VencimentoFields({ item }: { item?: CalendarioItem }) {
   return (
@@ -230,6 +224,7 @@ function CalendarioRow({ item, hoje }: { item: CalendarioItem; hoje: string }) {
 }
 
 export function CalendarioBoard({ itens }: { itens: CalendarioItem[] }) {
+  const [view, setView] = useState<"lista" | "calendario">("lista");
   const hoje = useMemo(() => todayISO(), []);
   const ordenados = useMemo(
     () => [...itens].sort((a, b) => a.data.localeCompare(b.data)),
@@ -237,7 +232,9 @@ export function CalendarioBoard({ itens }: { itens: CalendarioItem[] }) {
   );
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
+    <div
+      className={`mx-auto px-6 py-8 ${view === "calendario" ? "max-w-5xl" : "max-w-4xl"}`}
+    >
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-zinc-100">
@@ -248,22 +245,55 @@ export function CalendarioBoard({ itens }: { itens: CalendarioItem[] }) {
         <NewVencimentoForm />
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
-        <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-zinc-100">
-          <CalendarClock className="h-4 w-4 text-zinc-500" />
-          Próximos vencimentos
-        </div>
-
-        {ordenados.length > 0 ? (
-          <div className="space-y-2">
-            {ordenados.map((item) => (
-              <CalendarioRow key={item.id} item={item} hoje={hoje} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-zinc-600">Nenhum vencimento cadastrado.</p>
-        )}
+      <div className="mb-6 inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+        <button
+          type="button"
+          onClick={() => setView("lista")}
+          className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            view === "lista"
+              ? "bg-copper-600 text-white"
+              : "text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          <List className="h-3.5 w-3.5" />
+          Lista
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("calendario")}
+          className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            view === "calendario"
+              ? "bg-copper-600 text-white"
+              : "text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          <Grid3x3 className="h-3.5 w-3.5" />
+          Calendário
+        </button>
       </div>
+
+      {view === "lista" ? (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-zinc-100">
+            <CalendarClock className="h-4 w-4 text-zinc-500" />
+            Próximos vencimentos
+          </div>
+
+          {ordenados.length > 0 ? (
+            <div className="space-y-2">
+              {ordenados.map((item) => (
+                <CalendarioRow key={item.id} item={item} hoje={hoje} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-zinc-600">
+              Nenhum vencimento cadastrado.
+            </p>
+          )}
+        </div>
+      ) : (
+        <CalendarioGrid itens={itens} />
+      )}
     </div>
   );
 }
