@@ -7,6 +7,7 @@ import type { Lead } from "@/lib/types";
 const STATUS_LABEL: Record<Lead["status"], string> = {
   abordar: "A abordar",
   abordado: "Abordado",
+  convertido: "Convertido",
 };
 
 const RESULTADO_LABEL: Record<NonNullable<Lead["resultado"]>, string> = {

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Target } from "lucide-react";
-import type { Lead } from "@/lib/types";
+import type { Lead, Proposta } from "@/lib/types";
 import { LeadCard } from "@/components/lead-card";
 import { NewLeadDialog } from "@/components/new-lead-dialog";
 import { ExportButton } from "@/components/export-button";
@@ -11,8 +11,16 @@ import { SegmentFilter } from "@/components/segment-filter";
 const PREVIA_OPTIONS = ["Prévia enviada", "Prévia pendente"];
 const CONTATO_OPTIONS = ["WhatsApp/Ambos", "Só ligação"];
 
-export function LeadsBoard({ leads }: { leads: Lead[] }) {
-  const [tab, setTab] = useState<"abordar" | "abordado">("abordar");
+export function LeadsBoard({
+  leads,
+  propostas = [],
+}: {
+  leads: Lead[];
+  propostas?: Proposta[];
+}) {
+  const [tab, setTab] = useState<"abordar" | "abordado" | "convertido">(
+    "abordar"
+  );
   const [nicho, setNicho] = useState("");
   const [previaFiltro, setPreviaFiltro] = useState<"" | "enviada" | "pendente">(
     ""
@@ -39,12 +47,29 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
     : porNicho;
   const aAbordar = porContato.filter((lead) => lead.status === "abordar");
   const abordados = porContato.filter((lead) => lead.status === "abordado");
+  const convertidos = porContato.filter((lead) => lead.status === "convertido");
   const abordadosFiltrados = previaFiltro
     ? abordados.filter((lead) =>
         previaFiltro === "enviada" ? lead.previa_enviada : !lead.previa_enviada
       )
     : abordados;
-  const list = tab === "abordar" ? aAbordar : abordadosFiltrados;
+  const list =
+    tab === "abordar"
+      ? aAbordar
+      : tab === "abordado"
+        ? abordadosFiltrados
+        : convertidos;
+
+  const propostasPorLead = useMemo(() => {
+    const map = new Map<string, Proposta[]>();
+    for (const proposta of propostas) {
+      if (!proposta.lead_id) continue;
+      const lista = map.get(proposta.lead_id) ?? [];
+      lista.push(proposta);
+      map.set(proposta.lead_id, lista);
+    }
+    return map;
+  }, [propostas]);
 
   const exportHref = nicho
     ? `/api/export/leads?nicho=${encodeURIComponent(nicho)}`
@@ -88,6 +113,17 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
             }`}
           >
             Abordados ({abordados.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("convertido")}
+            className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              tab === "convertido"
+                ? "bg-copper-600 text-white"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            Convertidos ({convertidos.length})
           </button>
         </div>
 
@@ -148,7 +184,11 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
       {list.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} />
+            <LeadCard
+              key={lead.id}
+              lead={lead}
+              propostas={propostasPorLead.get(lead.id) ?? []}
+            />
           ))}
         </div>
       ) : (
@@ -157,7 +197,9 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
           <p className="text-sm text-zinc-500">
             {tab === "abordar"
               ? "Nenhum lead para abordar."
-              : "Nenhum lead abordado ainda."}
+              : tab === "abordado"
+                ? "Nenhum lead abordado ainda."
+                : "Nenhum lead convertido ainda."}
           </p>
         </div>
       )}

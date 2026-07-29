@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   LeadSchema,
   LeadResultadoSchema,
   LeadPreviaSchema,
 } from "@/lib/validations/lead";
+import { ClienteSchema } from "@/lib/validations/cliente";
 import type { ActionState } from "@/lib/actions/types";
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -176,4 +178,60 @@ export async function deleteLead(leadId: string) {
   const { supabase } = await requireUser();
   await supabase.from("leads").delete().eq("id", leadId);
   revalidatePath("/leads");
+}
+
+export async function convertLeadToCliente(
+  leadId: string,
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = ClienteSchema.safeParse({
+    nome: formData.get("nome"),
+    telefone: textOrNull(formData.get("telefone")) ?? undefined,
+    email: textOrNull(formData.get("email")) ?? undefined,
+    resumo: textOrNull(formData.get("resumo")) ?? undefined,
+    site_link: textOrNull(formData.get("site_link")) ?? undefined,
+    status: formData.get("status") ?? "em_andamento",
+    segmento: textOrNull(formData.get("segmento")) ?? undefined,
+    abordado_por: textOrNull(formData.get("abordado_por")) ?? undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const { supabase, user } = await requireUser();
+  if (!user) return { error: "Sessão expirada. Faça login novamente." };
+
+  const { data: cliente, error } = await supabase
+    .from("clientes")
+    .insert({
+      user_id: user.id,
+      nome: parsed.data.nome,
+      telefone: parsed.data.telefone ?? null,
+      email: parsed.data.email ?? null,
+      resumo: parsed.data.resumo ?? null,
+      site_link: parsed.data.site_link ?? null,
+      status: parsed.data.status,
+      segmento: parsed.data.segmento ?? null,
+      abordado_por: parsed.data.abordado_por ?? null,
+      lead_origem_id: leadId,
+    })
+    .select("id")
+    .single();
+  if (error || !cliente) return { error: "Não foi possível criar o cliente." };
+
+  const { error: updateError } = await supabase
+    .from("leads")
+    .update({ status: "convertido" })
+    .eq("id", leadId);
+  if (updateError) {
+    return {
+      error:
+        "Cliente criado, mas não foi possível atualizar o status do lead.",
+    };
+  }
+
+  revalidatePath("/leads");
+  revalidatePath("/clientes");
+  redirect(`/clientes/${(cliente as { id: string }).id}`);
 }

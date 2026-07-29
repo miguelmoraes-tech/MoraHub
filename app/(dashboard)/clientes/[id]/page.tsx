@@ -12,6 +12,8 @@ import { AcessosSection } from "@/components/acessos-section";
 import { InfraestruturaSection } from "@/components/infraestrutura-section";
 import { ProjetosSection } from "@/components/projetos-section";
 import { ManutencoesSection } from "@/components/manutencoes-section";
+import { PropostasSection } from "@/components/propostas-section";
+import { LeadOrigemCard } from "@/components/lead-origem-card";
 import type {
   Cliente,
   Contrato,
@@ -22,6 +24,7 @@ import type {
   Infraestrutura,
   Projeto,
   Manutencao,
+  Proposta,
 } from "@/lib/types";
 
 export default async function ClienteDetailPage({
@@ -42,6 +45,7 @@ export default async function ClienteDetailPage({
     { data: infraestrutura },
     { data: projetos },
     { data: manutencoes },
+    { data: propostas },
   ] = (await Promise.all([
     supabase.from("clientes").select("*").eq("id", id).single(),
     supabase
@@ -84,6 +88,11 @@ export default async function ClienteDetailPage({
       .select("*")
       .eq("cliente_id", id)
       .order("data", { ascending: false }),
+    supabase
+      .from("propostas")
+      .select("*")
+      .eq("cliente_id", id)
+      .order("versao", { ascending: false }),
   ])) as [
     { data: Cliente | null },
     { data: Contrato[] | null },
@@ -94,9 +103,20 @@ export default async function ClienteDetailPage({
     { data: Infraestrutura[] | null },
     { data: Projeto[] | null },
     { data: Manutencao[] | null },
+    { data: Proposta[] | null },
   ];
 
   if (!cliente) notFound();
+
+  const { data: leadOrigem } = cliente.lead_origem_id
+    ? ((await supabase
+        .from("leads")
+        .select("id, nome, descricao, nicho")
+        .eq("id", cliente.lead_origem_id)
+        .maybeSingle()) as {
+        data: { id: string; nome: string; descricao: string | null; nicho: string | null } | null;
+      })
+    : { data: null };
 
   const contratosList = contratos ?? [];
   const comprovantesList = comprovantes ?? [];
@@ -132,6 +152,10 @@ export default async function ClienteDetailPage({
       </Link>
 
       <ClienteForm cliente={cliente} />
+      {leadOrigem && (
+        <LeadOrigemCard lead={leadOrigem} convertidoEm={cliente.created_at} />
+      )}
+      <PropostasSection clienteId={id} propostas={propostas ?? []} />
       <AssinaturasSection clienteId={id} assinaturas={assinaturas ?? []} />
       <ContratosSection clienteId={id} contratos={contratosComArquivo} />
       <ComprovantesSection clienteId={id} comprovantes={comprovantesComArquivo} />

@@ -12,14 +12,28 @@ import {
   Send,
   Phone,
 } from "lucide-react";
-import type { Lead } from "@/lib/types";
+import type { Lead, Proposta } from "@/lib/types";
 import { updateLead, deleteLead } from "@/app/(dashboard)/leads/actions";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { LeadFields } from "@/components/lead-fields";
 import { ResultadoFields } from "@/components/resultado-fields";
 import { PreviaFields } from "@/components/previa-fields";
-import { StatusChip } from "@/components/status-chip";
+import { StatusChip, type ChipTone } from "@/components/status-chip";
+import { ConvertLeadDialog } from "@/components/convert-lead-dialog";
+import { PropostasSection } from "@/components/propostas-section";
 import { formatDate } from "@/lib/format";
+
+const STATUS_LABEL: Record<Lead["status"], string> = {
+  abordar: "A abordar",
+  abordado: "Abordado",
+  convertido: "Convertido",
+};
+
+const STATUS_TONE: Record<Lead["status"], ChipTone> = {
+  abordar: "amber",
+  abordado: "emerald",
+  convertido: "copper",
+};
 
 const RESULTADO_LABEL = {
   sem_resposta: "Sem resposta",
@@ -32,7 +46,13 @@ const TIPO_CONTATO_LABEL = {
   ambos: "Ambos",
 } as const;
 
-export function LeadDetailDialog({ lead }: { lead: Lead }) {
+export function LeadDetailDialog({
+  lead,
+  propostas = [],
+}: {
+  lead: Lead;
+  propostas?: Proposta[];
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -114,10 +134,8 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
             ) : (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <StatusChip
-                    tone={lead.status === "abordado" ? "emerald" : "amber"}
-                  >
-                    {lead.status === "abordado" ? "Abordado" : "A abordar"}
+                  <StatusChip tone={STATUS_TONE[lead.status]}>
+                    {STATUS_LABEL[lead.status]}
                   </StatusChip>
                   {lead.nicho && (
                     <StatusChip tone="copper">{lead.nicho}</StatusChip>
@@ -228,6 +246,8 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
                   )}
                 </div>
 
+                <PropostasSection leadId={lead.id} propostas={propostas} />
+
                 <div className="flex items-center justify-between border-t border-zinc-800/80 pt-3.5">
                   {confirmingDelete ? (
                     <div className="flex items-center gap-2 text-xs">
@@ -258,14 +278,19 @@ export function LeadDetailDialog({ lead }: { lead: Lead }) {
                       Excluir lead
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setMode("edit")}
-                    className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Editar
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {lead.status !== "convertido" && (
+                      <ConvertLeadDialog lead={lead} />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setMode("edit")}
+                      className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Editar
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

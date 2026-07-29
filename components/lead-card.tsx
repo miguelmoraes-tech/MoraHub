@@ -11,7 +11,7 @@ import {
   Send,
   Phone,
 } from "lucide-react";
-import type { Lead } from "@/lib/types";
+import type { Lead, Proposta } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import {
   updateLead,
@@ -22,15 +22,34 @@ import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { LeadFields } from "@/components/lead-fields";
 import { ResultadoFields } from "@/components/resultado-fields";
 import { PreviaFields } from "@/components/previa-fields";
-import { StatusChip } from "@/components/status-chip";
+import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { LeadDetailDialog } from "@/components/lead-detail-dialog";
+import { ConvertLeadDialog } from "@/components/convert-lead-dialog";
 
 const RESULTADO_LABEL = {
   sem_resposta: "Sem resposta",
   negou: "Negou",
 } as const;
 
-export function LeadCard({ lead }: { lead: Lead }) {
+const STATUS_LABEL: Record<Lead["status"], string> = {
+  abordar: "A abordar",
+  abordado: "Abordado",
+  convertido: "Convertido",
+};
+
+const STATUS_TONE: Record<Lead["status"], ChipTone> = {
+  abordar: "amber",
+  abordado: "emerald",
+  convertido: "copper",
+};
+
+export function LeadCard({
+  lead,
+  propostas = [],
+}: {
+  lead: Lead;
+  propostas?: Proposta[];
+}) {
   const [mode, setMode] = useState<"view" | "edit" | "marcar">("view");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -129,9 +148,9 @@ export function LeadCard({ lead }: { lead: Lead }) {
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <LeadDetailDialog lead={lead} />
-          <StatusChip tone={lead.status === "abordado" ? "emerald" : "amber"}>
-            {lead.status === "abordado" ? "Abordado" : "A abordar"}
+          <LeadDetailDialog lead={lead} propostas={propostas} />
+          <StatusChip tone={STATUS_TONE[lead.status]}>
+            {STATUS_LABEL[lead.status]}
           </StatusChip>
         </div>
       </div>
@@ -250,15 +269,22 @@ export function LeadCard({ lead }: { lead: Lead }) {
           </div>
         )}
 
-        {lead.status === "abordar" && !confirmingDelete && (
-          <button
-            type="button"
-            onClick={() => setMode("marcar")}
-            className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Marcar como abordado
-          </button>
+        {!confirmingDelete && (
+          <div className="flex items-center gap-3">
+            {lead.status === "abordar" && (
+              <button
+                type="button"
+                onClick={() => setMode("marcar")}
+                className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Marcar como abordado
+              </button>
+            )}
+            {lead.status !== "convertido" && (
+              <ConvertLeadDialog lead={lead} />
+            )}
+          </div>
         )}
       </div>
     </div>

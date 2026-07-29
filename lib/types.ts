@@ -11,6 +11,7 @@ export interface Cliente {
   status: ClienteStatus;
   segmento: string | null;
   abordado_por: string | null;
+  lead_origem_id: string | null;
   created_at: string;
 }
 
@@ -142,7 +143,7 @@ export interface Manutencao {
   created_at: string;
 }
 
-export type LeadStatus = "abordar" | "abordado";
+export type LeadStatus = "abordar" | "abordado" | "convertido";
 export type LeadResultado = "sem_resposta" | "negou";
 export type LeadTipoContato = "whatsapp" | "ligacao" | "ambos";
 
@@ -241,6 +242,24 @@ export interface Juridico {
   prazo: string | null;
   status: JuridicoStatus;
   nota: string | null;
+  created_at: string;
+}
+
+export type PropostaStatus = "enviada" | "em_negociacao" | "aceita" | "recusada";
+
+export interface Proposta {
+  id: string;
+  user_id: string;
+  lead_id: string | null;
+  cliente_id: string | null;
+  titulo: string;
+  descricao: string | null;
+  valor: number | null;
+  versao: number;
+  status: PropostaStatus;
+  data_envio: string | null;
+  data_resposta: string | null;
+  observacoes: string | null;
   created_at: string;
 }
 
