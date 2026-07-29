@@ -11,11 +11,17 @@
   --font-sans: var(--font-space-grotesk);
   --font-mono: var(--font-geist-mono);
 
-  /* Burnt copper — brand accent (forge / transformation) */
+  /* Burnt copper — brand accent (forge / transformation), Business mode */
   --color-copper-300: #eab48c;
   --color-copper-400: #e0873f;
   --color-copper-500: #cc5a1f;
   --color-copper-600: #a83e18;
+
+  /* Petrol blue — brand accent, Pessoal mode */
+  --color-petrol-300: #7fb8c9;
+  --color-petrol-400: #3d8fa6;
+  --color-petrol-500: #1c6f85;
+  --color-petrol-600: #0f4c5c;
 }
 
 body {
@@ -27,4 +33,19 @@ body {
 ::selection {
   background: #a83e18;
   color: #fff;
+}
+
+@keyframes hub-mode-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hub-mode-fade-in {
+  animation: hub-mode-fade-in 220ms ease-out;
 }

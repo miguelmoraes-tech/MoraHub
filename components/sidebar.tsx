@@ -15,8 +15,19 @@ import {
   Scale,
   FileText,
   LogOut,
+  LayoutGrid,
+  Landmark,
+  ArrowLeftRight,
+  Tags,
+  Repeat,
+  TrendingUp,
+  Library,
+  FolderKanban,
+  ListChecks,
+  Inbox,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
+import { ModeSwitcher } from "@/components/mode-switcher";
 
 type NavItem = {
   label: string;
@@ -25,10 +36,12 @@ type NavItem = {
   enabled?: boolean;
 };
 
+type Accent = "copper" | "petrol";
+
 const DASHBOARD_ITEMS: NavItem[] = [
-  { label: "Financeiro", href: "/dashboard/financeiro", icon: Wallet },
-  { label: "Clientes", href: "/dashboard/clientes", icon: LayoutDashboard },
-  { label: "Leads", href: "/dashboard/leads", icon: Target },
+  { label: "Financeiro", href: "/dashboard/financeiro", icon: Wallet, enabled: true },
+  { label: "Clientes", href: "/dashboard/clientes", icon: LayoutDashboard, enabled: true },
+  { label: "Leads", href: "/dashboard/leads", icon: Target, enabled: true },
 ];
 
 const GESTAO_ITEMS: NavItem[] = [
@@ -42,7 +55,35 @@ const GESTAO_ITEMS: NavItem[] = [
   { label: "Documentos", href: "/documentos", icon: FileText, enabled: true },
 ];
 
-function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
+const PAINEL_ITEMS: NavItem[] = [
+  { label: "Visão Geral", href: "/pessoal", icon: LayoutGrid, enabled: true },
+];
+
+const FINANCAS_ITEMS: NavItem[] = [
+  { label: "Contas", href: "/pessoal/contas", icon: Landmark, enabled: true },
+  { label: "Transações", href: "/pessoal/transacoes", icon: ArrowLeftRight, enabled: true },
+  { label: "Categorias", href: "/pessoal/categorias", icon: Tags, enabled: true },
+  { label: "Gastos Recorrentes", href: "/pessoal/recorrentes", icon: Repeat, enabled: true },
+  { label: "Investimentos", href: "/pessoal/investimentos", icon: TrendingUp, enabled: true },
+];
+
+const ORGANIZACAO_ITEMS: NavItem[] = [
+  { label: "Documentos", href: "/pessoal/documentos", icon: FileText, enabled: true },
+  { label: "Biblioteca", href: "/pessoal/biblioteca", icon: Library, enabled: true },
+  { label: "Projetos", href: "/pessoal/projetos", icon: FolderKanban, enabled: true },
+  { label: "Tarefas", href: "/pessoal/tarefas", icon: ListChecks, enabled: true },
+  { label: "Inbox", href: "/pessoal/inbox", icon: Inbox, enabled: true },
+];
+
+function NavGroup({
+  title,
+  items,
+  accent,
+}: {
+  title: string;
+  items: NavItem[];
+  accent: Accent;
+}) {
   const pathname = usePathname();
 
   return (
@@ -52,7 +93,11 @@ function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
       </p>
       <ul className="mt-2 space-y-0.5">
         {items.map((item) => {
-          const isActive = item.enabled && pathname.startsWith(item.href);
+          const isActive =
+            item.enabled &&
+            (item.href === "/pessoal"
+              ? pathname === "/pessoal"
+              : pathname.startsWith(item.href));
           const Icon = item.icon;
 
           if (!item.enabled) {
@@ -77,7 +122,9 @@ function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
                 href={item.href}
                 className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-copper-600/15 text-copper-300"
+                    ? accent === "petrol"
+                      ? "bg-petrol-600/15 text-petrol-300"
+                      : "bg-copper-600/15 text-copper-300"
                     : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
                 }`}
               >
@@ -93,6 +140,10 @@ function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
 }
 
 export function Sidebar({ userEmail }: { userEmail: string }) {
+  const pathname = usePathname();
+  const isPessoal = pathname.startsWith("/pessoal");
+  const accent: Accent = isPessoal ? "petrol" : "copper";
+
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
       <div className="flex items-center gap-2.5 px-5 py-6">
@@ -105,13 +156,36 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
           priority
         />
         <span className="text-[15px] font-semibold tracking-tight text-zinc-50">
-          Mora <span className="text-copper-400">HUB</span>
+          Mora{" "}
+          <span
+            className={`transition-colors duration-300 ${isPessoal ? "text-petrol-400" : "text-copper-400"}`}
+          >
+            HUB
+          </span>
         </span>
       </div>
 
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-2">
-        <NavGroup title="Dashboards" items={DASHBOARD_ITEMS} />
-        <NavGroup title="Gestão" items={GESTAO_ITEMS} />
+      <nav className="flex-1 overflow-y-auto px-3 py-2">
+        <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} />
+
+        <div key={accent} className="hub-mode-fade-in space-y-6">
+          {isPessoal ? (
+            <>
+              <NavGroup title="Painel" items={PAINEL_ITEMS} accent={accent} />
+              <NavGroup title="Finanças" items={FINANCAS_ITEMS} accent={accent} />
+              <NavGroup
+                title="Organização"
+                items={ORGANIZACAO_ITEMS}
+                accent={accent}
+              />
+            </>
+          ) : (
+            <>
+              <NavGroup title="Dashboards" items={DASHBOARD_ITEMS} accent={accent} />
+              <NavGroup title="Gestão" items={GESTAO_ITEMS} accent={accent} />
+            </>
+          )}
+        </div>
       </nav>
 
       <div className="border-t border-zinc-900 p-3">

@@ -2,7 +2,9 @@
 
 import * as z from "zod";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { HUB_MODE_COOKIE, MODE_HOME_ROUTE } from "@/lib/hub-mode";
 
 const LoginSchema = z.object({
   email: z.email({ error: "Informe um e-mail válido." }),
@@ -33,7 +35,9 @@ export async function login(
     return { error: "E-mail ou senha incorretos." };
   }
 
-  redirect("/clientes");
+  const cookieStore = await cookies();
+  const lastMode = cookieStore.get(HUB_MODE_COOKIE)?.value;
+  redirect(lastMode === "pessoal" ? MODE_HOME_ROUTE.pessoal : "/clientes");
 }
 
 export async function logout() {

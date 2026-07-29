@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/sidebar";
 import { VencimentosBanner } from "@/components/vencimentos-banner";
+import { PageTransition } from "@/components/page-transition";
 import { getVencimentoAlertas } from "@/lib/vencimentos/get-alerts";
 
 export default async function DashboardLayout({
@@ -25,7 +26,7 @@ export default async function DashboardLayout({
       <Sidebar userEmail={user.email ?? ""} />
       <main className="flex flex-1 flex-col overflow-y-auto">
         <VencimentosBanner alertas={alertas} />
-        {children}
+        <PageTransition>{children}</PageTransition>
       </main>
     </div>
   );

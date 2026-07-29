@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import { AlertTriangle, X } from "lucide-react";
 import type { VencimentoAlerta } from "@/lib/vencimentos/types";
 
@@ -64,11 +65,14 @@ export function VencimentosBanner({
 }: {
   alertas: VencimentoAlerta[];
 }) {
+  const pathname = usePathname();
   const dismissedIds = useSyncExternalStore(
     subscribe,
     getSnapshot,
     getServerSnapshot
   );
+
+  if (pathname.startsWith("/pessoal")) return null;
 
   const visiveis = alertas.filter((a) => !dismissedIds.includes(a.id));
   if (visiveis.length === 0) return null;
