@@ -35,11 +35,11 @@ const GESTAO_ITEMS: NavItem[] = [
   { label: "Clientes", href: "/clientes", icon: Users, enabled: true },
   { label: "Leads", href: "/leads", icon: Target, enabled: true },
   { label: "Renegados", href: "/renegados", icon: UserX, enabled: true },
-  { label: "Assinantes", href: "/assinantes", icon: BadgeCheck },
-  { label: "Calendário", href: "/calendario", icon: CalendarClock },
+  { label: "Assinantes", href: "/assinantes", icon: BadgeCheck, enabled: true },
+  { label: "Calendário", href: "/calendario", icon: CalendarClock, enabled: true },
   { label: "Gastos", href: "/gastos", icon: Receipt, enabled: true },
-  { label: "Jurídico & Contábil", href: "/juridico", icon: Scale },
-  { label: "Documentos", href: "/documentos", icon: FileText },
+  { label: "Jurídico & Contábil", href: "/juridico", icon: Scale, enabled: true },
+  { label: "Documentos", href: "/documentos", icon: FileText, enabled: true },
 ];
 
 function NavGroup({ title, items }: { title: string; items: NavItem[] }) {

@@ -200,13 +200,23 @@ export interface Gasto {
 }
 
 export type DocumentoTipo = "link" | "nota";
+export type DocumentoCategoria =
+  | "Contrato"
+  | "Proposta"
+  | "Briefing"
+  | "Nota fiscal"
+  | "Arquivo do cliente"
+  | "Outro";
 
 export interface Documento {
   id: string;
   user_id: string;
+  cliente_id: string | null;
   titulo: string;
   tipo: DocumentoTipo;
+  categoria: DocumentoCategoria | null;
   conteudo: string | null;
+  arquivo_path: string | null;
   data: string | null;
   created_at: string;
 }

@@ -21,6 +21,16 @@ export async function uploadClienteArquivo(
   return path;
 }
 
+export async function uploadDocumentoArquivo(userId: string, file: File) {
+  const supabase = await createClient();
+  const path = `${userId}/documentos/${Date.now()}-${sanitizeFileName(file.name)}`;
+
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file);
+  if (error) throw error;
+
+  return path;
+}
+
 export async function removeClienteArquivo(path: string) {
   const supabase = await createClient();
   await supabase.storage.from(BUCKET).remove([path]);

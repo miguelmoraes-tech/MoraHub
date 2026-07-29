@@ -12,3 +12,19 @@ export interface VencimentoAlerta {
   diasRestantes: number;
   mensagem: string;
 }
+
+export type CalendarioItemTipo =
+  | "vencimento"
+  | "assinatura_cliente"
+  | "contrato"
+  | "juridico"
+  | "assinatura";
+
+export interface CalendarioItem {
+  id: string;
+  tipo: CalendarioItemTipo;
+  titulo: string;
+  data: string;
+  nota: string | null;
+  href: string | null;
+}
