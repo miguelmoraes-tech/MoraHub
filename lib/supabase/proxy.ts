@@ -1,7 +1,22 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_ROUTES = ["/login"];
+// Exact-path routes usable without a session. Also the set a logged-in user
+// gets bounced away from (see the `user && PUBLIC_ROUTES.includes(path)`
+// check below) — that bounce must NOT apply to /convite/*, since an
+// already-authenticated collaborator still needs to land on that page to
+// accept/decline.
+const PUBLIC_ROUTES = ["/login", "/signup"];
+// Path prefixes usable without a session, but that a logged-in user may
+// still need to visit (e.g. accepting an invite while already signed in).
+const PUBLIC_ROUTE_PREFIXES = ["/convite/"];
+
+function isPublicPath(path: string) {
+  return (
+    PUBLIC_ROUTES.includes(path) ||
+    PUBLIC_ROUTE_PREFIXES.some((prefix) => path.startsWith(prefix))
+  );
+}
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -32,15 +47,14 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isPublicRoute = PUBLIC_ROUTES.includes(path);
 
-  if (!user && !isPublicRoute) {
+  if (!user && !isPublicPath(path)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && isPublicRoute) {
+  if (user && PUBLIC_ROUTES.includes(path)) {
     const url = request.nextUrl.clone();
     url.pathname = "/clientes";
     return NextResponse.redirect(url);
