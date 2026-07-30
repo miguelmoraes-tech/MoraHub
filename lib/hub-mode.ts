@@ -7,6 +7,14 @@ export const MODE_HOME_ROUTE: Record<HubMode, string> = {
   pessoal: "/pessoal",
 };
 
+/** Matches the `perfis.tipo_conta_padrao` check constraint. */
+export type AccountType = "empresarial" | "pessoal";
+
+/** Missing/unrecognized values (e.g. accounts predating this column) fall back to business. */
+export function accountTypeToHubMode(tipo: string | null | undefined): HubMode {
+  return tipo === "pessoal" ? "pessoal" : "business";
+}
+
 /** Client-only — reads the last mode the user picked via the switcher. */
 export function readHubModeCookie(): HubMode | null {
   if (typeof document === "undefined") return null;

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useActionState } from "react";
 import { login } from "@/lib/actions/auth";
 
@@ -81,6 +82,13 @@ export default function LoginPage() {
             {pending ? "Entrando..." : "Entrar"}
           </button>
         </form>
+
+        <p className="mt-6 text-center text-sm text-zinc-500">
+          Não tem conta?{" "}
+          <Link href="/signup" className="font-medium text-copper-400 hover:text-copper-300">
+            Criar conta
+          </Link>
+        </p>
       </div>
     </div>
   );
