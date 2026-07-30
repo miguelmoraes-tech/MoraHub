@@ -14,7 +14,7 @@ export default function LoginPage() {
           <Image
             src="/logo.png"
             alt="Mora HUB"
-            width={80}
+            width={75}
             height={40}
             className="mx-auto mb-4 h-10 w-auto object-contain"
             priority

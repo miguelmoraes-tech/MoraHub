@@ -150,7 +150,7 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
         <Image
           src="/logo.png"
           alt="Mora HUB"
-          width={56}
+          width={53}
           height={28}
           className="h-7 w-auto shrink-0 object-contain"
           priority
