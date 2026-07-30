@@ -12,6 +12,13 @@ function businessLoginRoute(mode: HubMode) {
   return mode === "pessoal" ? MODE_HOME_ROUTE.pessoal : "/clientes";
 }
 
+/** Only accept same-origin relative paths (e.g. "/convite/abc"), to avoid an open redirect. */
+function safeRedirect(value: FormDataEntryValue | null): string | null {
+  if (typeof value !== "string" || value === "") return null;
+  if (!value.startsWith("/") || value.startsWith("//")) return null;
+  return value;
+}
+
 const LoginSchema = z.object({
   email: z.email({ error: "Informe um e-mail válido." }),
   password: z.string().min(1, { error: "Informe a senha." }),
@@ -39,6 +46,26 @@ export async function login(
 
   if (error) {
     return { error: "E-mail ou senha incorretos." };
+  }
+
+  const redirectTo = safeRedirect(formData.get("redirectTo"));
+  if (redirectTo) {
+    redirect(redirectTo);
+  }
+
+  // Collaborators (external accountants/lawyers) pick which linked account
+  // to work on before landing in any hub — same idea as the business/pessoal
+  // mode choice below, but for whose data they're viewing.
+  const { data: colaboracao } = await supabase
+    .from("membros")
+    .select("id")
+    .eq("membro_id", data.user.id)
+    .eq("status", "ativo")
+    .limit(1)
+    .maybeSingle();
+
+  if (colaboracao) {
+    redirect("/colaborador");
   }
 
   const cookieStore = await cookies();
@@ -139,7 +166,9 @@ export async function signup(
     maxAge: HUB_MODE_COOKIE_MAX_AGE,
     sameSite: "lax",
   });
-  redirect(MODE_HOME_ROUTE[mode]);
+
+  const redirectTo = safeRedirect(formData.get("redirectTo"));
+  redirect(redirectTo ?? MODE_HOME_ROUTE[mode]);
 }
 
 export async function logout() {

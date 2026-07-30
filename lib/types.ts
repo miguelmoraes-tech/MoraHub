@@ -263,3 +263,46 @@ export interface Proposta {
   created_at: string;
 }
 
+export type ColaboradorPapel = "contador" | "advogado";
+export type ConviteStatus = "pendente" | "aceito" | "recusado" | "expirado";
+export type MembroStatus = "ativo" | "removido";
+
+export interface Convite {
+  id: string;
+  dono_id: string;
+  email_convidado: string;
+  papel: ColaboradorPapel;
+  status: ConviteStatus;
+  token: string;
+  created_at: string;
+  respondido_em: string | null;
+}
+
+export interface Membro {
+  id: string;
+  dono_id: string;
+  membro_id: string;
+  papel: ColaboradorPapel;
+  status: MembroStatus;
+  created_at: string;
+}
+
+/** Shape returned by the get_colaboradores_do_dono() RPC (membros + display name/email). */
+export interface ColaboradorVinculado {
+  id: string;
+  membro_id: string;
+  papel: ColaboradorPapel;
+  status: MembroStatus;
+  created_at: string;
+  nome: string | null;
+  email: string | null;
+}
+
+/** Shape returned by the get_contas_vinculadas() RPC (owner accounts a collaborator can enter). */
+export interface ContaVinculada {
+  dono_id: string;
+  papel: ColaboradorPapel;
+  dono_nome: string | null;
+  dono_email: string | null;
+}
+

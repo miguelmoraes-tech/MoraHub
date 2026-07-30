@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { Suspense, useActionState, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Building2, Home, ArrowLeft } from "lucide-react";
 import { signup } from "@/lib/actions/auth";
 import type { AccountType } from "@/lib/hub-mode";
@@ -27,15 +28,21 @@ const ACCOUNT_TYPES: {
   },
 ];
 
-export default function SignupPage() {
+function SignupForm() {
   const [step, setStep] = useState<1 | 2>(1);
   const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [state, formAction, pending] = useActionState(signup, undefined);
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") ?? "";
+  const prefillEmail = searchParams.get("email") ?? "";
+  const loginHref = redirectTo
+    ? `/login?redirect=${encodeURIComponent(redirectTo)}&email=${encodeURIComponent(prefillEmail)}`
+    : "/login";
 
   const selected = ACCOUNT_TYPES.find((o) => o.value === accountType);
 
   return (
-    <div className="flex flex-1 items-center justify-center px-4 py-10">
+    <>
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <Image
@@ -99,6 +106,7 @@ export default function SignupPage() {
             className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 shadow-lg shadow-black/20"
           >
             <input type="hidden" name="tipoConta" value={accountType ?? ""} />
+            <input type="hidden" name="redirectTo" value={redirectTo} />
 
             {selected && (
               <button
@@ -155,6 +163,7 @@ export default function SignupPage() {
                 type="email"
                 required
                 autoComplete="email"
+                defaultValue={prefillEmail}
                 placeholder="voce@empresa.com"
                 className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
               />
@@ -203,11 +212,21 @@ export default function SignupPage() {
 
         <p className="mt-6 text-center text-sm text-zinc-500">
           Já tem conta?{" "}
-          <Link href="/login" className="font-medium text-copper-400 hover:text-copper-300">
+          <Link href={loginHref} className="font-medium text-copper-400 hover:text-copper-300">
             Entrar
           </Link>
         </p>
       </div>
+    </>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <div className="flex flex-1 items-center justify-center px-4 py-10">
+      <Suspense>
+        <SignupForm />
+      </Suspense>
     </div>
   );
 }

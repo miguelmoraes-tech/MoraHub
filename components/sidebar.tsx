@@ -25,6 +25,7 @@ import {
   FolderKanban,
   ListChecks,
   Inbox,
+  Users2,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
@@ -139,7 +140,13 @@ function NavGroup({
   );
 }
 
-export function Sidebar({ userEmail }: { userEmail: string }) {
+export function Sidebar({
+  userEmail,
+  temColaboracoes,
+}: {
+  userEmail: string;
+  temColaboracoes?: boolean;
+}) {
   const pathname = usePathname();
   const isPessoal = pathname.startsWith("/pessoal");
   const accent: Accent = isPessoal ? "petrol" : "copper";
@@ -191,6 +198,15 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
       </nav>
 
       <div className="border-t border-zinc-900 p-3">
+        {temColaboracoes && (
+          <Link
+            href="/colaborador"
+            className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+          >
+            <Users2 className="h-4 w-4" />
+            Colaborações
+          </Link>
+        )}
         <div className="mb-2 truncate px-2 text-xs text-zinc-500">
           {userEmail}
         </div>
