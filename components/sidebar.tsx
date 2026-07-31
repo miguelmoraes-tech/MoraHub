@@ -30,6 +30,7 @@ import {
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
 import { GlobalSearch } from "@/components/global-search";
+import type { AccountType } from "@/lib/hub-mode";
 
 type NavItem = {
   label: string;
@@ -144,9 +145,11 @@ function NavGroup({
 export function Sidebar({
   userEmail,
   temColaboracoes,
+  tiposAtivos,
 }: {
   userEmail: string;
   temColaboracoes?: boolean;
+  tiposAtivos: AccountType[];
 }) {
   const pathname = usePathname();
   const isPessoal = pathname.startsWith("/pessoal");
@@ -175,7 +178,7 @@ export function Sidebar({
 
       <div className="space-y-3 border-b border-zinc-900 px-3 pb-4">
         <GlobalSearch />
-        <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} />
+        <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} tiposAtivos={tiposAtivos} />
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">

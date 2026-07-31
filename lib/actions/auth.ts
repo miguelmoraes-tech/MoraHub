@@ -174,6 +174,14 @@ export async function signup(
     return { error: "Conta criada, mas houve um problema ao salvar seu perfil. Tente entrar normalmente." };
   }
 
+  // The type chosen at signup is also the first active type in the switcher.
+  await supabase
+    .from("perfis_tipos_ativos")
+    .upsert(
+      { user_id: data.user.id, tipo: tipoConta },
+      { onConflict: "user_id,tipo", ignoreDuplicates: true }
+    );
+
   const redirectTo = safeRedirect(formData.get("redirectTo"));
   if (redirectTo) {
     redirect(redirectTo);

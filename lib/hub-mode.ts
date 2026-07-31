@@ -23,6 +23,25 @@ export function isCollaboratorAccountType(tipo: string | null | undefined): bool
   return tipo === "contador" || tipo === "advogado";
 }
 
+/** Where activating/switching to each account type sends the user. */
+export const ACCOUNT_TYPE_HOME_ROUTE: Record<AccountType, string> = {
+  empresarial: MODE_HOME_ROUTE.business,
+  pessoal: MODE_HOME_ROUTE.pessoal,
+  contador: "/colaborador",
+  advogado: "/colaborador",
+};
+
+/**
+ * The HubMode an account type maps to inside the Business/Pessoal sidebar,
+ * or null for contador/advogado — those don't have a persistent hub of
+ * their own, so they're never the "current" selection in that sidebar.
+ */
+export function accountTypeHubMode(tipo: AccountType): HubMode | null {
+  if (tipo === "pessoal") return "pessoal";
+  if (tipo === "empresarial") return "business";
+  return null;
+}
+
 /** Client-only — reads the last mode the user picked via the switcher. */
 export function readHubModeCookie(): HubMode | null {
   if (typeof document === "undefined") return null;

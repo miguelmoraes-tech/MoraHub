@@ -4,71 +4,10 @@ import { Suspense, useActionState, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Building2, Home, Calculator, Scale, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { signup } from "@/lib/actions/auth";
+import { ACCOUNT_TYPES, ACCOUNT_TYPE_STYLES } from "@/lib/account-types";
 import type { AccountType } from "@/lib/hub-mode";
-
-const ACCOUNT_TYPES: {
-  value: AccountType;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  {
-    value: "empresarial",
-    label: "Conta Empresarial",
-    description: "Para gerenciar seu negócio: clientes, leads, financeiro",
-    icon: Building2,
-  },
-  {
-    value: "pessoal",
-    label: "Conta Pessoal",
-    description: "Para organizar sua vida financeira e pessoal",
-    icon: Home,
-  },
-  {
-    value: "contador",
-    label: "Conta Contador",
-    description: "Para atender seus clientes de contabilidade em um só lugar",
-    icon: Calculator,
-  },
-  {
-    value: "advogado",
-    label: "Conta Jurídica",
-    description: "Para atender seus clientes de advocacia em um só lugar",
-    icon: Scale,
-  },
-];
-
-const ACCOUNT_TYPE_STYLES: Record<
-  AccountType,
-  { card: string; iconBg: string; text: string; button: string }
-> = {
-  empresarial: {
-    card: "border-copper-600/40 bg-copper-600/10 hover:bg-copper-600/15",
-    iconBg: "bg-copper-400",
-    text: "text-copper-200",
-    button: "bg-copper-600 hover:bg-copper-500",
-  },
-  pessoal: {
-    card: "border-petrol-600/40 bg-petrol-600/10 hover:bg-petrol-600/15",
-    iconBg: "bg-petrol-400",
-    text: "text-petrol-200",
-    button: "bg-petrol-600 hover:bg-petrol-500",
-  },
-  contador: {
-    card: "border-sky-600/40 bg-sky-600/10 hover:bg-sky-600/15",
-    iconBg: "bg-sky-400",
-    text: "text-sky-200",
-    button: "bg-sky-600 hover:bg-sky-500",
-  },
-  advogado: {
-    card: "border-violet-600/40 bg-violet-600/10 hover:bg-violet-600/15",
-    iconBg: "bg-violet-400",
-    text: "text-violet-200",
-    button: "bg-violet-600 hover:bg-violet-500",
-  },
-};
 
 function SignupForm() {
   const [step, setStep] = useState<1 | 2>(1);

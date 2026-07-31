@@ -2,30 +2,29 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Building2, Home, ChevronDown, Check } from "lucide-react";
-import { writeHubModeCookie, MODE_HOME_ROUTE, type HubMode } from "@/lib/hub-mode";
+import { ChevronDown, Check, Plus } from "lucide-react";
+import {
+  writeHubModeCookie,
+  accountTypeHubMode,
+  ACCOUNT_TYPE_HOME_ROUTE,
+  type HubMode,
+  type AccountType,
+} from "@/lib/hub-mode";
+import { ACCOUNT_TYPES, ACCOUNT_TYPE_STYLES } from "@/lib/account-types";
+import { ativarTipoConta } from "@/lib/actions/tipos-ativos";
 
-const OPTIONS: {
+/** "Conta Jurídica" -> "Criar conta Jurídica" */
+function criarLabel(label: string) {
+  return `Criar ${label.charAt(0).toLowerCase()}${label.slice(1)}`;
+}
+
+export function ModeSwitcher({
+  mode,
+  tiposAtivos,
+}: {
   mode: HubMode;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  {
-    mode: "business",
-    label: "Business",
-    description: "Clientes, leads, gestão",
-    icon: Building2,
-  },
-  {
-    mode: "pessoal",
-    label: "Pessoal",
-    description: "Finanças e organização pessoal",
-    icon: Home,
-  },
-];
-
-export function ModeSwitcher({ mode }: { mode: HubMode }) {
+  tiposAtivos: AccountType[];
+}) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -47,8 +46,11 @@ export function ModeSwitcher({ mode }: { mode: HubMode }) {
     };
   }, [open]);
 
-  const current = OPTIONS.find((o) => o.mode === mode) ?? OPTIONS[0];
+  const current =
+    ACCOUNT_TYPES.find((o) => accountTypeHubMode(o.value) === mode) ??
+    ACCOUNT_TYPES[0];
   const CurrentIcon = current.icon;
+  const currentStyles = ACCOUNT_TYPE_STYLES[current.value];
 
   return (
     <div ref={containerRef} className="relative">
@@ -57,16 +59,10 @@ export function ModeSwitcher({ mode }: { mode: HubMode }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="true"
-        className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors ${
-          mode === "pessoal"
-            ? "border-petrol-600/40 bg-petrol-600/10 hover:bg-petrol-600/15"
-            : "border-copper-600/40 bg-copper-600/10 hover:bg-copper-600/15"
-        }`}
+        className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors ${currentStyles.card}`}
       >
         <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-950 ${
-            mode === "pessoal" ? "bg-petrol-400" : "bg-copper-400"
-          }`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-950 ${currentStyles.iconBg}`}
         >
           <CurrentIcon className="h-4 w-4" />
         </span>
@@ -74,11 +70,7 @@ export function ModeSwitcher({ mode }: { mode: HubMode }) {
           <span className="block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
             Modo atual
           </span>
-          <span
-            className={`block truncate text-sm font-semibold ${
-              mode === "pessoal" ? "text-petrol-200" : "text-copper-200"
-            }`}
-          >
+          <span className={`block truncate text-sm font-semibold ${currentStyles.text}`}>
             {current.label}
           </span>
         </span>
@@ -97,33 +89,54 @@ export function ModeSwitcher({ mode }: { mode: HubMode }) {
         }`}
       >
         <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
-          Trocar de modo
+          Tipos de conta
         </p>
         <div className="space-y-1">
-          {OPTIONS.map((option) => {
+          {ACCOUNT_TYPES.map((option) => {
             const Icon = option.icon;
-            const isCurrent = option.mode === mode;
+            const styles = ACCOUNT_TYPE_STYLES[option.value];
+            const isAtivo = tiposAtivos.includes(option.value);
+            const optionHubMode = accountTypeHubMode(option.value);
+            const isCurrent = isAtivo && optionHubMode !== null && optionHubMode === mode;
+
+            if (!isAtivo) {
+              return (
+                <form key={option.value} action={ativarTipoConta.bind(null, option.value)}>
+                  <button
+                    type="submit"
+                    onClick={() => setOpen(false)}
+                    className="flex w-full items-center gap-3 rounded-lg border-l-[3px] border-transparent px-2.5 py-2.5 text-left opacity-50 transition-opacity hover:bg-zinc-900 hover:opacity-90"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-dashed border-zinc-600 text-zinc-500">
+                      <Plus className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-zinc-300">
+                        {criarLabel(option.label)}
+                      </span>
+                      <span className="block truncate text-xs text-zinc-600">
+                        {option.description}
+                      </span>
+                    </span>
+                  </button>
+                </form>
+              );
+            }
 
             return (
               <Link
-                key={option.mode}
-                href={MODE_HOME_ROUTE[option.mode]}
+                key={option.value}
+                href={ACCOUNT_TYPE_HOME_ROUTE[option.value]}
                 onClick={() => {
-                  writeHubModeCookie(option.mode);
+                  if (optionHubMode) writeHubModeCookie(optionHubMode);
                   setOpen(false);
                 }}
                 className={`flex items-center gap-3 rounded-lg border-l-[3px] px-2.5 py-2.5 transition-colors ${
-                  isCurrent
-                    ? option.mode === "pessoal"
-                      ? "border-petrol-400 bg-petrol-600/10"
-                      : "border-copper-400 bg-copper-600/10"
-                    : "border-transparent hover:bg-zinc-900"
+                  isCurrent ? styles.current : "border-transparent hover:bg-zinc-900"
                 }`}
               >
                 <span
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-950 ${
-                    option.mode === "pessoal" ? "bg-petrol-400" : "bg-copper-400"
-                  }`}
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-950 ${styles.iconBg}`}
                 >
                   <Icon className="h-4 w-4" />
                 </span>
@@ -136,11 +149,7 @@ export function ModeSwitcher({ mode }: { mode: HubMode }) {
                   </span>
                 </span>
                 {isCurrent && (
-                  <Check
-                    className={`h-4 w-4 shrink-0 ${
-                      option.mode === "pessoal" ? "text-petrol-400" : "text-copper-400"
-                    }`}
-                  />
+                  <Check className={`h-4 w-4 shrink-0 ${styles.accentText}`} />
                 )}
               </Link>
             );

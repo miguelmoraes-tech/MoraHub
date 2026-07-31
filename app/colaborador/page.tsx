@@ -1,7 +1,8 @@
 import { Building2, Home, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { MODE_HOME_ROUTE, accountTypeToHubMode, isCollaboratorAccountType } from "@/lib/hub-mode";
+import { HUB_MODE_COOKIE, MODE_HOME_ROUTE, accountTypeHubMode, type AccountType, type HubMode } from "@/lib/hub-mode";
 import { entrarContaVinculada } from "@/app/colaborador/actions";
 import type { ColaboradorPapel, ContaVinculada } from "@/lib/types";
 
@@ -16,13 +17,24 @@ export default async function ColaboradorPickerPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: perfil } = await supabase
-    .from("perfis")
-    .select("tipo_conta_padrao")
-    .eq("id", user?.id ?? "")
-    .maybeSingle();
-  const meuModo = accountTypeToHubMode(perfil?.tipo_conta_padrao);
-  const isColaboradorAccount = isCollaboratorAccountType(perfil?.tipo_conta_padrao);
+  const { data: tiposAtivosRows } = await supabase
+    .from("perfis_tipos_ativos")
+    .select("tipo")
+    .eq("user_id", user?.id ?? "");
+  const tiposAtivos = (tiposAtivosRows ?? []).map((r) => r.tipo as AccountType);
+
+  // A user may have activated Business, Pessoal, both, or neither — whichever
+  // matches the last mode they browsed (cookie) wins; otherwise the first one
+  // they've activated. "Minha conta" only shows if they own at least one.
+  const ownModes = Array.from(
+    new Set(tiposAtivos.map(accountTypeHubMode).filter((m): m is HubMode => m !== null))
+  );
+  const cookieStore = await cookies();
+  const cookieMode = cookieStore.get(HUB_MODE_COOKIE)?.value;
+  const meuModo: HubMode | null =
+    (cookieMode === "business" || cookieMode === "pessoal") && ownModes.includes(cookieMode)
+      ? cookieMode
+      : (ownModes[0] ?? null);
 
   const { data: contas } = (await supabase.rpc("get_contas_vinculadas")) as {
     data: ContaVinculada[] | null;
@@ -34,13 +46,13 @@ export default async function ColaboradorPickerPage() {
         Escolha onde entrar
       </h1>
       <p className="mb-6 text-sm text-zinc-500">
-        {isColaboradorAccount
-          ? "As contas em que você colabora."
-          : "Sua conta e as contas em que você colabora."}
+        {meuModo
+          ? "Sua conta e as contas em que você colabora."
+          : "As contas em que você colabora."}
       </p>
 
       <div className="space-y-2">
-        {!isColaboradorAccount && (
+        {meuModo && (
           <Link
             href={MODE_HOME_ROUTE[meuModo]}
             className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3.5 transition-colors hover:bg-zinc-900"
