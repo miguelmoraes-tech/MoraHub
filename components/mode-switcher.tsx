@@ -110,10 +110,10 @@ export function ModeSwitcher({
             const isCurrent = isAtivo && optionHubMode !== null && optionHubMode === mode;
 
             if (!isAtivo && isCollaboratorAccountType(option.value)) {
-              // Contador/Advogado/Financeiro never self-activate from here —
-              // they only turn on via signup's default type or by accepting
-              // an invite. Shown so the switcher always lists all 5 types,
-              // but with no action to take.
+              // Contador/Advogado/Financeiro/RH never self-activate from here
+              // — they only turn on via signup's default type or by
+              // accepting an invite. Shown so the switcher always lists all
+              // account types, but with no action to take.
               return (
                 <div
                   key={option.value}

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
+import { getEffectiveDonoIdForRH } from "@/lib/rh";
 import { getClienteArquivoSignedUrls } from "@/lib/supabase/storage";
 import { CandidatosKanban } from "@/components/rh/candidatos-kanban";
 import type { Candidato, Vaga } from "@/lib/types";
@@ -11,7 +11,7 @@ export default async function VagaCandidatosPage({
   params: Promise<{ vagaId: string }>;
 }) {
   const { vagaId } = await params;
-  const donoId = await getEffectiveDonoId();
+  const donoId = await getEffectiveDonoIdForRH();
   if (!donoId) notFound();
 
   const supabase = await createClient();

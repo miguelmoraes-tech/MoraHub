@@ -17,13 +17,15 @@ const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
   contador: "Contador",
   advogado: "Advogado",
   financeiro: "Financeiro",
+  rh: "RH",
 };
 
 const PAPEL_ACESSO_DESCRICAO: Record<ColaboradorPapel, string> = {
   contador: "com acesso à aba Jurídico & Contábil",
   advogado: "com acesso à aba Jurídico & Contábil",
   financeiro:
-    "com acesso às seções financeiras da empresa (Contas a Pagar, Contas a Receber, Orçamento e Fluxo de Caixa)",
+    "com acesso às seções financeiras da empresa (Contas a Pagar, Contas a Receber, Orçamento e Fluxo de Caixa) e à Folha de Pagamento",
+  rh: "com acesso ao módulo de RH da empresa (Departamentos, Funcionários, Férias, Benefícios, Recrutamento, Avaliações, Ponto e Folha de Pagamento)",
 };
 
 export default async function ConvitePage({

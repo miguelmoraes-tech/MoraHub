@@ -14,6 +14,7 @@ const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
   contador: "Contador",
   advogado: "Advogado",
   financeiro: "Financeiro",
+  rh: "RH",
 };
 
 export async function ConversaChatPage({
@@ -51,10 +52,19 @@ export async function ConversaChatPage({
     .maybeSingle()) as { data: Conversa | null };
 
   const resolvedBackHref =
-    backHref ?? (conversa && user.id === conversa.dono_id ? "/juridico" : "/contas-pagar");
+    backHref ??
+    (conversa && user.id === conversa.dono_id
+      ? "/juridico"
+      : conversa?.papel === "rh"
+        ? "/rh"
+        : "/contas-pagar");
   const resolvedBackLabel =
     backLabel ??
-    (conversa && user.id === conversa.dono_id ? "Voltar ao Jurídico & Contábil" : "Voltar ao financeiro");
+    (conversa && user.id === conversa.dono_id
+      ? "Voltar ao Jurídico & Contábil"
+      : conversa?.papel === "rh"
+        ? "Voltar ao RH"
+        : "Voltar ao financeiro");
 
   if (!conversa) {
     return (

@@ -79,6 +79,9 @@ const FINANCEIRO_ITEMS: NavItem[] = [
   { label: "Contas a Receber", href: "/contas-receber", icon: HandCoins, enabled: true },
   { label: "Orçamento", href: "/orcamentos", icon: PieChart, enabled: true },
   { label: "Fluxo de Caixa", href: "/fluxo-caixa", icon: LineChart, enabled: true },
+  // The one RH screen Financeiro keeps — it's also where contas_pagar sync
+  // lives. The rest of RH_ITEMS below is exclusive to the rh papel.
+  { label: "Folha de Pagamento", href: "/rh/folha", icon: Banknote, enabled: true },
 ];
 
 const RH_ITEMS: NavItem[] = [
@@ -184,6 +187,7 @@ export function Sidebar({
   temColaboracoes,
   tiposAtivos,
   restritoFinanceiro,
+  restritoRH,
   chatHref,
   unreadTotal,
 }: {
@@ -192,12 +196,14 @@ export function Sidebar({
   temColaboracoes?: boolean;
   tiposAtivos: AccountType[];
   restritoFinanceiro?: boolean;
+  restritoRH?: boolean;
   chatHref: string;
   unreadTotal: number;
 }) {
   const pathname = usePathname();
   const isPessoal = pathname.startsWith("/pessoal");
   const accent: Accent = isPessoal ? "petrol" : "copper";
+  const restrito = restritoFinanceiro || restritoRH;
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
@@ -223,9 +229,14 @@ export function Sidebar({
             Financeiro
           </span>
         )}
+        {restritoRH && (
+          <span className="rounded-full border border-amber-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-400">
+            RH
+          </span>
+        )}
       </div>
 
-      {!restritoFinanceiro && (
+      {!restrito && (
         <div className="space-y-3 border-b border-zinc-900 px-3 pb-4">
           <GlobalSearch />
           <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} tiposAtivos={tiposAtivos} />
@@ -235,10 +246,9 @@ export function Sidebar({
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <div key={accent} className="hub-mode-fade-in space-y-6">
           {restritoFinanceiro ? (
-            <>
-              <NavGroup title="Financeiro" items={FINANCEIRO_ITEMS} accent="copper" />
-              <NavGroup title="RH" items={RH_ITEMS} accent="copper" />
-            </>
+            <NavGroup title="Financeiro" items={FINANCEIRO_ITEMS} accent="copper" />
+          ) : restritoRH ? (
+            <NavGroup title="RH" items={RH_ITEMS} accent="copper" />
           ) : isPessoal ? (
             <>
               <NavGroup title="Painel" items={PAINEL_ITEMS} accent={accent} />

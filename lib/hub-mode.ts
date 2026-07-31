@@ -13,7 +13,8 @@ export type AccountType =
   | "pessoal"
   | "contador"
   | "advogado"
-  | "financeiro";
+  | "financeiro"
+  | "rh";
 
 /** Missing/unrecognized values (e.g. accounts predating this column) fall back to business. */
 export function accountTypeToHubMode(tipo: string | null | undefined): HubMode {
@@ -21,14 +22,14 @@ export function accountTypeToHubMode(tipo: string | null | undefined): HubMode {
 }
 
 /**
- * Contador/advogado/financeiro accounts have no business or pessoal hub of
- * their own by default — they land on the linked-accounts picker instead of
- * a HubMode home. Financeiro differs from contador/advogado in that it's
- * capped at one active link (enforced by a DB unique index), not several —
- * see lib/financeiro.ts.
+ * Contador/advogado/financeiro/rh accounts have no business or pessoal hub
+ * of their own by default — they land on the linked-accounts picker instead
+ * of a HubMode home. Financeiro and RH differ from contador/advogado in that
+ * each is capped at one active link (enforced by a DB unique index), not
+ * several — see lib/financeiro.ts and lib/rh.ts.
  */
 export function isCollaboratorAccountType(tipo: string | null | undefined): boolean {
-  return tipo === "contador" || tipo === "advogado" || tipo === "financeiro";
+  return tipo === "contador" || tipo === "advogado" || tipo === "financeiro" || tipo === "rh";
 }
 
 /** Where activating/switching to each account type sends the user. */
@@ -38,12 +39,14 @@ export const ACCOUNT_TYPE_HOME_ROUTE: Record<AccountType, string> = {
   contador: "/colaborador",
   advogado: "/colaborador",
   financeiro: "/colaborador",
+  rh: "/colaborador",
 };
 
 /**
  * The HubMode an account type maps to inside the Business/Pessoal sidebar,
- * or null for contador/advogado/financeiro — those don't have a persistent
- * hub of their own, so they're never the "current" selection in that sidebar.
+ * or null for contador/advogado/financeiro/rh — those don't have a
+ * persistent hub of their own, so they're never the "current" selection in
+ * that sidebar.
  */
 export function accountTypeHubMode(tipo: AccountType): HubMode | null {
   if (tipo === "pessoal") return "pessoal";

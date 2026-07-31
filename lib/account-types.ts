@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Building2, Home, Calculator, Scale, Briefcase } from "lucide-react";
+import { Building2, Home, Calculator, Scale, Briefcase, Users2 } from "lucide-react";
 import type { AccountType } from "@/lib/hub-mode";
 
 export const ACCOUNT_TYPES: {
@@ -38,6 +38,13 @@ export const ACCOUNT_TYPES: {
     description:
       "Acesso de funcionário interno à área financeira de uma única empresa — não substitui o acesso do dono, é vinculada a apenas um negócio por vez",
     icon: Briefcase,
+  },
+  {
+    value: "rh",
+    label: "Conta RH",
+    description:
+      "Para gerenciar pessoas, contratação e folha de uma empresa — vinculada a apenas um negócio por vez, como o Financeiro",
+    icon: Users2,
   },
 ];
 
@@ -92,5 +99,13 @@ export const ACCOUNT_TYPE_STYLES: Record<
     button: "bg-emerald-600 hover:bg-emerald-500",
     current: "border-emerald-400 bg-emerald-600/10",
     accentText: "text-emerald-400",
+  },
+  rh: {
+    card: "border-amber-600/40 bg-amber-600/10 hover:bg-amber-600/15",
+    iconBg: "bg-amber-400",
+    text: "text-amber-200",
+    button: "bg-amber-600 hover:bg-amber-500",
+    current: "border-amber-400 bg-amber-600/10",
+    accentText: "text-amber-400",
   },
 };

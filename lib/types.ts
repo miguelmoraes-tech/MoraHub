@@ -278,7 +278,7 @@ export interface Proposta {
   created_at: string;
 }
 
-export type ColaboradorPapel = "contador" | "advogado" | "financeiro";
+export type ColaboradorPapel = "contador" | "advogado" | "financeiro" | "rh";
 export type ConviteStatus = "pendente" | "aceito" | "recusado" | "expirado";
 export type MembroStatus = "ativo" | "removido";
 

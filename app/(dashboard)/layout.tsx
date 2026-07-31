@@ -6,6 +6,7 @@ import { WelcomeBanner } from "@/components/welcome-banner";
 import { PageTransition } from "@/components/page-transition";
 import { getVencimentoAlertas } from "@/lib/vencimentos/get-alerts";
 import { getFinanceiroDonoId } from "@/lib/financeiro";
+import { getRHDonoId } from "@/lib/rh";
 import { getUnreadTotal } from "@/lib/chat";
 import type { AccountType } from "@/lib/hub-mode";
 
@@ -26,6 +27,12 @@ export default async function DashboardLayout({
   const alertas = await getVencimentoAlertas();
   const financeiroDonoId = await getFinanceiroDonoId();
   const restritoFinanceiro = !!financeiroDonoId;
+  const rhDonoId = await getRHDonoId();
+  // A person could in principle hold both an active financeiro and an
+  // active rh link (different companies, or even the same one) — Financeiro
+  // wins the restricted-sidebar view in that edge case, same as before RH
+  // existed; nothing about their actual data access depends on this choice.
+  const restritoRH = !!rhDonoId && !restritoFinanceiro;
 
   const { data: colaboracao } = await supabase
     .from("membros")
@@ -51,6 +58,15 @@ export default async function DashboardLayout({
       .eq("papel", "financeiro")
       .maybeSingle();
     if (conversaFinanceiro) chatHref = `/chat/${conversaFinanceiro.id}`;
+  } else if (restritoRH && rhDonoId) {
+    const { data: conversaRH } = await supabase
+      .from("conversas")
+      .select("id")
+      .eq("dono_id", rhDonoId)
+      .eq("membro_id", user.id)
+      .eq("papel", "rh")
+      .maybeSingle();
+    if (conversaRH) chatHref = `/chat/${conversaRH.id}`;
   }
   const unreadTotal = await getUnreadTotal();
 
@@ -59,9 +75,10 @@ export default async function DashboardLayout({
       <Sidebar
         userEmail={user.email ?? ""}
         userId={user.id}
-        temColaboracoes={!!colaboracao && !restritoFinanceiro}
+        temColaboracoes={!!colaboracao && !restritoFinanceiro && !restritoRH}
         tiposAtivos={tiposAtivos}
         restritoFinanceiro={restritoFinanceiro}
+        restritoRH={restritoRH}
         chatHref={chatHref}
         unreadTotal={unreadTotal}
       />

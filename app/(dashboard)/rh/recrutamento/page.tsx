@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
+import { getEffectiveDonoIdForRH } from "@/lib/rh";
 import { VagasBoard } from "@/components/rh/vagas-board";
 import type { Candidato, Departamento, Vaga } from "@/lib/types";
 
 export default async function RecrutamentoPage() {
-  const donoId = await getEffectiveDonoId();
+  const donoId = await getEffectiveDonoIdForRH();
   const supabase = await createClient();
 
   const [{ data: vagas }, { data: departamentos }, { data: candidatos }] = donoId
