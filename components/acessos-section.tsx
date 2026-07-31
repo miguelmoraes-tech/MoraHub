@@ -267,7 +267,7 @@ export function AcessosSection({
   acessos: Acesso[];
 }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+    <div id="acessos" className="scroll-mt-6 rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
           <KeyRound className="h-4 w-4 text-zinc-500" />

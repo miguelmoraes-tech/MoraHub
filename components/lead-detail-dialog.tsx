@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   Maximize2,
   X,
@@ -49,9 +49,11 @@ const TIPO_CONTATO_LABEL = {
 export function LeadDetailDialog({
   lead,
   propostas = [],
+  autoOpen = false,
 }: {
   lead: Lead;
   propostas?: Proposta[];
+  autoOpen?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -63,6 +65,13 @@ export function LeadDetailDialog({
     undefined
   );
   useActionSuccess(updateState, () => setMode("view"));
+
+  useEffect(() => {
+    if (autoOpen) dialogRef.current?.showModal();
+    // Only meant to fire once, right when this card mounts already flagged
+    // as the search result to open — not on every re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleClose() {
     setMode("view");

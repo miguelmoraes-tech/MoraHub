@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Target } from "lucide-react";
 import type { Lead, Proposta } from "@/lib/types";
 import { LeadCard } from "@/components/lead-card";
@@ -18,8 +19,14 @@ export function LeadsBoard({
   leads: Lead[];
   propostas?: Proposta[];
 }) {
+  const searchParams = useSearchParams();
+  const highlightLeadId = searchParams.get("lead");
+  const highlightedLead = highlightLeadId
+    ? leads.find((l) => l.id === highlightLeadId)
+    : undefined;
+
   const [tab, setTab] = useState<"abordar" | "abordado" | "convertido">(
-    "abordar"
+    highlightedLead?.status ?? "abordar"
   );
   const [nicho, setNicho] = useState("");
   const [previaFiltro, setPreviaFiltro] = useState<"" | "enviada" | "pendente">(
@@ -188,6 +195,7 @@ export function LeadsBoard({
               key={lead.id}
               lead={lead}
               propostas={propostasPorLead.get(lead.id) ?? []}
+              autoOpenDetail={lead.id === highlightLeadId}
             />
           ))}
         </div>

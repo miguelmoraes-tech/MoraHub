@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
+import { GlobalSearch } from "@/components/global-search";
 
 type NavItem = {
   label: string;
@@ -172,7 +173,8 @@ export function Sidebar({
         </span>
       </div>
 
-      <div className="border-b border-zinc-900 px-3 pb-4">
+      <div className="space-y-3 border-b border-zinc-900 px-3 pb-4">
+        <GlobalSearch />
         <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} />
       </div>
 

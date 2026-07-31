@@ -46,9 +46,11 @@ const STATUS_TONE: Record<Lead["status"], ChipTone> = {
 export function LeadCard({
   lead,
   propostas = [],
+  autoOpenDetail = false,
 }: {
   lead: Lead;
   propostas?: Proposta[];
+  autoOpenDetail?: boolean;
 }) {
   const [mode, setMode] = useState<"view" | "edit" | "marcar">("view");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -148,7 +150,11 @@ export function LeadCard({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <LeadDetailDialog lead={lead} propostas={propostas} />
+          <LeadDetailDialog
+            lead={lead}
+            propostas={propostas}
+            autoOpen={autoOpenDetail}
+          />
           <StatusChip tone={STATUS_TONE[lead.status]}>
             {STATUS_LABEL[lead.status]}
           </StatusChip>

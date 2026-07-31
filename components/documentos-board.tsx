@@ -244,7 +244,10 @@ function DocumentoRow({
   const cliente = clientes.find((c) => c.id === documento.cliente_id);
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800/80 px-3 py-2.5">
+    <div
+      id={`documento-${documento.id}`}
+      className="scroll-mt-6 flex items-center justify-between gap-3 rounded-lg border border-zinc-800/80 px-3 py-2.5"
+    >
       <div className="min-w-0">
         <p className="flex flex-wrap items-center gap-2 truncate text-sm text-zinc-200">
           {documento.titulo}
