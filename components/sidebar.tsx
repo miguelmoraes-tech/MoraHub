@@ -91,6 +91,7 @@ const ORGANIZACAO_ITEMS: NavItem[] = [
   { label: "Projetos", href: "/pessoal/projetos", icon: FolderKanban, enabled: true },
   { label: "Tarefas", href: "/pessoal/tarefas", icon: ListChecks, enabled: true },
   { label: "Inbox", href: "/pessoal/inbox", icon: Inbox, enabled: true },
+  { label: "Jurídico", href: "/pessoal/juridico", icon: Scale, enabled: true },
 ];
 
 function NavGroup({

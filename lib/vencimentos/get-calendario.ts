@@ -28,6 +28,13 @@ type VencimentoRow = {
   nota: string | null;
 };
 type ClienteRow = { id: string; nome: string };
+type PropriedadeIntelectualRow = {
+  id: string;
+  cliente_id: string | null;
+  nome: string;
+  tipo: string;
+  data_renovacao: string;
+};
 
 export async function getCalendarioItems(): Promise<CalendarioItem[]> {
   const supabase = await createClient();
@@ -39,6 +46,7 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
     { data: juridicos },
     { data: assinaturas },
     { data: clientes },
+    { data: propriedadesIntelectuais },
   ] = (await Promise.all([
     supabase.from("vencimentos").select("id, titulo, data, nota"),
     supabase
@@ -61,6 +69,10 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
       .eq("status", "ativa")
       .not("proxima_cobranca", "is", null),
     supabase.from("clientes").select("id, nome"),
+    supabase
+      .from("propriedade_intelectual")
+      .select("id, cliente_id, nome, tipo, data_renovacao")
+      .not("data_renovacao", "is", null),
   ])) as [
     { data: VencimentoRow[] | null },
     { data: ClienteAssinaturaRow[] | null },
@@ -68,6 +80,7 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
     { data: JuridicoRow[] | null },
     { data: AssinaturaRow[] | null },
     { data: ClienteRow[] | null },
+    { data: PropriedadeIntelectualRow[] | null },
   ];
 
   const clienteNome = new Map((clientes ?? []).map((c) => [c.id, c.nome]));
@@ -129,6 +142,19 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
       data: a.proxima_cobranca,
       nota: null,
       href: `/clientes/${a.cliente_id}`,
+    });
+  }
+
+  for (const p of propriedadesIntelectuais ?? []) {
+    itens.push({
+      id: `propriedade_intelectual-${p.id}`,
+      tipo: "propriedade_intelectual",
+      titulo: p.cliente_id
+        ? `Renovação: ${p.nome} (${p.tipo}) — ${clienteNome.get(p.cliente_id) ?? "cliente"}`
+        : `Renovação: ${p.nome} (${p.tipo})`,
+      data: p.data_renovacao,
+      nota: null,
+      href: p.cliente_id ? `/clientes/${p.cliente_id}` : null,
     });
   }
 

@@ -419,3 +419,81 @@ export interface Orcamento {
   created_at: string;
 }
 
+export type PropriedadeIntelectualTipo =
+  | "Marca"
+  | "Patente"
+  | "Direito Autoral"
+  | "Domínio"
+  | "Outro";
+
+export type PropriedadeIntelectualStatus =
+  | "registrado"
+  | "em_analise"
+  | "pendente"
+  | "vencido";
+
+export interface PropriedadeIntelectual {
+  id: string;
+  user_id: string;
+  cliente_id: string | null;
+  tipo: PropriedadeIntelectualTipo;
+  nome: string;
+  numero_registro: string | null;
+  orgao: string | null;
+  status: PropriedadeIntelectualStatus;
+  data_registro: string | null;
+  data_renovacao: string | null;
+  observacoes: string | null;
+  created_at: string;
+}
+
+export interface PessoalPropriedadeIntelectual {
+  id: string;
+  user_id: string;
+  tipo: PropriedadeIntelectualTipo;
+  nome: string;
+  numero_registro: string | null;
+  orgao: string | null;
+  status: PropriedadeIntelectualStatus;
+  data_registro: string | null;
+  data_renovacao: string | null;
+  observacoes: string | null;
+  created_at: string;
+}
+
+/** Same {item, feito} shape as FechamentoChecklistItem — kept as a separate
+ * alias so each feature's checklist can evolve independently if needed. */
+export interface ChecklistItem {
+  item: string;
+  feito: boolean;
+}
+
+export type ComplianceCategoria = "LGPD" | "Alvará" | "Licença" | "Outro";
+export type PessoalComplianceCategoria = "LGPD" | "Outro";
+export type ComplianceStatus = "pendente" | "em_andamento" | "conforme";
+
+export interface ComplianceJuridico {
+  id: string;
+  user_id: string;
+  cliente_id: string | null;
+  categoria: ComplianceCategoria;
+  checklist: ChecklistItem[];
+  status: ComplianceStatus;
+  proxima_revisao: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PessoalCompliance {
+  id: string;
+  user_id: string;
+  categoria: PessoalComplianceCategoria;
+  checklist: ChecklistItem[];
+  status: ComplianceStatus;
+  proxima_revisao: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+

@@ -79,24 +79,42 @@ export function VencimentosBanner({
 
   return (
     <div className="space-y-2 border-b border-amber-900/40 bg-amber-950/20 px-6 py-3">
-      {visiveis.map((alerta) => (
-        <div
-          key={alerta.id}
-          className="flex items-center justify-between gap-3 rounded-lg border border-amber-900/40 bg-amber-950/30 px-3 py-2 text-sm text-amber-200"
-        >
-          <div className="flex min-w-0 items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-            <span className="truncate">{alerta.mensagem}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => dismiss(alerta.id)}
-            className="shrink-0 rounded-md p-1 text-amber-400/70 hover:bg-amber-900/40 hover:text-amber-200"
+      {visiveis.map((alerta) => {
+        const atrasado = alerta.diasRestantes < 0;
+        return (
+          <div
+            key={alerta.id}
+            className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${
+              atrasado
+                ? "border-rose-900/50 bg-rose-950/40 text-rose-200"
+                : "border-amber-900/40 bg-amber-950/30 text-amber-200"
+            }`}
           >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      ))}
+            <div className="flex min-w-0 items-center gap-2">
+              <AlertTriangle
+                className={`h-4 w-4 shrink-0 ${atrasado ? "text-rose-400" : "text-amber-400"}`}
+              />
+              <span className="truncate">{alerta.mensagem}</span>
+              {atrasado && (
+                <span className="shrink-0 rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-300">
+                  Atrasado
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => dismiss(alerta.id)}
+              className={`shrink-0 rounded-md p-1 ${
+                atrasado
+                  ? "text-rose-400/70 hover:bg-rose-900/40 hover:text-rose-200"
+                  : "text-amber-400/70 hover:bg-amber-900/40 hover:text-amber-200"
+              }`}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

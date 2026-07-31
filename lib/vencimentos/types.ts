@@ -3,7 +3,8 @@ export type VencimentoTipo =
   | "gasto_fixo"
   | "vencimento"
   | "contrato"
-  | "juridico";
+  | "juridico"
+  | "propriedade_intelectual";
 
 export interface VencimentoAlerta {
   id: string;
@@ -18,7 +19,8 @@ export type CalendarioItemTipo =
   | "assinatura_cliente"
   | "contrato"
   | "juridico"
-  | "assinatura";
+  | "assinatura"
+  | "propriedade_intelectual";
 
 export interface CalendarioItem {
   id: string;

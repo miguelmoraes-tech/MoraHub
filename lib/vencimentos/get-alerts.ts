@@ -9,11 +9,13 @@ function pluralDias(dias: number) {
 }
 
 function mensagemCobrar(dias: number, nome: string) {
+  if (dias < 0) return `${nome} está atrasada há ${pluralDias(-dias)}`;
   if (dias === 0) return `${nome} cobra hoje`;
   return `Faltam ${pluralDias(dias)} para cobrar ${nome}`;
 }
 
 function mensagemVencer(dias: number, nome: string) {
+  if (dias < 0) return `${nome} venceu há ${pluralDias(-dias)}`;
   if (dias === 0) return `${nome} vence hoje`;
   return `Faltam ${pluralDias(dias)} para vencer ${nome}`;
 }
@@ -39,6 +41,12 @@ type ContratoRow = {
 };
 type JuridicoRow = { id: string; titulo: string; prazo: string };
 type ClienteRow = { id: string; nome: string };
+type PropriedadeIntelectualRow = {
+  id: string;
+  cliente_id: string | null;
+  nome: string;
+  data_renovacao: string;
+};
 
 export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
   const supabase = await createClient();
@@ -51,6 +59,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
     { data: contratos },
     { data: juridicos },
     { data: clientes },
+    { data: propriedadesIntelectuais },
   ] = (await Promise.all([
     supabase
       .from("assinaturas")
@@ -73,6 +82,10 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
       .eq("status", "pendente")
       .not("prazo", "is", null),
     supabase.from("clientes").select("id, nome"),
+    supabase
+      .from("propriedade_intelectual")
+      .select("id, cliente_id, nome, data_renovacao")
+      .not("data_renovacao", "is", null),
   ])) as [
     { data: AssinaturaRow[] | null },
     { data: GastoRecorrenteRow[] | null },
@@ -80,6 +93,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
     { data: ContratoRow[] | null },
     { data: JuridicoRow[] | null },
     { data: ClienteRow[] | null },
+    { data: PropriedadeIntelectualRow[] | null },
   ];
 
   const clienteNome = new Map((clientes ?? []).map((c) => [c.id, c.nome]));
@@ -88,7 +102,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
 
   for (const a of assinaturas ?? []) {
     const dias = diffInDays(hoje, a.proxima_cobranca);
-    if (dias < 0 || dias > JANELA_DIAS) continue;
+    if (dias > JANELA_DIAS) continue;
     const nome = `assinatura de ${clienteNome.get(a.cliente_id) ?? "cliente"} (${a.plano})`;
     alertas.push({
       id: `assinatura-${a.id}`,
@@ -102,7 +116,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
   for (const g of gastosFixos ?? []) {
     const proxima = nextOccurrence(g.data, g.recorrencia, hoje);
     const dias = diffInDays(hoje, proxima);
-    if (dias < 0 || dias > JANELA_DIAS) continue;
+    if (dias > JANELA_DIAS) continue;
     alertas.push({
       id: `gasto-${g.id}`,
       tipo: "gasto_fixo",
@@ -114,7 +128,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
 
   for (const v of vencimentos ?? []) {
     const dias = diffInDays(hoje, v.data);
-    if (dias < 0 || dias > JANELA_DIAS) continue;
+    if (dias > JANELA_DIAS) continue;
     alertas.push({
       id: `vencimento-${v.id}`,
       tipo: "vencimento",
@@ -126,7 +140,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
 
   for (const c of contratos ?? []) {
     const dias = diffInDays(hoje, c.vencimento);
-    if (dias < 0 || dias > JANELA_DIAS) continue;
+    if (dias > JANELA_DIAS) continue;
     const nome = `o contrato de ${clienteNome.get(c.cliente_id) ?? "cliente"} (${c.descricao})`;
     alertas.push({
       id: `contrato-${c.id}`,
@@ -139,13 +153,28 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
 
   for (const j of juridicos ?? []) {
     const dias = diffInDays(hoje, j.prazo);
-    if (dias < 0 || dias > JANELA_DIAS) continue;
+    if (dias > JANELA_DIAS) continue;
     alertas.push({
       id: `juridico-${j.id}`,
       tipo: "juridico",
       data: j.prazo,
       diasRestantes: dias,
       mensagem: mensagemVencer(dias, j.titulo),
+    });
+  }
+
+  for (const p of propriedadesIntelectuais ?? []) {
+    const dias = diffInDays(hoje, p.data_renovacao);
+    if (dias > JANELA_DIAS) continue;
+    const nome = p.cliente_id
+      ? `a renovação de ${p.nome} (${clienteNome.get(p.cliente_id) ?? "cliente"})`
+      : `a renovação de ${p.nome}`;
+    alertas.push({
+      id: `propriedade_intelectual-${p.id}`,
+      tipo: "propriedade_intelectual",
+      data: p.data_renovacao,
+      diasRestantes: dias,
+      mensagem: mensagemVencer(dias, nome),
     });
   }
 

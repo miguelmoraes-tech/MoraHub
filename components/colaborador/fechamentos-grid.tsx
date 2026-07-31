@@ -13,6 +13,7 @@ import {
   updateFechamento,
 } from "@/app/colaborador/contador/fechamentos/actions";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
+import { ChecklistEditor } from "@/components/colaborador/checklist-editor";
 
 const MESES_ABREV = [
   "Jan",
@@ -119,14 +120,6 @@ function EditarFechamentoForm({
   const [state, formAction, pending] = useActionState(action, undefined);
   useActionSuccess(state, onClose);
 
-  function toggleItem(index: number) {
-    setChecklist((prev) =>
-      prev.map((entry, i) =>
-        i === index ? { ...entry, feito: !entry.feito } : entry
-      )
-    );
-  }
-
   return (
     <form action={formAction} className="space-y-3 px-5 py-4">
       <input type="hidden" name="checklist" value={JSON.stringify(checklist)} />
@@ -145,27 +138,7 @@ function EditarFechamentoForm({
         </select>
       </div>
 
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-zinc-400">Checklist</p>
-        <div className="space-y-1.5 rounded-lg border border-zinc-800 bg-zinc-950/60 p-2.5">
-          {checklist.map((entry, index) => (
-            <label
-              key={`${entry.item}-${index}`}
-              className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300"
-            >
-              <input
-                type="checkbox"
-                checked={entry.feito}
-                onChange={() => toggleItem(index)}
-                className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 accent-copper-600"
-              />
-              <span className={entry.feito ? "text-zinc-500 line-through" : ""}>
-                {entry.item}
-              </span>
-            </label>
-          ))}
-        </div>
-      </div>
+      <ChecklistEditor items={checklist} onChange={setChecklist} />
 
       <div className="space-y-1">
         <label className="text-xs font-medium text-zinc-400">Observações</label>
