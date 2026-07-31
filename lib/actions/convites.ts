@@ -11,6 +11,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   not_authenticated: "Faça login para aceitar o convite.",
   convite_nao_encontrado: "Convite não encontrado.",
   convite_ja_respondido: "Este convite já foi respondido.",
+  convite_expirado: "Este convite expirou.",
   email_nao_confere: "Este convite foi enviado para outro e-mail.",
 };
 
@@ -42,8 +43,15 @@ export async function aceitarConvite(
   redirect("/colaborador/juridico");
 }
 
-export async function recusarConvite(token: string) {
+export async function recusarConvite(
+  token: string,
+  _prevState: ConviteResponseState,
+  _formData: FormData
+): Promise<ConviteResponseState> {
   const supabase = await createClient();
-  await supabase.rpc("recusar_convite", { p_token: token });
+  const { error } = await supabase.rpc("recusar_convite", { p_token: token });
+
+  if (error) return { error: friendlyError(error.message) };
+
   redirect(`/convite/${token}`);
 }

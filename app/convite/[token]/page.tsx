@@ -2,8 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/lib/actions/auth";
-import { recusarConvite } from "@/lib/actions/convites";
 import { AceitarConviteForm } from "@/components/aceitar-convite-form";
+import { RecusarConviteForm } from "@/components/recusar-convite-form";
 import type { ColaboradorPapel, ConviteStatus } from "@/lib/types";
 
 type ConvitePublico = {
@@ -84,14 +84,11 @@ export default async function ConvitePage({
                 user.email === convite.email_convidado ? (
                   <div className="flex gap-2 pt-2">
                     <AceitarConviteForm token={token} />
-                    <form action={recusarConvite.bind(null, token)}>
-                      <button
-                        type="submit"
-                        className="rounded-lg px-3.5 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200"
-                      >
-                        Recusar
-                      </button>
-                    </form>
+                    <RecusarConviteForm
+                      token={token}
+                      label="Recusar"
+                      className="rounded-lg px-3.5 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200"
+                    />
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -125,14 +122,11 @@ export default async function ConvitePage({
                       Criar conta
                     </Link>
                   </div>
-                  <form action={recusarConvite.bind(null, token)}>
-                    <button
-                      type="submit"
-                      className="text-xs text-zinc-500 hover:text-zinc-300"
-                    >
-                      Não quero colaborar
-                    </button>
-                  </form>
+                  <RecusarConviteForm
+                    token={token}
+                    label="Não quero colaborar"
+                    className="text-xs text-zinc-500 hover:text-zinc-300"
+                  />
                 </div>
               )}
             </>
