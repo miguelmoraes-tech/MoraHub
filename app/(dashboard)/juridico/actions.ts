@@ -153,3 +153,19 @@ export async function removerColaborador(membroId: string) {
   await supabase.from("membros").update({ status: "removido" }).eq("id", membroId);
   revalidatePath("/juridico");
 }
+
+export async function cancelarConvite(conviteId: string) {
+  const { supabase, user } = await requireUser();
+  if (!user) return;
+
+  // Scoped to "pendente" so an invite that was already accepted/declined in
+  // the meantime can't be wiped out by a stale button in the UI.
+  await supabase
+    .from("convites")
+    .delete()
+    .eq("id", conviteId)
+    .eq("dono_id", user.id)
+    .eq("status", "pendente");
+
+  revalidatePath("/juridico");
+}
