@@ -12,23 +12,37 @@ function textOrNull(value: FormDataEntryValue | null) {
   return str === "" ? null : str;
 }
 
-function parseForm(formData: FormData, tipo: JuridicoTipo) {
+function parseForm(formData: FormData, tipoFixo: JuridicoTipo | null) {
   return JuridicoSchema.safeParse({
     titulo: formData.get("titulo"),
-    tipo,
+    tipo: tipoFixo ?? formData.get("tipo"),
     prazo: textOrNull(formData.get("prazo")) ?? undefined,
     status: formData.get("status") ?? "pendente",
     nota: textOrNull(formData.get("nota")) ?? undefined,
   });
 }
 
+function revalidateWorkspaces() {
+  revalidatePath("/colaborador/advogado");
+  revalidatePath("/colaborador/contador");
+}
+
+/**
+ * Shared by both the advogado (tipoFixo="Jurídico") and contador
+ * (tipoFixo=null, tipo comes from the form's Contábil/Fiscal select)
+ * workspaces. `donoId` (which linked account this belongs to) travels in
+ * the form itself, not as a bound arg — it's picked from a <select> at
+ * submit time, so it can't be known when the action is bound at render.
+ */
 export async function createJuridicoColaborador(
-  donoId: string,
-  tipo: JuridicoTipo,
+  tipoFixo: JuridicoTipo | null,
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const parsed = parseForm(formData, tipo);
+  const donoId = textOrNull(formData.get("donoId"));
+  if (!donoId) return { error: "Selecione o cliente." };
+
+  const parsed = parseForm(formData, tipoFixo);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
@@ -47,17 +61,17 @@ export async function createJuridicoColaborador(
   // tampered donoId simply fails here rather than needing an app-side check.
   if (error) return { error: "Não foi possível salvar a pendência." };
 
-  revalidatePath("/colaborador/juridico");
+  revalidateWorkspaces();
   return { ok: true };
 }
 
 export async function updateJuridicoColaborador(
   juridicoId: string,
-  tipo: JuridicoTipo,
+  tipoFixo: JuridicoTipo | null,
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const parsed = parseForm(formData, tipo);
+  const parsed = parseForm(formData, tipoFixo);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
@@ -67,6 +81,7 @@ export async function updateJuridicoColaborador(
     .from("juridico")
     .update({
       titulo: parsed.data.titulo,
+      tipo: parsed.data.tipo,
       prazo: parsed.data.prazo ?? null,
       status: parsed.data.status,
       nota: parsed.data.nota ?? null,
@@ -74,12 +89,12 @@ export async function updateJuridicoColaborador(
     .eq("id", juridicoId);
   if (error) return { error: "Não foi possível atualizar a pendência." };
 
-  revalidatePath("/colaborador/juridico");
+  revalidateWorkspaces();
   return { ok: true };
 }
 
 export async function deleteJuridicoColaborador(juridicoId: string) {
   const supabase = await createClient();
   await supabase.from("juridico").delete().eq("id", juridicoId);
-  revalidatePath("/colaborador/juridico");
+  revalidateWorkspaces();
 }

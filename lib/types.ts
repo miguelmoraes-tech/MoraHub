@@ -210,6 +210,14 @@ export type DocumentoCategoria =
   | "Arquivo do cliente"
   | "Outro";
 
+export type StatusAssinatura = "pendente" | "assinado" | "recusado";
+
+export interface Signatario {
+  nome: string;
+  email: string;
+  assinado: boolean;
+}
+
 export interface Documento {
   id: string;
   user_id: string;
@@ -221,6 +229,11 @@ export interface Documento {
   arquivo_path: string | null;
   data: string | null;
   created_at: string;
+  precisa_assinatura: boolean;
+  status_assinatura: StatusAssinatura | null;
+  signatarios: Signatario[];
+  id_externo_assinatura: string | null;
+  link_assinatura: string | null;
 }
 
 export interface Vencimento {
@@ -305,5 +318,61 @@ export interface ContaVinculada {
   papel: ColaboradorPapel;
   dono_nome: string | null;
   dono_email: string | null;
+}
+
+export type ProcessoFase =
+  | "inicial"
+  | "instrucao"
+  | "recursal"
+  | "execucao"
+  | "encerrado";
+
+export interface Processo {
+  id: string;
+  user_id: string;
+  cliente_id: string;
+  numero_processo: string | null;
+  tribunal_orgao: string | null;
+  parte_contraria: string | null;
+  tipo_acao: string | null;
+  fase: ProcessoFase;
+  proximo_prazo: string | null;
+  descricao_prazo: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FechamentoStatus = "pendente" | "em_andamento" | "concluido";
+
+export interface FechamentoChecklistItem {
+  item: string;
+  feito: boolean;
+}
+
+export interface FechamentoMensal {
+  id: string;
+  user_id: string;
+  cliente_id: string;
+  mes_referencia: string;
+  status: FechamentoStatus;
+  checklist: FechamentoChecklistItem[];
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SolicitacaoDocumentoStatus = "pendente" | "enviado" | "concluida";
+
+export interface SolicitacaoDocumento {
+  id: string;
+  user_id: string;
+  cliente_id: string;
+  solicitante_id: string;
+  titulo: string;
+  descricao: string | null;
+  status: SolicitacaoDocumentoStatus;
+  documento_id: string | null;
+  created_at: string;
 }
 

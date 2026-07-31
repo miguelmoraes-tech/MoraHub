@@ -1,9 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { COLAB_DONO_COOKIE, COLAB_DONO_COOKIE_MAX_AGE } from "@/lib/colaborador";
 
 export type ConviteResponseState = { error: string } | undefined;
 
@@ -33,14 +31,7 @@ export async function aceitarConvite(
 
   if (error || !donoId) return { error: friendlyError(error?.message) };
 
-  const cookieStore = await cookies();
-  cookieStore.set(COLAB_DONO_COOKIE, donoId as string, {
-    path: "/",
-    maxAge: COLAB_DONO_COOKIE_MAX_AGE,
-    sameSite: "lax",
-  });
-
-  redirect("/colaborador/juridico");
+  redirect("/colaborador");
 }
 
 export async function recusarConvite(

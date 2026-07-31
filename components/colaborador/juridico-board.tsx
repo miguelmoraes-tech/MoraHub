@@ -1,18 +1,20 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Scale, Plus, Pencil, Trash2 } from "lucide-react";
-import type { Juridico, JuridicoTipo } from "@/lib/types";
+import type { ContaVinculada, Juridico, JuridicoTipo } from "@/lib/types";
+import { nomeConta } from "@/lib/colaborador-shared";
 import {
   createJuridicoColaborador,
   updateJuridicoColaborador,
   deleteJuridicoColaborador,
-} from "@/app/colaborador/juridico/actions";
+} from "@/lib/actions/colaborador-juridico";
 import { formatDate } from "@/lib/format";
 import { todayISO, diffInDays } from "@/lib/vencimentos/dates";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
+
+export type PendenciaComDono = Juridico & { donoNome: string };
 
 const STATUS_LABEL: Record<Juridico["status"], string> = {
   pendente: "Pendente",
@@ -24,9 +26,45 @@ const STATUS_TONE: Record<Juridico["status"], ChipTone> = {
   concluida: "emerald",
 };
 
-function Fields({ item }: { item?: Juridico }) {
+const TIPO_TONE: Record<JuridicoTipo, ChipTone> = {
+  Jurídico: "sky",
+  Contábil: "copper",
+  Fiscal: "zinc",
+};
+
+function Fields({
+  item,
+  contas,
+  tipoFixo,
+  showDonoSelect,
+}: {
+  item?: PendenciaComDono;
+  contas: ContaVinculada[];
+  tipoFixo: JuridicoTipo | null;
+  showDonoSelect: boolean;
+}) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {showDonoSelect && (
+        <div className="col-span-2 space-y-1 sm:col-span-3">
+          <label className="text-xs font-medium text-zinc-400">Cliente *</label>
+          <select
+            name="donoId"
+            required
+            defaultValue=""
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+          >
+            <option value="" disabled>
+              Selecione o cliente
+            </option>
+            {contas.map((conta) => (
+              <option key={conta.dono_id} value={conta.dono_id}>
+                {nomeConta(conta)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="col-span-2 space-y-1 sm:col-span-1">
         <label className="text-xs font-medium text-zinc-400">Título *</label>
         <input
@@ -36,6 +74,19 @@ function Fields({ item }: { item?: Juridico }) {
           className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
+      {!tipoFixo && (
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-zinc-400">Tipo</label>
+          <select
+            name="tipo"
+            defaultValue={item?.tipo ?? "Contábil"}
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+          >
+            <option value="Contábil">Contábil</option>
+            <option value="Fiscal">Fiscal</option>
+          </select>
+        </div>
+      )}
       <div className="space-y-1">
         <label className="text-xs font-medium text-zinc-400">Prazo</label>
         <input
@@ -69,10 +120,16 @@ function Fields({ item }: { item?: Juridico }) {
   );
 }
 
-function NewForm({ donoId, tipo }: { donoId: string; tipo: JuridicoTipo }) {
+function NewForm({
+  contas,
+  tipoFixo,
+}: {
+  contas: ContaVinculada[];
+  tipoFixo: JuridicoTipo | null;
+}) {
   const [open, setOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
-  const action = createJuridicoColaborador.bind(null, donoId, tipo);
+  const action = createJuridicoColaborador.bind(null, tipoFixo);
   const [state, formAction, pending] = useActionState(action, undefined);
 
   useActionSuccess(state, () => setOpen(false));
@@ -100,7 +157,7 @@ function NewForm({ donoId, tipo }: { donoId: string; tipo: JuridicoTipo }) {
       action={formAction}
       className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3"
     >
-      <Fields />
+      <Fields contas={contas} tipoFixo={tipoFixo} showDonoSelect />
       {state && "error" in state && (
         <p className="text-xs text-rose-400">{state.error}</p>
       )}
@@ -127,14 +184,14 @@ function NewForm({ donoId, tipo }: { donoId: string; tipo: JuridicoTipo }) {
 function Row({
   item,
   hoje,
-  tipo,
+  tipoFixo,
 }: {
-  item: Juridico;
+  item: PendenciaComDono;
   hoje: string;
-  tipo: JuridicoTipo;
+  tipoFixo: JuridicoTipo | null;
 }) {
   const [editing, setEditing] = useState(false);
-  const action = updateJuridicoColaborador.bind(null, item.id, tipo);
+  const action = updateJuridicoColaborador.bind(null, item.id, tipoFixo);
   const [state, formAction, pending] = useActionState(action, undefined);
 
   useActionSuccess(state, () => setEditing(false));
@@ -145,7 +202,7 @@ function Row({
         action={formAction}
         className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3"
       >
-        <Fields item={item} />
+        <Fields item={item} contas={[]} tipoFixo={tipoFixo} showDonoSelect={false} />
         {state && "error" in state && (
           <p className="text-xs text-rose-400">{state.error}</p>
         )}
@@ -185,15 +242,19 @@ function Row({
       className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 ${rowClass}`}
     >
       <div className="min-w-0">
-        <p className="flex items-center gap-2 truncate text-sm text-zinc-200">
+        <p className="flex flex-wrap items-center gap-2 text-sm text-zinc-200">
           {item.titulo}
           <StatusChip tone={STATUS_TONE[item.status]}>
             {STATUS_LABEL[item.status]}
           </StatusChip>
+          {!tipoFixo && (
+            <StatusChip tone={TIPO_TONE[item.tipo]}>{item.tipo}</StatusChip>
+          )}
         </p>
         <p className="text-xs text-zinc-500">
+          {item.donoNome}
           {item.prazo &&
-            `prazo ${formatDate(item.prazo)}${atrasado ? " (atrasado)" : proximo ? " (em breve)" : ""}`}
+            ` · prazo ${formatDate(item.prazo)}${atrasado ? " (atrasado)" : proximo ? " (em breve)" : ""}`}
           {item.nota && ` · ${item.nota}`}
         </p>
       </div>
@@ -219,15 +280,15 @@ function Row({
 }
 
 export function ColaboradorJuridicoBoard({
+  titulo,
   items,
-  donoId,
-  donoNome,
-  tipo,
+  contas,
+  tipoFixo,
 }: {
-  items: Juridico[];
-  donoId: string;
-  donoNome: string;
-  tipo: JuridicoTipo;
+  titulo: string;
+  items: PendenciaComDono[];
+  contas: ContaVinculada[];
+  tipoFixo: JuridicoTipo | null;
 }) {
   const hoje = todayISO();
   const ordenados = [...items].sort((a, b) => {
@@ -239,21 +300,14 @@ export function ColaboradorJuridicoBoard({
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
-      <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-zinc-600">
-        <Link href="/colaborador" className="hover:text-zinc-400">
-          Contas vinculadas
-        </Link>
-        <span>/</span>
-        <span className="text-zinc-400">{donoNome}</span>
-      </div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-zinc-100">{tipo}</h1>
+          <h1 className="text-lg font-semibold text-zinc-100">{titulo}</h1>
           <p className="text-sm text-zinc-500">
-            {ordenados.length} pendência(s)
+            {ordenados.length} pendência(s) · {contas.length} cliente(s) vinculado(s)
           </p>
         </div>
-        <NewForm donoId={donoId} tipo={tipo} />
+        <NewForm contas={contas} tipoFixo={tipoFixo} />
       </div>
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
@@ -265,7 +319,7 @@ export function ColaboradorJuridicoBoard({
         {ordenados.length > 0 ? (
           <div className="space-y-2">
             {ordenados.map((item) => (
-              <Row key={item.id} item={item} hoje={hoje} tipo={tipo} />
+              <Row key={item.id} item={item} hoje={hoje} tipoFixo={tipoFixo} />
             ))}
           </div>
         ) : (

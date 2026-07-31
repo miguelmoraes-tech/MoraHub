@@ -28,7 +28,19 @@ async function requireUser() {
   return { supabase, user };
 }
 
+function parseSignatarios(formData: FormData) {
+  const raw = formData.get("signatarios");
+  if (typeof raw !== "string" || raw.trim() === "") return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function parseDocumentoForm(formData: FormData) {
+  const precisaAssinatura = formData.get("precisa_assinatura") === "on";
   return DocumentoSchema.safeParse({
     titulo: formData.get("titulo"),
     tipo: formData.get("tipo") ?? "nota",
@@ -36,6 +48,11 @@ function parseDocumentoForm(formData: FormData) {
     cliente_id: textOrNull(formData.get("cliente_id")) ?? undefined,
     conteudo: textOrNull(formData.get("conteudo")) ?? undefined,
     data: textOrNull(formData.get("data")) ?? undefined,
+    precisa_assinatura: precisaAssinatura,
+    status_assinatura: precisaAssinatura
+      ? ((formData.get("status_assinatura") as string) ?? "pendente")
+      : undefined,
+    signatarios: precisaAssinatura ? parseSignatarios(formData) : [],
   });
 }
 
@@ -70,6 +87,9 @@ export async function createDocumento(
     conteudo: parsed.data.conteudo ?? null,
     arquivo_path,
     data: parsed.data.data ?? null,
+    precisa_assinatura: parsed.data.precisa_assinatura,
+    status_assinatura: parsed.data.status_assinatura ?? null,
+    signatarios: parsed.data.signatarios,
   });
   if (error) {
     if (arquivo_path) await removeClienteArquivo(arquivo_path);
@@ -101,6 +121,9 @@ export async function updateDocumento(
     categoria: parsed.data.categoria ?? null,
     conteudo: parsed.data.conteudo ?? null,
     data: parsed.data.data ?? null,
+    precisa_assinatura: parsed.data.precisa_assinatura,
+    status_assinatura: parsed.data.status_assinatura ?? null,
+    signatarios: parsed.data.signatarios,
   };
 
   let novoArquivoPath: string | null = null;

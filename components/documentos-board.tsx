@@ -9,8 +9,17 @@ import {
   Trash2,
   ExternalLink,
   Paperclip,
+  FileSignature,
+  UserPlus,
+  X,
 } from "lucide-react";
-import type { Cliente, Documento, DocumentoCategoria } from "@/lib/types";
+import type {
+  Cliente,
+  Documento,
+  DocumentoCategoria,
+  Signatario,
+  StatusAssinatura,
+} from "@/lib/types";
 import {
   createDocumento,
   updateDocumento,
@@ -18,7 +27,7 @@ import {
 } from "@/app/(dashboard)/documentos/actions";
 import { formatDate } from "@/lib/format";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
-import { StatusChip } from "@/components/status-chip";
+import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { SegmentFilter } from "@/components/segment-filter";
 
 export type DocumentoComArquivo = Documento & { arquivoUrl: string | null };
@@ -34,6 +43,18 @@ const CATEGORIAS: DocumentoCategoria[] = [
 
 const TIPO_OPTIONS = ["Link", "Nota"];
 
+const STATUS_ASSINATURA_LABEL: Record<StatusAssinatura, string> = {
+  pendente: "Assinatura pendente",
+  assinado: "Assinado",
+  recusado: "Assinatura recusada",
+};
+
+const STATUS_ASSINATURA_TONE: Record<StatusAssinatura, ChipTone> = {
+  pendente: "amber",
+  assinado: "emerald",
+  recusado: "rose",
+};
+
 function DocumentoFields({
   documento,
   clientes,
@@ -42,6 +63,26 @@ function DocumentoFields({
   clientes: Cliente[];
 }) {
   const [tipo, setTipo] = useState<"link" | "nota">(documento?.tipo ?? "link");
+  const [precisaAssinatura, setPrecisaAssinatura] = useState(
+    documento?.precisa_assinatura ?? false
+  );
+  const [signatarios, setSignatarios] = useState<Signatario[]>(
+    documento?.signatarios ?? []
+  );
+
+  function addSignatario() {
+    setSignatarios((prev) => [...prev, { nome: "", email: "", assinado: false }]);
+  }
+
+  function updateSignatario(index: number, patch: Partial<Signatario>) {
+    setSignatarios((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, ...patch } : s))
+    );
+  }
+
+  function removeSignatario(index: number) {
+    setSignatarios((prev) => prev.filter((_, i) => i !== index));
+  }
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -136,6 +177,97 @@ function DocumentoFields({
           type="file"
           className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-400 outline-none file:mr-3 file:rounded-md file:border-0 file:bg-zinc-800 file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-zinc-200 focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
+      </div>
+
+      <div className="col-span-2 space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3 sm:col-span-4">
+        <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            name="precisa_assinatura"
+            checked={precisaAssinatura}
+            onChange={(e) => setPrecisaAssinatura(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 accent-copper-600"
+          />
+          <FileSignature className="h-3.5 w-3.5 text-zinc-500" />
+          Precisa de assinatura eletrônica
+        </label>
+
+        {precisaAssinatura && (
+          <div className="space-y-3 pl-6">
+            <input
+              type="hidden"
+              name="signatarios"
+              value={JSON.stringify(signatarios)}
+            />
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-zinc-400">
+                Status da assinatura
+              </label>
+              <select
+                name="status_assinatura"
+                defaultValue={documento?.status_assinatura ?? "pendente"}
+                className="w-full max-w-48 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+              >
+                <option value="pendente">Pendente</option>
+                <option value="assinado">Assinado</option>
+                <option value="recusado">Recusado</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-400">
+                Signatários
+              </label>
+              {signatarios.map((signatario, index) => (
+                <div key={index} className="flex items-center gap-1.5">
+                  <input
+                    placeholder="Nome"
+                    value={signatario.nome}
+                    onChange={(e) =>
+                      updateSignatario(index, { nome: e.target.value })
+                    }
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+                  />
+                  <input
+                    placeholder="E-mail"
+                    type="email"
+                    value={signatario.email}
+                    onChange={(e) =>
+                      updateSignatario(index, { email: e.target.value })
+                    }
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+                  />
+                  <label className="flex shrink-0 items-center gap-1 text-xs text-zinc-400">
+                    <input
+                      type="checkbox"
+                      checked={signatario.assinado}
+                      onChange={(e) =>
+                        updateSignatario(index, { assinado: e.target.checked })
+                      }
+                      className="h-3.5 w-3.5 rounded border-zinc-700 bg-zinc-900 accent-copper-600"
+                    />
+                    assinou
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => removeSignatario(index)}
+                    className="shrink-0 rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addSignatario}
+                className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Adicionar signatário
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -253,6 +385,11 @@ function DocumentoRow({
           {documento.titulo}
           {documento.categoria && (
             <StatusChip tone="copper">{documento.categoria}</StatusChip>
+          )}
+          {documento.precisa_assinatura && (
+            <StatusChip tone={STATUS_ASSINATURA_TONE[documento.status_assinatura ?? "pendente"]}>
+              {STATUS_ASSINATURA_LABEL[documento.status_assinatura ?? "pendente"]}
+            </StatusChip>
           )}
         </p>
         <p className="truncate text-xs text-zinc-500">
