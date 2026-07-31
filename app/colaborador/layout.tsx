@@ -4,6 +4,8 @@ import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/lib/actions/auth";
+import { ModeSwitcher } from "@/components/mode-switcher";
+import type { AccountType } from "@/lib/hub-mode";
 
 export default async function ColaboradorLayout({
   children,
@@ -19,10 +21,19 @@ export default async function ColaboradorLayout({
     redirect("/login");
   }
 
+  // A collaborator (accountant/lawyer/financeiro) is still a real person who
+  // may also want a Business or Pessoal hub — the switcher here lets them
+  // activate either without leaving this screen.
+  const { data: tiposAtivosRows } = await supabase
+    .from("perfis_tipos_ativos")
+    .select("tipo")
+    .eq("user_id", user.id);
+  const tiposAtivos = (tiposAtivosRows ?? []).map((r) => r.tipo as AccountType);
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <header className="flex items-center justify-between border-b border-zinc-900 px-6 py-4">
-        <Link href="/colaborador" className="flex items-center gap-2.5">
+      <header className="flex items-center justify-between gap-4 border-b border-zinc-900 px-6 py-4">
+        <Link href="/colaborador" className="flex shrink-0 items-center gap-2.5">
           <Image
             src="/logo.png"
             alt="Mora HUB"
@@ -38,6 +49,9 @@ export default async function ColaboradorLayout({
           </span>
         </Link>
         <div className="flex items-center gap-4">
+          <div className="w-64">
+            <ModeSwitcher mode={null} tiposAtivos={tiposAtivos} />
+          </div>
           <span className="text-xs text-zinc-500">{user.email}</span>
           <form action={logout}>
             <button

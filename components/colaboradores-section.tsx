@@ -10,6 +10,7 @@ import {
 import { formatDate } from "@/lib/format";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { ConviteColaboradorDialog } from "@/components/convite-colaborador-dialog";
+import { ChatLink } from "@/components/chat/chat-link";
 
 const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
   contador: "Contador",
@@ -36,9 +37,15 @@ type Confirmando = { tipo: "colaborador" | "convite"; id: string } | null;
 export function ColaboradoresSection({
   convites,
   colaboradores,
+  conversaByColaborador,
+  unreadByConversa,
+  currentUserId,
 }: {
   convites: Convite[];
   colaboradores: ColaboradorVinculado[];
+  conversaByColaborador: Map<string, string>;
+  unreadByConversa: Map<string, number>;
+  currentUserId: string;
 }) {
   const [confirmando, setConfirmando] = useState<Confirmando>(null);
 
@@ -99,13 +106,27 @@ export function ColaboradoresSection({
                     </button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmando({ tipo: "colaborador", id: c.id })}
-                    className="shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
-                  >
-                    Remover acesso
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {conversaByColaborador.has(`${c.membro_id}|${c.papel}`) && (
+                      <ChatLink
+                        href={`/chat/${conversaByColaborador.get(`${c.membro_id}|${c.papel}`)}`}
+                        conversaId={conversaByColaborador.get(`${c.membro_id}|${c.papel}`)!}
+                        currentUserId={currentUserId}
+                        initialUnread={
+                          unreadByConversa.get(
+                            conversaByColaborador.get(`${c.membro_id}|${c.papel}`)!
+                          ) ?? 0
+                        }
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setConfirmando({ tipo: "colaborador", id: c.id })}
+                      className="rounded-md px-2.5 py-1.5 text-xs font-medium text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+                    >
+                      Remover acesso
+                    </button>
+                  </div>
                 )}
               </div>
             );

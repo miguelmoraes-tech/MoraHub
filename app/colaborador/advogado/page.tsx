@@ -6,6 +6,8 @@ import {
   type PendenciaComDono,
 } from "@/components/colaborador/juridico-board";
 import { VisaoGeralCards, type VisaoGeralCard } from "@/components/juridico/visao-geral-cards";
+import { ContasVinculadasChat } from "@/components/colaborador/contas-vinculadas-chat";
+import { getConversasComoMembro, getUnreadCountsByConversa } from "@/lib/chat";
 import { todayISO, diffInDays } from "@/lib/vencimentos/dates";
 import type {
   ComplianceJuridico,
@@ -19,6 +21,9 @@ export default async function AdvogadoPainelPage() {
   const donoIds = contas.map((c) => c.dono_id);
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const [
     { data: items },
     { data: compliance },
@@ -63,6 +68,12 @@ export default async function AdvogadoPainelPage() {
     ...item,
     donoNome: nomeConta(contasByDono.get(item.user_id)),
   }));
+
+  const conversas = await getConversasComoMembro("advogado");
+  const conversaByDono = new Map(conversas.map((c) => [c.dono_id, c.id]));
+  const unreadByConversa = await getUnreadCountsByConversa(
+    conversas.map((c) => c.id)
+  );
 
   const hoje = todayISO();
   const complianceRegistros = compliance ?? [];
@@ -127,6 +138,15 @@ export default async function AdvogadoPainelPage() {
         contas={contas}
         tipoFixo="Jurídico"
       />
+      {user && (
+        <ContasVinculadasChat
+          contas={contas}
+          papel="advogado"
+          conversaByDono={conversaByDono}
+          unreadByConversa={unreadByConversa}
+          currentUserId={user.id}
+        />
+      )}
     </>
   );
 }

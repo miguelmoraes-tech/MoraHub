@@ -509,3 +509,28 @@ export interface ModeloContrato {
   updated_at: string;
 }
 
+export interface Conversa {
+  id: string;
+  dono_id: string;
+  membro_id: string;
+  papel: ColaboradorPapel;
+  created_at: string;
+}
+
+export interface Mensagem {
+  id: string;
+  conversa_id: string;
+  remetente_id: string;
+  conteudo: string;
+  lida: boolean;
+  created_at: string;
+}
+
+/** Shape returned by the get_conversa_participante_info() RPC — the *other*
+ * party's display info from whichever side of the conversa is calling. */
+export interface ConversaParticipanteInfo {
+  nome: string | null;
+  email: string | null;
+  status: MembroStatus;
+}
+

@@ -17,3 +17,11 @@ export function isOverdue(value: string | null) {
   const today = new Date().toISOString().slice(0, 10);
   return value < today;
 }
+
+/** Formats an ISO timestamp as a HH:mm clock time (pt-BR, local timezone). */
+export function formatTime(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}

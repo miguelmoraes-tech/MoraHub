@@ -34,6 +34,7 @@ import {
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
 import { GlobalSearch } from "@/components/global-search";
+import { GlobalChatBadge } from "@/components/chat/global-chat-badge";
 import type { AccountType } from "@/lib/hub-mode";
 
 type NavItem = {
@@ -160,14 +161,20 @@ function NavGroup({
 
 export function Sidebar({
   userEmail,
+  userId,
   temColaboracoes,
   tiposAtivos,
   restritoFinanceiro,
+  chatHref,
+  unreadTotal,
 }: {
   userEmail: string;
+  userId: string;
   temColaboracoes?: boolean;
   tiposAtivos: AccountType[];
   restritoFinanceiro?: boolean;
+  chatHref: string;
+  unreadTotal: number;
 }) {
   const pathname = usePathname();
   const isPessoal = pathname.startsWith("/pessoal");
@@ -230,6 +237,11 @@ export function Sidebar({
       </nav>
 
       <div className="border-t border-zinc-900 p-3">
+        <GlobalChatBadge
+          href={chatHref}
+          currentUserId={userId}
+          initialCount={unreadTotal}
+        />
         {temColaboracoes && (
           <Link
             href="/colaborador"

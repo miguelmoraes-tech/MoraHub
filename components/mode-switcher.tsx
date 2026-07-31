@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Check, Plus } from "lucide-react";
+import { ChevronDown, Check, Plus, Users2 } from "lucide-react";
 import {
   writeHubModeCookie,
   accountTypeHubMode,
+  isCollaboratorAccountType,
   ACCOUNT_TYPE_HOME_ROUTE,
   type HubMode,
   type AccountType,
@@ -22,7 +23,8 @@ export function ModeSwitcher({
   mode,
   tiposAtivos,
 }: {
-  mode: HubMode;
+  /** null outside a Business/Pessoal hub (e.g. the collaborator picker) — no option is highlighted as current. */
+  mode: HubMode | null;
   tiposAtivos: AccountType[];
 }) {
   const [open, setOpen] = useState(false);
@@ -47,10 +49,12 @@ export function ModeSwitcher({
   }, [open]);
 
   const current =
-    ACCOUNT_TYPES.find((o) => accountTypeHubMode(o.value) === mode) ??
-    ACCOUNT_TYPES[0];
-  const CurrentIcon = current.icon;
-  const currentStyles = ACCOUNT_TYPE_STYLES[current.value];
+    mode === null
+      ? null
+      : ACCOUNT_TYPES.find((o) => accountTypeHubMode(o.value) === mode) ??
+        ACCOUNT_TYPES[0];
+  const CurrentIcon = current?.icon ?? Users2;
+  const currentStyles = current ? ACCOUNT_TYPE_STYLES[current.value] : null;
 
   return (
     <div ref={containerRef} className="relative">
@@ -59,19 +63,25 @@ export function ModeSwitcher({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="true"
-        className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors ${currentStyles.card}`}
+        className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors ${
+          currentStyles?.card ?? "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900"
+        }`}
       >
         <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-950 ${currentStyles.iconBg}`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-950 ${
+            currentStyles?.iconBg ?? "bg-zinc-600"
+          }`}
         >
           <CurrentIcon className="h-4 w-4" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-            Modo atual
+            {current ? "Modo atual" : "Tipos de conta"}
           </span>
-          <span className={`block truncate text-sm font-semibold ${currentStyles.text}`}>
-            {current.label}
+          <span
+            className={`block truncate text-sm font-semibold ${currentStyles?.text ?? "text-zinc-100"}`}
+          >
+            {current ? current.label : "Trocar ou ativar conta"}
           </span>
         </span>
         <ChevronDown
@@ -98,6 +108,31 @@ export function ModeSwitcher({
             const isAtivo = tiposAtivos.includes(option.value);
             const optionHubMode = accountTypeHubMode(option.value);
             const isCurrent = isAtivo && optionHubMode !== null && optionHubMode === mode;
+
+            if (!isAtivo && isCollaboratorAccountType(option.value)) {
+              // Contador/Advogado/Financeiro never self-activate from here —
+              // they only turn on via signup's default type or by accepting
+              // an invite. Shown so the switcher always lists all 5 types,
+              // but with no action to take.
+              return (
+                <div
+                  key={option.value}
+                  className="flex w-full items-center gap-3 rounded-lg border-l-[3px] border-transparent px-2.5 py-2.5 text-left opacity-40"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-dashed border-zinc-700 text-zinc-600">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-zinc-400">
+                      {option.label}
+                    </span>
+                    <span className="block truncate text-xs text-zinc-600">
+                      Ative aceitando um convite
+                    </span>
+                  </span>
+                </div>
+              );
+            }
 
             if (!isAtivo) {
               return (

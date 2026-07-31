@@ -8,6 +8,7 @@ import {
   PropriedadeIntelectualReadonlyList,
   ProcessosReadonlyList,
 } from "@/components/juridico/juridico-readonly-lists";
+import { getConversasComoDono, getUnreadCountsByConversa } from "@/lib/chat";
 import { todayISO, diffInDays } from "@/lib/vencimentos/dates";
 import type {
   ColaboradorVinculado,
@@ -21,6 +22,9 @@ import type {
 
 export default async function JuridicoPage() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const [
     { data: items },
@@ -77,6 +81,14 @@ export default async function JuridicoPage() {
     return dias >= 0 && dias <= 7;
   }).length;
 
+  const conversas = await getConversasComoDono();
+  const conversaByColaborador = new Map(
+    conversas.map((c) => [`${c.membro_id}|${c.papel}`, c.id])
+  );
+  const unreadByConversa = await getUnreadCountsByConversa(
+    conversas.map((c) => c.id)
+  );
+
   const cards: VisaoGeralCard[] = [
     {
       icon: ShieldCheck,
@@ -118,10 +130,15 @@ export default async function JuridicoPage() {
       <PropriedadeIntelectualReadonlyList itens={propriedadesItens} clienteNome={clienteNome} />
       <ProcessosReadonlyList processos={processosItens} clienteNome={clienteNome} />
       <div className="mx-auto max-w-4xl px-6 pb-8">
-        <ColaboradoresSection
-          convites={convites ?? []}
-          colaboradores={colaboradores ?? []}
-        />
+        {user && (
+          <ColaboradoresSection
+            convites={convites ?? []}
+            colaboradores={colaboradores ?? []}
+            conversaByColaborador={conversaByColaborador}
+            unreadByConversa={unreadByConversa}
+            currentUserId={user.id}
+          />
+        )}
       </div>
     </>
   );

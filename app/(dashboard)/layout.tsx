@@ -6,6 +6,7 @@ import { WelcomeBanner } from "@/components/welcome-banner";
 import { PageTransition } from "@/components/page-transition";
 import { getVencimentoAlertas } from "@/lib/vencimentos/get-alerts";
 import { getFinanceiroDonoId } from "@/lib/financeiro";
+import { getUnreadTotal } from "@/lib/chat";
 import type { AccountType } from "@/lib/hub-mode";
 
 export default async function DashboardLayout({
@@ -40,13 +41,29 @@ export default async function DashboardLayout({
     .eq("user_id", user.id);
   const tiposAtivos = (tiposAtivosRows ?? []).map((r) => r.tipo as AccountType);
 
+  let chatHref = "/juridico";
+  if (restritoFinanceiro && financeiroDonoId) {
+    const { data: conversaFinanceiro } = await supabase
+      .from("conversas")
+      .select("id")
+      .eq("dono_id", financeiroDonoId)
+      .eq("membro_id", user.id)
+      .eq("papel", "financeiro")
+      .maybeSingle();
+    if (conversaFinanceiro) chatHref = `/chat/${conversaFinanceiro.id}`;
+  }
+  const unreadTotal = await getUnreadTotal();
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
         userEmail={user.email ?? ""}
+        userId={user.id}
         temColaboracoes={!!colaboracao && !restritoFinanceiro}
         tiposAtivos={tiposAtivos}
         restritoFinanceiro={restritoFinanceiro}
+        chatHref={chatHref}
+        unreadTotal={unreadTotal}
       />
       <main className="flex flex-1 flex-col overflow-y-auto">
         <VencimentosBanner alertas={alertas} />

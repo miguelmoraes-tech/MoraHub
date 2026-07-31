@@ -21,8 +21,19 @@ const HUB_MODE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
  * user_id), so activating just records the choice and redirects — no signup
  * form needed. First activation appends `?bemvindo=<tipo>` so the target
  * screen can show a one-time welcome message.
+ *
+ * Contador/Advogado/Financeiro are excluded from this self-service path —
+ * those only ever become active via signup's default type or by accepting
+ * an invite (see aceitarConvite / the `membros` table), never through this
+ * action. The UI never offers this action for them, but the check is
+ * repeated here since a server action is reachable directly, not just via
+ * the button that calls it.
  */
 export async function ativarTipoConta(tipo: AccountType) {
+  if (isCollaboratorAccountType(tipo)) {
+    redirect("/colaborador");
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -41,10 +52,6 @@ export async function ativarTipoConta(tipo: AccountType) {
     .select("id");
 
   const isPrimeiraAtivacao = (inserted?.length ?? 0) > 0;
-
-  if (isCollaboratorAccountType(tipo)) {
-    redirect("/colaborador");
-  }
 
   const mode = accountTypeToHubMode(tipo);
   const cookieStore = await cookies();
