@@ -11,6 +11,7 @@ export interface Cliente {
   status: ClienteStatus;
   segmento: string | null;
   abordado_por: string | null;
+  responsavel: string | null;
   lead_origem_id: string | null;
   created_at: string;
 }

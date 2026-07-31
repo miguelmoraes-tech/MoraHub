@@ -59,6 +59,17 @@ export function ClienteForm({ cliente }: { cliente: Cliente }) {
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-zinc-400">
+              Responsável
+            </label>
+            <input
+              name="responsavel"
+              placeholder="Nome do contato na empresa"
+              defaultValue={cliente.responsavel ?? ""}
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">
               Telefone
             </label>
             <input

@@ -11,6 +11,7 @@ export const ClienteSchema = z.object({
   }),
   segmento: z.string().optional(),
   abordado_por: z.string().optional(),
+  responsavel: z.string().optional(),
 });
 
 export type ClienteInput = z.infer<typeof ClienteSchema>;

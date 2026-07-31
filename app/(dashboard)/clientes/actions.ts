@@ -30,6 +30,7 @@ function parseClienteForm(formData: FormData) {
     status: formData.get("status") ?? "em_andamento",
     segmento: textOrNull(formData.get("segmento")) ?? undefined,
     abordado_por: textOrNull(formData.get("abordado_por")) ?? undefined,
+    responsavel: textOrNull(formData.get("responsavel")) ?? undefined,
   });
 }
 
@@ -54,6 +55,7 @@ export async function createCliente(
     status: parsed.data.status,
     segmento: parsed.data.segmento ?? null,
     abordado_por: parsed.data.abordado_por ?? null,
+    responsavel: parsed.data.responsavel ?? null,
     user_id: user.id,
   });
 
@@ -87,6 +89,7 @@ export async function updateCliente(
       status: parsed.data.status,
       segmento: parsed.data.segmento ?? null,
       abordado_por: parsed.data.abordado_por ?? null,
+      responsavel: parsed.data.responsavel ?? null,
     })
     .eq("id", clienteId);
 

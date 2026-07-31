@@ -37,6 +37,11 @@ export function ClienteCard({ cliente }: { cliente: Cliente }) {
             {contato && (
               <p className="truncate text-xs text-zinc-500">{contato}</p>
             )}
+            {cliente.responsavel && (
+              <p className="truncate text-xs text-zinc-500">
+                Responsável: {cliente.responsavel}
+              </p>
+            )}
           </div>
         </div>
         <StatusChip tone={STATUS_TONE[cliente.status]}>

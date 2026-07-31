@@ -72,6 +72,16 @@ export function NewClienteDialog() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-zinc-400">
+                  Responsável
+                </label>
+                <input
+                  name="responsavel"
+                  placeholder="Nome do contato na empresa"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-400">
                   Telefone
                 </label>
                 <input
@@ -80,17 +90,18 @@ export function NewClienteDialog() {
                   className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">
-                  E-mail
-                </label>
-                <input
-                  name="email"
-                  type="email"
-                  placeholder="contato@empresa.com"
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
-                />
-              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-400">
+                E-mail
+              </label>
+              <input
+                name="email"
+                type="email"
+                placeholder="contato@empresa.com"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+              />
             </div>
 
             <div className="space-y-1.5">
