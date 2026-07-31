@@ -1,5 +1,8 @@
-import { Wallet, TrendingUp, Receipt, Scale, Handshake, ArrowLeftRight, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Wallet, TrendingUp, Receipt, Scale, Handshake, ArrowLeftRight, ArrowUpRight, ArrowDownRight, Users2 } from "lucide-react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveDonoId } from "@/lib/financeiro";
+import { getRHOverview } from "@/lib/rh/get-overview";
 import { StatCard } from "@/components/stat-card";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { todayISO } from "@/lib/vencimentos/dates";
@@ -33,32 +36,36 @@ type Movimentacao = {
 export default async function DashboardFinanceiroPage() {
   const supabase = await createClient();
   const mesAtual = todayISO().slice(0, 7);
+  const donoId = await getEffectiveDonoId();
 
   const [
-    { data: comprovantes },
-    { data: gastos },
-    { data: propostas },
-    { data: clientes },
-  ] = (await Promise.all([
-    supabase
-      .from("comprovantes")
-      .select("id, cliente_id, descricao, valor, data")
-      .order("data", { ascending: false }),
-    supabase
-      .from("gastos")
-      .select("id, nome, valor, data, cliente_id")
-      .order("data", { ascending: false }),
-    supabase
-      .from("propostas")
-      .select("valor")
-      .in("status", ["enviada", "em_negociacao"]),
-    supabase.from("clientes").select("id, nome"),
-  ])) as [
-    { data: ComprovanteRow[] | null },
-    { data: GastoRow[] | null },
-    { data: PropostaRow[] | null },
-    { data: ClienteRow[] | null },
-  ];
+    [{ data: comprovantes }, { data: gastos }, { data: propostas }, { data: clientes }],
+    rhOverview,
+  ] = await Promise.all([
+    Promise.all([
+      supabase
+        .from("comprovantes")
+        .select("id, cliente_id, descricao, valor, data")
+        .order("data", { ascending: false }),
+      supabase
+        .from("gastos")
+        .select("id, nome, valor, data, cliente_id")
+        .order("data", { ascending: false }),
+      supabase
+        .from("propostas")
+        .select("valor")
+        .in("status", ["enviada", "em_negociacao"]),
+      supabase.from("clientes").select("id, nome"),
+    ]) as Promise<
+      [
+        { data: ComprovanteRow[] | null },
+        { data: GastoRow[] | null },
+        { data: PropostaRow[] | null },
+        { data: ClienteRow[] | null },
+      ]
+    >,
+    getRHOverview(donoId),
+  ]);
 
   const comprovantesList = comprovantes ?? [];
   const gastosList = gastos ?? [];
@@ -135,6 +142,54 @@ export default async function DashboardFinanceiroPage() {
           tone={saldo >= 0 ? "emerald" : "rose"}
         />
       </div>
+
+      <Link
+        href="/rh"
+        className="block rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
+      >
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+          <Users2 className="h-4 w-4 text-zinc-500" />
+          RH
+        </h2>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <p className="text-xl font-semibold text-zinc-100">{rhOverview.funcionariosAtivos}</p>
+            <p className="text-xs text-zinc-500">funcionários ativos</p>
+          </div>
+          <div>
+            <p
+              className={`text-xl font-semibold ${
+                rhOverview.folhaMes.totalFuncionarios === 0
+                  ? "text-zinc-100"
+                  : rhOverview.folhaMes.pagos === rhOverview.folhaMes.totalFuncionarios
+                    ? "text-emerald-400"
+                    : "text-amber-400"
+              }`}
+            >
+              {rhOverview.folhaMes.totalFuncionarios > 0
+                ? `${rhOverview.folhaMes.pagos}/${rhOverview.folhaMes.totalFuncionarios}`
+                : "—"}
+            </p>
+            <p className="text-xs text-zinc-500">
+              folha do mês · {formatCurrency(rhOverview.folhaMes.valorTotal)}
+            </p>
+          </div>
+          <div>
+            <p
+              className={`text-xl font-semibold ${
+                rhOverview.feriasVencendoCount > 0 ? "text-amber-400" : "text-zinc-100"
+              }`}
+            >
+              {rhOverview.feriasVencendoCount}
+            </p>
+            <p className="text-xs text-zinc-500">férias vencendo (30d)</p>
+          </div>
+          <div>
+            <p className="text-xl font-semibold text-zinc-100">{rhOverview.vagasAbertasCount}</p>
+            <p className="text-xs text-zinc-500">vagas abertas</p>
+          </div>
+        </div>
+      </Link>
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">

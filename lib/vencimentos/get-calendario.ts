@@ -35,6 +35,12 @@ type PropriedadeIntelectualRow = {
   tipo: string;
   data_renovacao: string;
 };
+type FeriaRow = {
+  id: string;
+  funcionario_id: string;
+  periodo_aquisitivo_fim: string;
+};
+type FuncionarioNomeRow = { id: string; nome: string };
 
 export async function getCalendarioItems(): Promise<CalendarioItem[]> {
   const supabase = await createClient();
@@ -47,6 +53,8 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
     { data: assinaturas },
     { data: clientes },
     { data: propriedadesIntelectuais },
+    { data: ferias },
+    { data: funcionarios },
   ] = (await Promise.all([
     supabase.from("vencimentos").select("id, titulo, data, nota"),
     supabase
@@ -73,6 +81,12 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
       .from("propriedade_intelectual")
       .select("id, cliente_id, nome, tipo, data_renovacao")
       .not("data_renovacao", "is", null),
+    supabase
+      .from("ferias")
+      .select("id, funcionario_id, periodo_aquisitivo_fim")
+      .eq("status", "pendente")
+      .not("periodo_aquisitivo_fim", "is", null),
+    supabase.from("funcionarios").select("id, nome"),
   ])) as [
     { data: VencimentoRow[] | null },
     { data: ClienteAssinaturaRow[] | null },
@@ -81,9 +95,12 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
     { data: AssinaturaRow[] | null },
     { data: ClienteRow[] | null },
     { data: PropriedadeIntelectualRow[] | null },
+    { data: FeriaRow[] | null },
+    { data: FuncionarioNomeRow[] | null },
   ];
 
   const clienteNome = new Map((clientes ?? []).map((c) => [c.id, c.nome]));
+  const funcionarioNome = new Map((funcionarios ?? []).map((f) => [f.id, f.nome]));
 
   const itens: CalendarioItem[] = [];
 
@@ -155,6 +172,17 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
       data: p.data_renovacao,
       nota: null,
       href: p.cliente_id ? `/clientes/${p.cliente_id}` : null,
+    });
+  }
+
+  for (const f of ferias ?? []) {
+    itens.push({
+      id: `ferias-${f.id}`,
+      tipo: "ferias",
+      titulo: `Férias: ${funcionarioNome.get(f.funcionario_id) ?? "funcionário"}`,
+      data: f.periodo_aquisitivo_fim,
+      nota: null,
+      href: "/rh/ferias",
     });
   }
 

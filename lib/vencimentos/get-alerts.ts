@@ -47,6 +47,12 @@ type PropriedadeIntelectualRow = {
   nome: string;
   data_renovacao: string;
 };
+type FeriaRow = {
+  id: string;
+  funcionario_id: string;
+  periodo_aquisitivo_fim: string;
+};
+type FuncionarioNomeRow = { id: string; nome: string };
 
 export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
   const supabase = await createClient();
@@ -60,6 +66,8 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
     { data: juridicos },
     { data: clientes },
     { data: propriedadesIntelectuais },
+    { data: ferias },
+    { data: funcionarios },
   ] = (await Promise.all([
     supabase
       .from("assinaturas")
@@ -86,6 +94,12 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
       .from("propriedade_intelectual")
       .select("id, cliente_id, nome, data_renovacao")
       .not("data_renovacao", "is", null),
+    supabase
+      .from("ferias")
+      .select("id, funcionario_id, periodo_aquisitivo_fim")
+      .eq("status", "pendente")
+      .not("periodo_aquisitivo_fim", "is", null),
+    supabase.from("funcionarios").select("id, nome"),
   ])) as [
     { data: AssinaturaRow[] | null },
     { data: GastoRecorrenteRow[] | null },
@@ -94,9 +108,12 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
     { data: JuridicoRow[] | null },
     { data: ClienteRow[] | null },
     { data: PropriedadeIntelectualRow[] | null },
+    { data: FeriaRow[] | null },
+    { data: FuncionarioNomeRow[] | null },
   ];
 
   const clienteNome = new Map((clientes ?? []).map((c) => [c.id, c.nome]));
+  const funcionarioNome = new Map((funcionarios ?? []).map((f) => [f.id, f.nome]));
 
   const alertas: VencimentoAlerta[] = [];
 
@@ -173,6 +190,19 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
       id: `propriedade_intelectual-${p.id}`,
       tipo: "propriedade_intelectual",
       data: p.data_renovacao,
+      diasRestantes: dias,
+      mensagem: mensagemVencer(dias, nome),
+    });
+  }
+
+  for (const f of ferias ?? []) {
+    const dias = diffInDays(hoje, f.periodo_aquisitivo_fim);
+    if (dias > JANELA_DIAS) continue;
+    const nome = `o período de férias de ${funcionarioNome.get(f.funcionario_id) ?? "funcionário"}`;
+    alertas.push({
+      id: `ferias-${f.id}`,
+      tipo: "ferias",
+      data: f.periodo_aquisitivo_fim,
       diasRestantes: dias,
       mensagem: mensagemVencer(dias, nome),
     });

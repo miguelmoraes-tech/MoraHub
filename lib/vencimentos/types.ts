@@ -4,7 +4,8 @@ export type VencimentoTipo =
   | "vencimento"
   | "contrato"
   | "juridico"
-  | "propriedade_intelectual";
+  | "propriedade_intelectual"
+  | "ferias";
 
 export interface VencimentoAlerta {
   id: string;
@@ -20,7 +21,8 @@ export type CalendarioItemTipo =
   | "contrato"
   | "juridico"
   | "assinatura"
-  | "propriedade_intelectual";
+  | "propriedade_intelectual"
+  | "ferias";
 
 export interface CalendarioItem {
   id: string;

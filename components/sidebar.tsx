@@ -30,6 +30,13 @@ import {
   HandCoins,
   PieChart,
   LineChart,
+  Building2,
+  Palmtree,
+  Gift,
+  Banknote,
+  Briefcase,
+  ClipboardCheck,
+  Clock,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
@@ -74,6 +81,18 @@ const FINANCEIRO_ITEMS: NavItem[] = [
   { label: "Fluxo de Caixa", href: "/fluxo-caixa", icon: LineChart, enabled: true },
 ];
 
+const RH_ITEMS: NavItem[] = [
+  { label: "Visão Geral", href: "/rh", icon: LayoutGrid, enabled: true },
+  { label: "Departamentos", href: "/rh/departamentos", icon: Building2, enabled: true },
+  { label: "Funcionários", href: "/rh/funcionarios", icon: Users, enabled: true },
+  { label: "Férias", href: "/rh/ferias", icon: Palmtree, enabled: true },
+  { label: "Benefícios", href: "/rh/beneficios", icon: Gift, enabled: true },
+  { label: "Folha de Pagamento", href: "/rh/folha", icon: Banknote, enabled: true },
+  { label: "Recrutamento", href: "/rh/recrutamento", icon: Briefcase, enabled: true },
+  { label: "Avaliações", href: "/rh/avaliacoes", icon: ClipboardCheck, enabled: true },
+  { label: "Ponto", href: "/rh/ponto", icon: Clock, enabled: true },
+];
+
 const PAINEL_ITEMS: NavItem[] = [
   { label: "Visão Geral", href: "/pessoal", icon: LayoutGrid, enabled: true },
 ];
@@ -115,8 +134,8 @@ function NavGroup({
         {items.map((item) => {
           const isActive =
             item.enabled &&
-            (item.href === "/pessoal"
-              ? pathname === "/pessoal"
+            (item.href === "/pessoal" || item.href === "/rh"
+              ? pathname === item.href
               : pathname.startsWith(item.href));
           const Icon = item.icon;
 
@@ -216,7 +235,10 @@ export function Sidebar({
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <div key={accent} className="hub-mode-fade-in space-y-6">
           {restritoFinanceiro ? (
-            <NavGroup title="Financeiro" items={FINANCEIRO_ITEMS} accent="copper" />
+            <>
+              <NavGroup title="Financeiro" items={FINANCEIRO_ITEMS} accent="copper" />
+              <NavGroup title="RH" items={RH_ITEMS} accent="copper" />
+            </>
           ) : isPessoal ? (
             <>
               <NavGroup title="Painel" items={PAINEL_ITEMS} accent={accent} />
@@ -231,6 +253,7 @@ export function Sidebar({
             <>
               <NavGroup title="Dashboards" items={DASHBOARD_ITEMS} accent={accent} />
               <NavGroup title="Gestão" items={GESTAO_ITEMS} accent={accent} />
+              <NavGroup title="RH" items={RH_ITEMS} accent={accent} />
             </>
           )}
         </div>

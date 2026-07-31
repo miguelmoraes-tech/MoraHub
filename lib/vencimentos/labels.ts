@@ -8,6 +8,7 @@ export const TIPO_LABEL: Record<CalendarioItemTipo, string> = {
   juridico: "Jurídico",
   assinatura: "Assinatura",
   propriedade_intelectual: "Propriedade Intelectual",
+  ferias: "Férias",
 };
 
 export const TIPO_TONE: Record<CalendarioItemTipo, ChipTone> = {
@@ -17,4 +18,5 @@ export const TIPO_TONE: Record<CalendarioItemTipo, ChipTone> = {
   juridico: "sky",
   assinatura: "sky",
   propriedade_intelectual: "sky",
+  ferias: "amber",
 };

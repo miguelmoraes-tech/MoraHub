@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveDonoId } from "@/lib/financeiro";
+import { syncFolhaFromContaPagar } from "@/lib/rh/folha-sync";
 import { ContaPagarSchema } from "@/lib/validations/conta-pagar";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -81,7 +82,17 @@ export async function updateContaPagar(
     .eq("id", contaId);
   if (error) return { error: "Não foi possível atualizar a conta." };
 
+  // Folha de pagamento gerada a partir desta conta (se houver) reflete o mesmo status.
+  await syncFolhaFromContaPagar(
+    supabase,
+    contaId,
+    parsed.data.status,
+    parsed.data.data_pagamento ?? null
+  );
+
   revalidatePath("/contas-pagar");
+  revalidatePath("/rh/folha");
+  revalidatePath("/rh");
   return { ok: true };
 }
 

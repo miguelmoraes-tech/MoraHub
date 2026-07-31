@@ -69,6 +69,22 @@ export async function getClienteArquivoSignedUrls(paths: (string | null)[]) {
   return new Map(entries);
 }
 
+/**
+ * Path is keyed by the *uploader's* auth.uid() (storage RLS requires
+ * folder[1] = auth.uid()), same constraint as uploadModeloContratoArquivo —
+ * a financeiro colaborador uploading a currículo can only read it back
+ * themselves; the dono re-uploading would need to do so under their own id.
+ */
+export async function uploadCandidatoCurriculo(userId: string, file: File) {
+  const supabase = await createClient();
+  const path = `${userId}/rh/candidatos/${Date.now()}-${sanitizeFileName(file.name)}`;
+
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file);
+  if (error) throw error;
+
+  return path;
+}
+
 export function buildPessoalDocumentoPath(
   userId: string,
   documentoId: string,

@@ -534,3 +534,168 @@ export interface ConversaParticipanteInfo {
   status: MembroStatus;
 }
 
+export interface Departamento {
+  id: string;
+  user_id: string;
+  nome: string;
+  descricao: string | null;
+  gestor_funcionario_id: string | null;
+  created_at: string;
+}
+
+export type FuncionarioTipoContrato =
+  | "clt"
+  | "pj"
+  | "estagio"
+  | "freelancer"
+  | "outro";
+export type FuncionarioStatus = "ativo" | "afastado" | "desligado";
+
+export interface Funcionario {
+  id: string;
+  user_id: string;
+  membro_id: string | null;
+  nome: string;
+  cargo: string | null;
+  cpf: string | null;
+  email: string | null;
+  telefone: string | null;
+  data_admissao: string | null;
+  data_desligamento: string | null;
+  tipo_contrato: FuncionarioTipoContrato;
+  salario: number | null;
+  status: FuncionarioStatus;
+  observacoes: string | null;
+  departamento_id: string | null;
+  gestor_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FeriasStatus = "pendente" | "agendada" | "em_gozo" | "concluida";
+
+export interface Feria {
+  id: string;
+  user_id: string;
+  funcionario_id: string;
+  periodo_aquisitivo_inicio: string | null;
+  periodo_aquisitivo_fim: string | null;
+  dias_direito: number;
+  dias_gozados: number;
+  data_inicio_gozo: string | null;
+  data_fim_gozo: string | null;
+  status: FeriasStatus;
+  observacoes: string | null;
+  created_at: string;
+}
+
+export type BeneficioTipo =
+  | "vale_refeicao"
+  | "vale_transporte"
+  | "plano_saude"
+  | "plano_odontologico"
+  | "seguro_vida"
+  | "outro";
+
+export interface Beneficio {
+  id: string;
+  user_id: string;
+  funcionario_id: string;
+  tipo: BeneficioTipo;
+  valor: number | null;
+  observacoes: string | null;
+  created_at: string;
+}
+
+export type FolhaPagamentoStatus = "pendente" | "pago";
+
+export interface FolhaPagamento {
+  id: string;
+  user_id: string;
+  funcionario_id: string;
+  mes_referencia: string;
+  salario_bruto: number | null;
+  descontos: number;
+  salario_liquido: number | null;
+  status: FolhaPagamentoStatus;
+  data_pagamento: string | null;
+  conta_pagar_id: string | null;
+  observacoes: string | null;
+  created_at: string;
+}
+
+export type VagaStatus = "aberta" | "pausada" | "fechada";
+
+export interface Vaga {
+  id: string;
+  user_id: string;
+  titulo: string;
+  departamento_id: string | null;
+  status: VagaStatus;
+  descricao: string | null;
+  requisitos: string | null;
+  salario_previsto: number | null;
+  tipo_contrato: FuncionarioTipoContrato;
+  created_at: string;
+}
+
+export type CandidatoStatus =
+  | "triagem"
+  | "entrevista"
+  | "teste"
+  | "aprovado"
+  | "reprovado"
+  | "contratado";
+
+export interface Candidato {
+  id: string;
+  user_id: string;
+  vaga_id: string;
+  nome: string;
+  email: string | null;
+  telefone: string | null;
+  status: CandidatoStatus;
+  curriculo_path: string | null;
+  origem: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AvaliacaoDesempenho {
+  id: string;
+  user_id: string;
+  funcionario_id: string;
+  avaliador_id: string | null;
+  periodo_referencia: string;
+  nota: number | null;
+  pontos_fortes: string | null;
+  pontos_melhoria: string | null;
+  metas_proximo_periodo: string | null;
+  observacoes: string | null;
+  created_at: string;
+}
+
+export type ControlePontoStatus =
+  | "normal"
+  | "falta"
+  | "falta_justificada"
+  | "feriado"
+  | "ferias"
+  | "atestado";
+
+export interface ControlePonto {
+  id: string;
+  user_id: string;
+  funcionario_id: string;
+  data: string;
+  entrada: string | null;
+  saida_almoco: string | null;
+  volta_almoco: string | null;
+  saida: string | null;
+  horas_trabalhadas: number | null;
+  status: ControlePontoStatus;
+  observacoes: string | null;
+  created_at: string;
+}
+
