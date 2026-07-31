@@ -8,7 +8,12 @@ export const MODE_HOME_ROUTE: Record<HubMode, string> = {
 };
 
 /** Matches the `perfis.tipo_conta_padrao` check constraint. */
-export type AccountType = "empresarial" | "pessoal" | "contador" | "advogado";
+export type AccountType =
+  | "empresarial"
+  | "pessoal"
+  | "contador"
+  | "advogado"
+  | "financeiro";
 
 /** Missing/unrecognized values (e.g. accounts predating this column) fall back to business. */
 export function accountTypeToHubMode(tipo: string | null | undefined): HubMode {
@@ -16,11 +21,14 @@ export function accountTypeToHubMode(tipo: string | null | undefined): HubMode {
 }
 
 /**
- * Contador/advogado accounts have no business or pessoal hub of their own by
- * default — they land on the linked-accounts picker instead of a HubMode home.
+ * Contador/advogado/financeiro accounts have no business or pessoal hub of
+ * their own by default — they land on the linked-accounts picker instead of
+ * a HubMode home. Financeiro differs from contador/advogado in that it's
+ * capped at one active link (enforced by a DB unique index), not several —
+ * see lib/financeiro.ts.
  */
 export function isCollaboratorAccountType(tipo: string | null | undefined): boolean {
-  return tipo === "contador" || tipo === "advogado";
+  return tipo === "contador" || tipo === "advogado" || tipo === "financeiro";
 }
 
 /** Where activating/switching to each account type sends the user. */
@@ -29,12 +37,13 @@ export const ACCOUNT_TYPE_HOME_ROUTE: Record<AccountType, string> = {
   pessoal: MODE_HOME_ROUTE.pessoal,
   contador: "/colaborador",
   advogado: "/colaborador",
+  financeiro: "/colaborador",
 };
 
 /**
  * The HubMode an account type maps to inside the Business/Pessoal sidebar,
- * or null for contador/advogado — those don't have a persistent hub of
- * their own, so they're never the "current" selection in that sidebar.
+ * or null for contador/advogado/financeiro — those don't have a persistent
+ * hub of their own, so they're never the "current" selection in that sidebar.
  */
 export function accountTypeHubMode(tipo: AccountType): HubMode | null {
   if (tipo === "pessoal") return "pessoal";

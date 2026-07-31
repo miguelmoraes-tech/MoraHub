@@ -197,6 +197,7 @@ export interface Gasto {
   tipo: GastoTipo;
   recorrencia: Recorrencia | null;
   cliente_id: string | null;
+  categoria: string | null;
   data: string;
   created_at: string;
 }
@@ -277,7 +278,7 @@ export interface Proposta {
   created_at: string;
 }
 
-export type ColaboradorPapel = "contador" | "advogado";
+export type ColaboradorPapel = "contador" | "advogado" | "financeiro";
 export type ConviteStatus = "pendente" | "aceito" | "recusado" | "expirado";
 export type MembroStatus = "ativo" | "removido";
 
@@ -373,6 +374,48 @@ export interface SolicitacaoDocumento {
   descricao: string | null;
   status: SolicitacaoDocumentoStatus;
   documento_id: string | null;
+  created_at: string;
+}
+
+export type ContaPagarStatus = "pendente" | "pago" | "atrasado";
+
+export interface ContaPagar {
+  id: string;
+  user_id: string;
+  descricao: string;
+  valor: number;
+  fornecedor: string | null;
+  categoria: string | null;
+  data_vencimento: string;
+  data_pagamento: string | null;
+  status: ContaPagarStatus;
+  observacoes: string | null;
+  created_at: string;
+}
+
+export type ContaReceberStatus = "pendente" | "recebido" | "atrasado";
+
+export interface ContaReceber {
+  id: string;
+  user_id: string;
+  cliente_id: string | null;
+  proposta_id: string | null;
+  descricao: string;
+  valor: number;
+  data_vencimento: string;
+  data_recebimento: string | null;
+  status: ContaReceberStatus;
+  observacoes: string | null;
+  created_at: string;
+}
+
+export interface Orcamento {
+  id: string;
+  user_id: string;
+  categoria: string;
+  mes_referencia: string;
+  valor_planejado: number;
+  observacoes: string | null;
   created_at: string;
 }
 

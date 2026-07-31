@@ -21,7 +21,7 @@ export function ConviteColaboradorDialog() {
         className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
       >
         <Plus className="h-4 w-4" />
-        Adicionar contador/advogado
+        Adicionar colaborador
       </button>
 
       {/* See new-cliente-dialog.tsx for why margin/display are handled this way. */}
@@ -57,6 +57,9 @@ function ConviteColaboradorForm({ onDone }: { onDone: () => void }) {
     undefined
   );
   const [copied, setCopied] = useState(false);
+  const [papel, setPapel] = useState<"contador" | "advogado" | "financeiro">(
+    "contador"
+  );
   const created = state && "ok" in state ? state : null;
 
   async function handleCopy() {
@@ -120,12 +123,21 @@ function ConviteColaboradorForm({ onDone }: { onDone: () => void }) {
         <select
           name="papel"
           required
-          defaultValue="contador"
+          value={papel}
+          onChange={(e) => setPapel(e.target.value as typeof papel)}
           className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         >
           <option value="contador">Contador</option>
           <option value="advogado">Advogado</option>
+          <option value="financeiro">Financeiro</option>
         </select>
+        {papel === "financeiro" && (
+          <p className="text-xs text-zinc-500">
+            Funcionário interno com acesso às seções financeiras desta
+            empresa. Diferente de contador/advogado, um financeiro só pode
+            estar vinculado a uma empresa por vez.
+          </p>
+        )}
       </div>
 
       {state && "error" in state && (

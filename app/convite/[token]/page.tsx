@@ -16,6 +16,14 @@ type ConvitePublico = {
 const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
   contador: "Contador",
   advogado: "Advogado",
+  financeiro: "Financeiro",
+};
+
+const PAPEL_ACESSO_DESCRICAO: Record<ColaboradorPapel, string> = {
+  contador: "com acesso à aba Jurídico & Contábil",
+  advogado: "com acesso à aba Jurídico & Contábil",
+  financeiro:
+    "com acesso às seções financeiras da empresa (Contas a Pagar, Contas a Receber, Orçamento e Fluxo de Caixa)",
 };
 
 export default async function ConvitePage({
@@ -77,7 +85,7 @@ export default async function ConvitePage({
                 <strong className="text-zinc-100">
                   {PAPEL_LABEL[convite.papel]}
                 </strong>{" "}
-                no Mora HUB, com acesso à aba Jurídico & Contábil.
+                no Mora HUB, {PAPEL_ACESSO_DESCRICAO[convite.papel]}.
               </p>
 
               {user ? (

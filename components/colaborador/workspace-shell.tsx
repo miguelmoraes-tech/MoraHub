@@ -1,12 +1,14 @@
-import { WorkspaceSidebar } from "@/components/colaborador/workspace-sidebar";
-import type { ColaboradorPapel } from "@/lib/types";
+import {
+  WorkspaceSidebar,
+  type WorkspacePapel,
+} from "@/components/colaborador/workspace-sidebar";
 
 export function WorkspaceShell({
   papel,
   contasCount,
   children,
 }: {
-  papel: ColaboradorPapel;
+  papel: WorkspacePapel;
   contasCount: number;
   children: React.ReactNode;
 }) {

@@ -77,7 +77,7 @@ function GastoFields({
           <option value="Único">Único</option>
         </select>
       </div>
-      <div className="col-span-2 space-y-1">
+      <div className="space-y-1">
         <label className="text-xs font-medium text-zinc-400">
           Cliente (opcional)
         </label>
@@ -93,6 +93,17 @@ function GastoFields({
             </option>
           ))}
         </select>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-zinc-400">
+          Categoria (orçamento)
+        </label>
+        <input
+          name="categoria"
+          defaultValue={gasto?.categoria ?? ""}
+          placeholder="Ex: Marketing"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+        />
       </div>
     </div>
   );
@@ -194,6 +205,7 @@ function GastoRow({ gasto, clientes }: { gasto: Gasto; clientes: Cliente[] }) {
     gasto.tipo === "fixo" ? "Fixo" : "Pontual",
     gasto.recorrencia,
     cliente?.nome,
+    gasto.categoria,
   ]
     .filter(Boolean)
     .join(" · ");

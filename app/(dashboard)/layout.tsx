@@ -5,6 +5,7 @@ import { VencimentosBanner } from "@/components/vencimentos-banner";
 import { WelcomeBanner } from "@/components/welcome-banner";
 import { PageTransition } from "@/components/page-transition";
 import { getVencimentoAlertas } from "@/lib/vencimentos/get-alerts";
+import { getFinanceiroDonoId } from "@/lib/financeiro";
 import type { AccountType } from "@/lib/hub-mode";
 
 export default async function DashboardLayout({
@@ -22,6 +23,8 @@ export default async function DashboardLayout({
   }
 
   const alertas = await getVencimentoAlertas();
+  const financeiroDonoId = await getFinanceiroDonoId();
+  const restritoFinanceiro = !!financeiroDonoId;
 
   const { data: colaboracao } = await supabase
     .from("membros")
@@ -41,8 +44,9 @@ export default async function DashboardLayout({
     <div className="flex h-screen overflow-hidden">
       <Sidebar
         userEmail={user.email ?? ""}
-        temColaboracoes={!!colaboracao}
+        temColaboracoes={!!colaboracao && !restritoFinanceiro}
         tiposAtivos={tiposAtivos}
+        restritoFinanceiro={restritoFinanceiro}
       />
       <main className="flex flex-1 flex-col overflow-y-auto">
         <VencimentosBanner alertas={alertas} />

@@ -26,6 +26,10 @@ import {
   ListChecks,
   Inbox,
   Users2,
+  CreditCard,
+  HandCoins,
+  PieChart,
+  LineChart,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
@@ -56,6 +60,17 @@ const GESTAO_ITEMS: NavItem[] = [
   { label: "Gastos", href: "/gastos", icon: Receipt, enabled: true },
   { label: "Jurídico & Contábil", href: "/juridico", icon: Scale, enabled: true },
   { label: "Documentos", href: "/documentos", icon: FileText, enabled: true },
+  { label: "Contas a Pagar", href: "/contas-pagar", icon: CreditCard, enabled: true },
+  { label: "Contas a Receber", href: "/contas-receber", icon: HandCoins, enabled: true },
+  { label: "Orçamento", href: "/orcamentos", icon: PieChart, enabled: true },
+  { label: "Fluxo de Caixa", href: "/fluxo-caixa", icon: LineChart, enabled: true },
+];
+
+const FINANCEIRO_ITEMS: NavItem[] = [
+  { label: "Contas a Pagar", href: "/contas-pagar", icon: CreditCard, enabled: true },
+  { label: "Contas a Receber", href: "/contas-receber", icon: HandCoins, enabled: true },
+  { label: "Orçamento", href: "/orcamentos", icon: PieChart, enabled: true },
+  { label: "Fluxo de Caixa", href: "/fluxo-caixa", icon: LineChart, enabled: true },
 ];
 
 const PAINEL_ITEMS: NavItem[] = [
@@ -146,10 +161,12 @@ export function Sidebar({
   userEmail,
   temColaboracoes,
   tiposAtivos,
+  restritoFinanceiro,
 }: {
   userEmail: string;
   temColaboracoes?: boolean;
   tiposAtivos: AccountType[];
+  restritoFinanceiro?: boolean;
 }) {
   const pathname = usePathname();
   const isPessoal = pathname.startsWith("/pessoal");
@@ -174,16 +191,25 @@ export function Sidebar({
             HUB
           </span>
         </span>
+        {restritoFinanceiro && (
+          <span className="rounded-full border border-emerald-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-400">
+            Financeiro
+          </span>
+        )}
       </div>
 
-      <div className="space-y-3 border-b border-zinc-900 px-3 pb-4">
-        <GlobalSearch />
-        <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} tiposAtivos={tiposAtivos} />
-      </div>
+      {!restritoFinanceiro && (
+        <div className="space-y-3 border-b border-zinc-900 px-3 pb-4">
+          <GlobalSearch />
+          <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} tiposAtivos={tiposAtivos} />
+        </div>
+      )}
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <div key={accent} className="hub-mode-fade-in space-y-6">
-          {isPessoal ? (
+          {restritoFinanceiro ? (
+            <NavGroup title="Financeiro" items={FINANCEIRO_ITEMS} accent="copper" />
+          ) : isPessoal ? (
             <>
               <NavGroup title="Painel" items={PAINEL_ITEMS} accent={accent} />
               <NavGroup title="Finanças" items={FINANCAS_ITEMS} accent={accent} />

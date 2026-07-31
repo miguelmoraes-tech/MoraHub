@@ -14,6 +14,7 @@ import { ConviteColaboradorDialog } from "@/components/convite-colaborador-dialo
 const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
   contador: "Contador",
   advogado: "Advogado",
+  financeiro: "Financeiro",
 };
 
 const CONVITE_STATUS_LABEL: Record<Convite["status"], string> = {
@@ -46,7 +47,7 @@ export function ColaboradoresSection({
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
           <UserCheck className="h-4 w-4 text-zinc-500" />
-          Colaboradores externos
+          Colaboradores
         </div>
         <ConviteColaboradorDialog />
       </div>

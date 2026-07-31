@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Building2, Home, Calculator, Scale } from "lucide-react";
+import { Building2, Home, Calculator, Scale, Briefcase } from "lucide-react";
 import type { AccountType } from "@/lib/hub-mode";
 
 export const ACCOUNT_TYPES: {
@@ -31,6 +31,13 @@ export const ACCOUNT_TYPES: {
     label: "Conta Jurídica",
     description: "Para atender seus clientes de advocacia em um só lugar",
     icon: Scale,
+  },
+  {
+    value: "financeiro",
+    label: "Conta Financeiro",
+    description:
+      "Acesso de funcionário interno à área financeira de uma única empresa — não substitui o acesso do dono, é vinculada a apenas um negócio por vez",
+    icon: Briefcase,
   },
 ];
 
@@ -77,5 +84,13 @@ export const ACCOUNT_TYPE_STYLES: Record<
     button: "bg-violet-600 hover:bg-violet-500",
     current: "border-violet-400 bg-violet-600/10",
     accentText: "text-violet-400",
+  },
+  financeiro: {
+    card: "border-emerald-600/40 bg-emerald-600/10 hover:bg-emerald-600/15",
+    iconBg: "bg-emerald-400",
+    text: "text-emerald-200",
+    button: "bg-emerald-600 hover:bg-emerald-500",
+    current: "border-emerald-400 bg-emerald-600/10",
+    accentText: "text-emerald-400",
   },
 };

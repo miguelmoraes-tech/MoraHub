@@ -12,7 +12,9 @@ import {
   Grid3x3,
   Wallet,
 } from "lucide-react";
-import type { ColaboradorPapel } from "@/lib/types";
+/** These workspaces only exist for advogado/contador — financeiro works
+ * inside the regular empresarial dashboard instead (see lib/financeiro.ts). */
+export type WorkspacePapel = "advogado" | "contador";
 
 type NavItem = {
   label: string;
@@ -20,7 +22,7 @@ type NavItem = {
   icon: ComponentType<{ className?: string }>;
 };
 
-const NAV_ITEMS: Record<ColaboradorPapel, NavItem[]> = {
+const NAV_ITEMS: Record<WorkspacePapel, NavItem[]> = {
   advogado: [
     { label: "Painel geral", href: "/colaborador/advogado", icon: LayoutGrid },
     { label: "Processos", href: "/colaborador/advogado/processos", icon: Gavel },
@@ -55,12 +57,12 @@ const NAV_ITEMS: Record<ColaboradorPapel, NavItem[]> = {
   ],
 };
 
-const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
+const PAPEL_LABEL: Record<WorkspacePapel, string> = {
   advogado: "Advogado",
   contador: "Contador",
 };
 
-const ACCENT: Record<ColaboradorPapel, string> = {
+const ACCENT: Record<WorkspacePapel, string> = {
   advogado: "bg-violet-600/15 text-violet-300",
   contador: "bg-sky-600/15 text-sky-300",
 };
@@ -69,7 +71,7 @@ export function WorkspaceSidebar({
   papel,
   contasCount,
 }: {
-  papel: ColaboradorPapel;
+  papel: WorkspacePapel;
   contasCount: number;
 }) {
   const pathname = usePathname();
