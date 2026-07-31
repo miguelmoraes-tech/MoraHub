@@ -4,18 +4,28 @@ import {
   DocumentosBoard,
   type DocumentoComArquivo,
 } from "@/components/documentos-board";
-import type { Cliente, Documento } from "@/lib/types";
+import type { Cliente, Documento, ModeloContrato } from "@/lib/types";
 
 export default async function DocumentosPage() {
   const supabase = await createClient();
 
-  const [{ data: documentos }, { data: clientes }] = (await Promise.all([
-    supabase
-      .from("documentos")
-      .select("*")
-      .order("created_at", { ascending: false }),
-    supabase.from("clientes").select("*").order("nome"),
-  ])) as [{ data: Documento[] | null }, { data: Cliente[] | null }];
+  const [{ data: documentos }, { data: clientes }, { data: modelos }] =
+    (await Promise.all([
+      supabase
+        .from("documentos")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      supabase.from("clientes").select("*").order("nome"),
+      supabase
+        .from("modelos_contrato")
+        .select("*")
+        .not("conteudo", "is", null)
+        .order("titulo"),
+    ])) as [
+      { data: Documento[] | null },
+      { data: Cliente[] | null },
+      { data: ModeloContrato[] | null },
+    ];
 
   const urls = await getClienteArquivoSignedUrls(
     (documentos ?? []).map((d) => d.arquivo_path)
@@ -31,6 +41,10 @@ export default async function DocumentosPage() {
   );
 
   return (
-    <DocumentosBoard documentos={documentosComArquivo} clientes={clientes ?? []} />
+    <DocumentosBoard
+      documentos={documentosComArquivo}
+      clientes={clientes ?? []}
+      modelos={modelos ?? []}
+    />
   );
 }

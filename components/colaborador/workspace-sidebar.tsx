@@ -13,6 +13,7 @@ import {
   Wallet,
   Copyright,
   ShieldCheck,
+  FileStack,
 } from "lucide-react";
 /** These workspaces only exist for advogado/contador — financeiro works
  * inside the regular empresarial dashboard instead (see lib/financeiro.ts). */
@@ -47,6 +48,11 @@ const NAV_ITEMS: Record<WorkspacePapel, NavItem[]> = {
       label: "Compliance",
       href: "/colaborador/advogado/compliance",
       icon: ShieldCheck,
+    },
+    {
+      label: "Modelos de Contrato",
+      href: "/colaborador/advogado/modelos-contrato",
+      icon: FileStack,
     },
   ],
   contador: [

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -12,11 +12,14 @@ import {
   FileSignature,
   UserPlus,
   X,
+  FileStack,
+  Search,
 } from "lucide-react";
 import type {
   Cliente,
   Documento,
   DocumentoCategoria,
+  ModeloContrato,
   Signatario,
   StatusAssinatura,
 } from "@/lib/types";
@@ -55,12 +58,102 @@ const STATUS_ASSINATURA_TONE: Record<StatusAssinatura, ChipTone> = {
   recusado: "rose",
 };
 
+function ModeloSelectorPanel({
+  modelos,
+  onSelect,
+  onClose,
+}: {
+  modelos: ModeloContrato[];
+  onSelect: (modelo: ModeloContrato) => void;
+  onClose: () => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const [categoria, setCategoria] = useState("");
+
+  const categorias = useMemo(
+    () =>
+      [...new Set(modelos.map((m) => m.categoria).filter((c): c is string => !!c))].sort(
+        (a, b) => a.localeCompare(b)
+      ),
+    [modelos]
+  );
+
+  const filtrados = modelos.filter((modelo) => {
+    if (categoria && modelo.categoria !== categoria) return false;
+    if (busca && !modelo.titulo.toLowerCase().includes(busca.toLowerCase())) {
+      return false;
+    }
+    return true;
+  });
+
+  return (
+    <div className="col-span-2 space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3 sm:col-span-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/50 px-2.5 py-1.5">
+            <Search className="h-3.5 w-3.5 text-zinc-500" />
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar modelo"
+              className="bg-transparent text-xs text-zinc-300 outline-none placeholder:text-zinc-600"
+            />
+          </div>
+          {categorias.length > 0 && (
+            <SegmentFilter
+              value={categoria}
+              options={categorias}
+              allLabel="Todas as categorias"
+              onChange={setCategoria}
+            />
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="max-h-56 space-y-1.5 overflow-y-auto">
+        {filtrados.length > 0 ? (
+          filtrados.map((modelo) => (
+            <button
+              key={modelo.id}
+              type="button"
+              onClick={() => onSelect(modelo)}
+              className="flex w-full flex-col gap-1 rounded-lg border border-zinc-800/80 px-3 py-2 text-left hover:border-copper-600/60 hover:bg-zinc-900"
+            >
+              <span className="flex flex-wrap items-center gap-1.5 text-sm text-zinc-200">
+                {modelo.titulo}
+                {modelo.categoria && (
+                  <StatusChip tone="copper">{modelo.categoria}</StatusChip>
+                )}
+              </span>
+              {modelo.conteudo && (
+                <span className="line-clamp-1 text-xs text-zinc-500">
+                  {modelo.conteudo}
+                </span>
+              )}
+            </button>
+          ))
+        ) : (
+          <p className="text-xs text-zinc-600">Nenhum modelo encontrado.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DocumentoFields({
   documento,
   clientes,
+  modelos = [],
 }: {
   documento?: Documento;
   clientes: Cliente[];
+  modelos?: ModeloContrato[];
 }) {
   const [tipo, setTipo] = useState<"link" | "nota">(documento?.tipo ?? "link");
   const [precisaAssinatura, setPrecisaAssinatura] = useState(
@@ -69,6 +162,16 @@ function DocumentoFields({
   const [signatarios, setSignatarios] = useState<Signatario[]>(
     documento?.signatarios ?? []
   );
+  const [modeloSelectorOpen, setModeloSelectorOpen] = useState(false);
+  const [templateConteudo, setTemplateConteudo] = useState<string | undefined>(
+    undefined
+  );
+
+  function handleSelectModelo(modelo: ModeloContrato) {
+    setTipo("nota");
+    setTemplateConteudo(modelo.conteudo ?? "");
+    setModeloSelectorOpen(false);
+  }
 
   function addSignatario() {
     setSignatarios((prev) => [...prev, { nome: "", email: "", assinado: false }]);
@@ -86,6 +189,26 @@ function DocumentoFields({
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {!documento && modelos.length > 0 && (
+        <div className="col-span-2 sm:col-span-4">
+          {modeloSelectorOpen ? (
+            <ModeloSelectorPanel
+              modelos={modelos}
+              onSelect={handleSelectModelo}
+              onClose={() => setModeloSelectorOpen(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setModeloSelectorOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800"
+            >
+              <FileStack className="h-3.5 w-3.5" />
+              Começar a partir de um modelo
+            </button>
+          )}
+        </div>
+      )}
       <div className="col-span-2 space-y-1">
         <label className="text-xs font-medium text-zinc-400">Título *</label>
         <input
@@ -162,8 +285,9 @@ function DocumentoFields({
         ) : (
           <textarea
             name="conteudo"
-            rows={2}
-            defaultValue={documento?.conteudo ?? ""}
+            rows={templateConteudo ? 10 : 2}
+            key={templateConteudo ?? "conteudo"}
+            defaultValue={documento?.conteudo ?? templateConteudo ?? ""}
             className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         )}
@@ -273,7 +397,13 @@ function DocumentoFields({
   );
 }
 
-function NewDocumentoForm({ clientes }: { clientes: Cliente[] }) {
+function NewDocumentoForm({
+  clientes,
+  modelos,
+}: {
+  clientes: Cliente[];
+  modelos: ModeloContrato[];
+}) {
   const [open, setOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(
@@ -306,7 +436,7 @@ function NewDocumentoForm({ clientes }: { clientes: Cliente[] }) {
       action={formAction}
       className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3"
     >
-      <DocumentoFields clientes={clientes} />
+      <DocumentoFields clientes={clientes} modelos={modelos} />
       {state && "error" in state && (
         <p className="text-xs text-rose-400">{state.error}</p>
       )}
@@ -451,9 +581,11 @@ function DocumentoRow({
 export function DocumentosBoard({
   documentos,
   clientes,
+  modelos,
 }: {
   documentos: DocumentoComArquivo[];
   clientes: Cliente[];
+  modelos: ModeloContrato[];
 }) {
   const [categoria, setCategoria] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState<"" | "link" | "nota">("");
@@ -474,7 +606,7 @@ export function DocumentosBoard({
             {filtrados.length} documento(s)
           </p>
         </div>
-        <NewDocumentoForm clientes={clientes} />
+        <NewDocumentoForm clientes={clientes} modelos={modelos} />
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-3">

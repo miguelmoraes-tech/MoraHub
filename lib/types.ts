@@ -497,3 +497,15 @@ export interface PessoalCompliance {
   updated_at: string;
 }
 
+export interface ModeloContrato {
+  id: string;
+  user_id: string;
+  titulo: string;
+  categoria: string | null;
+  conteudo: string | null;
+  arquivo_path: string | null;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+

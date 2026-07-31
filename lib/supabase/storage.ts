@@ -32,6 +32,22 @@ export async function uploadDocumentoArquivo(userId: string, file: File) {
   return path;
 }
 
+/**
+ * Path is keyed by the *uploader's* auth.uid() (storage RLS requires
+ * folder[1] = auth.uid()), not the modelo's dono_id — an advogado filing a
+ * modelo on behalf of a linked conta uploads under their own folder, same as
+ * they're the only one who ever opens it back from the Biblioteca screen.
+ */
+export async function uploadModeloContratoArquivo(userId: string, file: File) {
+  const supabase = await createClient();
+  const path = `${userId}/modelos/${Date.now()}-${sanitizeFileName(file.name)}`;
+
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file);
+  if (error) throw error;
+
+  return path;
+}
+
 export async function removeClienteArquivo(path: string) {
   const supabase = await createClient();
   await supabase.storage.from(BUCKET).remove([path]);
