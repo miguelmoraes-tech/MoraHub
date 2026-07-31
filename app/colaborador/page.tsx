@@ -1,7 +1,7 @@
 import { Building2, Home, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { MODE_HOME_ROUTE, accountTypeToHubMode } from "@/lib/hub-mode";
+import { MODE_HOME_ROUTE, accountTypeToHubMode, isCollaboratorAccountType } from "@/lib/hub-mode";
 import { entrarContaVinculada } from "@/app/colaborador/actions";
 import type { ColaboradorPapel, ContaVinculada } from "@/lib/types";
 
@@ -22,6 +22,7 @@ export default async function ColaboradorPickerPage() {
     .eq("id", user?.id ?? "")
     .maybeSingle();
   const meuModo = accountTypeToHubMode(perfil?.tipo_conta_padrao);
+  const isColaboradorAccount = isCollaboratorAccountType(perfil?.tipo_conta_padrao);
 
   const { data: contas } = (await supabase.rpc("get_contas_vinculadas")) as {
     data: ContaVinculada[] | null;
@@ -33,27 +34,31 @@ export default async function ColaboradorPickerPage() {
         Escolha onde entrar
       </h1>
       <p className="mb-6 text-sm text-zinc-500">
-        Sua conta e as contas em que você colabora.
+        {isColaboradorAccount
+          ? "As contas em que você colabora."
+          : "Sua conta e as contas em que você colabora."}
       </p>
 
       <div className="space-y-2">
-        <Link
-          href={MODE_HOME_ROUTE[meuModo]}
-          className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3.5 transition-colors hover:bg-zinc-900"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-zinc-300">
-            <Home className="h-4 w-4" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-medium text-zinc-100">
-              Minha conta
+        {!isColaboradorAccount && (
+          <Link
+            href={MODE_HOME_ROUTE[meuModo]}
+            className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3.5 transition-colors hover:bg-zinc-900"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-zinc-300">
+              <Home className="h-4 w-4" />
             </span>
-            <span className="block truncate text-xs text-zinc-500">
-              {user?.email}
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-zinc-100">
+                Minha conta
+              </span>
+              <span className="block truncate text-xs text-zinc-500">
+                {user?.email}
+              </span>
             </span>
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-zinc-600" />
-        </Link>
+            <ArrowRight className="h-4 w-4 shrink-0 text-zinc-600" />
+          </Link>
+        )}
 
         {(contas ?? []).map((conta) => (
           <form
@@ -83,7 +88,9 @@ export default async function ColaboradorPickerPage() {
 
       {(contas ?? []).length === 0 && (
         <p className="mt-4 text-xs text-zinc-600">
-          Você ainda não colabora em nenhuma conta.
+          Você ainda não está vinculado a nenhuma conta — peça para seu
+          cliente te convidar pelo e-mail que você cadastrou aqui:{" "}
+          <span className="font-medium text-zinc-400">{user?.email}</span>.
         </p>
       )}
     </div>

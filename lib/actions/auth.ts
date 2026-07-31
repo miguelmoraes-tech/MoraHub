@@ -4,7 +4,13 @@ import * as z from "zod";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { HUB_MODE_COOKIE, MODE_HOME_ROUTE, accountTypeToHubMode, type HubMode } from "@/lib/hub-mode";
+import {
+  HUB_MODE_COOKIE,
+  MODE_HOME_ROUTE,
+  accountTypeToHubMode,
+  isCollaboratorAccountType,
+  type HubMode,
+} from "@/lib/hub-mode";
 
 const HUB_MODE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
@@ -53,9 +59,24 @@ export async function login(
     redirect(redirectTo);
   }
 
-  // Collaborators (external accountants/lawyers) pick which linked account
-  // to work on before landing in any hub — same idea as the business/pessoal
-  // mode choice below, but for whose data they're viewing.
+  const { data: perfil } = await supabase
+    .from("perfis")
+    .select("tipo_conta_padrao")
+    .eq("id", data.user.id)
+    .maybeSingle();
+
+  // Accountants/lawyers don't own a Business/Pessoal hub by default — they
+  // always land on the linked-accounts picker, based on the type chosen at
+  // signup. This doesn't stop the account from becoming an owner later too;
+  // it only decides which screen it sees first on login.
+  if (isCollaboratorAccountType(perfil?.tipo_conta_padrao)) {
+    redirect("/colaborador");
+  }
+
+  // Collaborators (external accountants/lawyers acting on someone else's
+  // account) pick which linked account to work on before landing in any hub
+  // — same idea as the business/pessoal mode choice below, but for whose
+  // data they're viewing.
   const { data: colaboracao } = await supabase
     .from("membros")
     .select("id")
@@ -78,12 +99,6 @@ export async function login(
   // No cookie yet (e.g. first login on a new device) — fall back to the
   // account's default mode chosen at signup. Missing/unknown rows default
   // to "empresarial" via accountTypeToHubMode, so old accounts still work.
-  const { data: perfil } = await supabase
-    .from("perfis")
-    .select("tipo_conta_padrao")
-    .eq("id", data.user.id)
-    .maybeSingle();
-
   const mode = accountTypeToHubMode(perfil?.tipo_conta_padrao);
   cookieStore.set(HUB_MODE_COOKIE, mode, {
     path: "/",
@@ -97,7 +112,7 @@ const SignupSchema = z.object({
   nome: z.string().trim().max(120).optional().or(z.literal("")),
   email: z.email({ error: "Informe um e-mail válido." }),
   password: z.string().min(6, { error: "A senha deve ter pelo menos 6 caracteres." }),
-  tipoConta: z.enum(["empresarial", "pessoal"], {
+  tipoConta: z.enum(["empresarial", "pessoal", "contador", "advogado"], {
     error: "Selecione o tipo de conta.",
   }),
 });
@@ -159,6 +174,17 @@ export async function signup(
     return { error: "Conta criada, mas houve um problema ao salvar seu perfil. Tente entrar normalmente." };
   }
 
+  const redirectTo = safeRedirect(formData.get("redirectTo"));
+  if (redirectTo) {
+    redirect(redirectTo);
+  }
+
+  // Accountants/lawyers don't own a Business/Pessoal hub by default — send
+  // them straight to the linked-accounts picker instead of a mode home.
+  if (isCollaboratorAccountType(tipoConta)) {
+    redirect("/colaborador");
+  }
+
   const mode = accountTypeToHubMode(tipoConta);
   const cookieStore = await cookies();
   cookieStore.set(HUB_MODE_COOKIE, mode, {
@@ -167,8 +193,7 @@ export async function signup(
     sameSite: "lax",
   });
 
-  const redirectTo = safeRedirect(formData.get("redirectTo"));
-  redirect(redirectTo ?? MODE_HOME_ROUTE[mode]);
+  redirect(MODE_HOME_ROUTE[mode]);
 }
 
 export async function logout() {

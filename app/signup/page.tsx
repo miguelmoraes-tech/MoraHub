@@ -4,7 +4,7 @@ import { Suspense, useActionState, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Building2, Home, ArrowLeft } from "lucide-react";
+import { Building2, Home, Calculator, Scale, ArrowLeft } from "lucide-react";
 import { signup } from "@/lib/actions/auth";
 import type { AccountType } from "@/lib/hub-mode";
 
@@ -26,7 +26,49 @@ const ACCOUNT_TYPES: {
     description: "Para organizar sua vida financeira e pessoal",
     icon: Home,
   },
+  {
+    value: "contador",
+    label: "Conta Contador",
+    description: "Para atender seus clientes de contabilidade em um só lugar",
+    icon: Calculator,
+  },
+  {
+    value: "advogado",
+    label: "Conta Jurídica",
+    description: "Para atender seus clientes de advocacia em um só lugar",
+    icon: Scale,
+  },
 ];
+
+const ACCOUNT_TYPE_STYLES: Record<
+  AccountType,
+  { card: string; iconBg: string; text: string; button: string }
+> = {
+  empresarial: {
+    card: "border-copper-600/40 bg-copper-600/10 hover:bg-copper-600/15",
+    iconBg: "bg-copper-400",
+    text: "text-copper-200",
+    button: "bg-copper-600 hover:bg-copper-500",
+  },
+  pessoal: {
+    card: "border-petrol-600/40 bg-petrol-600/10 hover:bg-petrol-600/15",
+    iconBg: "bg-petrol-400",
+    text: "text-petrol-200",
+    button: "bg-petrol-600 hover:bg-petrol-500",
+  },
+  contador: {
+    card: "border-sky-600/40 bg-sky-600/10 hover:bg-sky-600/15",
+    iconBg: "bg-sky-400",
+    text: "text-sky-200",
+    button: "bg-sky-600 hover:bg-sky-500",
+  },
+  advogado: {
+    card: "border-violet-600/40 bg-violet-600/10 hover:bg-violet-600/15",
+    iconBg: "bg-violet-400",
+    text: "text-violet-200",
+    button: "bg-violet-600 hover:bg-violet-500",
+  },
+};
 
 function SignupForm() {
   const [step, setStep] = useState<1 | 2>(1);
@@ -65,6 +107,7 @@ function SignupForm() {
           <div className="grid grid-cols-2 gap-3">
             {ACCOUNT_TYPES.map((option) => {
               const Icon = option.icon;
+              const styles = ACCOUNT_TYPE_STYLES[option.value];
               return (
                 <button
                   key={option.value}
@@ -73,24 +116,14 @@ function SignupForm() {
                     setAccountType(option.value);
                     setStep(2);
                   }}
-                  className={`flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-colors ${
-                    option.value === "pessoal"
-                      ? "border-petrol-600/40 bg-petrol-600/10 hover:bg-petrol-600/15"
-                      : "border-copper-600/40 bg-copper-600/10 hover:bg-copper-600/15"
-                  }`}
+                  className={`flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-colors ${styles.card}`}
                 >
                   <span
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-950 ${
-                      option.value === "pessoal" ? "bg-petrol-400" : "bg-copper-400"
-                    }`}
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-950 ${styles.iconBg}`}
                   >
                     <Icon className="h-5 w-5" />
                   </span>
-                  <span
-                    className={`text-sm font-semibold ${
-                      option.value === "pessoal" ? "text-petrol-200" : "text-copper-200"
-                    }`}
-                  >
+                  <span className={`text-sm font-semibold ${styles.text}`}>
                     {option.label}
                   </span>
                   <span className="text-xs leading-relaxed text-zinc-500">
@@ -112,23 +145,15 @@ function SignupForm() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${
-                  selected.value === "pessoal"
-                    ? "border-petrol-600/40 bg-petrol-600/10"
-                    : "border-copper-600/40 bg-copper-600/10"
-                }`}
+                className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${ACCOUNT_TYPE_STYLES[selected.value].card}`}
               >
                 <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-950 ${
-                    selected.value === "pessoal" ? "bg-petrol-400" : "bg-copper-400"
-                  }`}
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-950 ${ACCOUNT_TYPE_STYLES[selected.value].iconBg}`}
                 >
                   <selected.icon className="h-3.5 w-3.5" />
                 </span>
                 <span
-                  className={`flex-1 truncate text-sm font-medium ${
-                    selected.value === "pessoal" ? "text-petrol-200" : "text-copper-200"
-                  }`}
+                  className={`flex-1 truncate text-sm font-medium ${ACCOUNT_TYPE_STYLES[selected.value].text}`}
                 >
                   {selected.label}
                 </span>
@@ -200,9 +225,7 @@ function SignupForm() {
               type="submit"
               disabled={pending || !accountType}
               className={`w-full rounded-lg px-3 py-2 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                selected?.value === "pessoal"
-                  ? "bg-petrol-600 hover:bg-petrol-500"
-                  : "bg-copper-600 hover:bg-copper-500"
+                selected ? ACCOUNT_TYPE_STYLES[selected.value].button : "bg-copper-600 hover:bg-copper-500"
               }`}
             >
               {pending ? "Criando conta..." : "Criar conta"}
