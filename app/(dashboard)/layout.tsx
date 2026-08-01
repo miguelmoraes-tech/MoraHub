@@ -8,6 +8,7 @@ import { getVencimentoAlertas } from "@/lib/vencimentos/get-alerts";
 import { getFinanceiroDonoId } from "@/lib/financeiro";
 import { getRHDonoId } from "@/lib/rh";
 import { getComercialDonoId } from "@/lib/comercial";
+import { getMarketingDonoId } from "@/lib/marketing";
 import { getUnreadTotal } from "@/lib/chat";
 import type { AccountType } from "@/lib/hub-mode";
 
@@ -36,6 +37,9 @@ export default async function DashboardLayout({
   const restritoRH = !!rhDonoId && !restritoFinanceiro;
   const comercialDonoId = await getComercialDonoId();
   const restritoComercial = !!comercialDonoId && !restritoFinanceiro && !restritoRH;
+  const marketingDonoId = await getMarketingDonoId();
+  const restritoMarketing =
+    !!marketingDonoId && !restritoFinanceiro && !restritoRH && !restritoComercial;
 
   const { data: colaboracao } = await supabase
     .from("membros")
@@ -79,6 +83,15 @@ export default async function DashboardLayout({
       .eq("papel", "comercial")
       .maybeSingle();
     if (conversaComercial) chatHref = `/chat/${conversaComercial.id}`;
+  } else if (restritoMarketing && marketingDonoId) {
+    const { data: conversaMarketing } = await supabase
+      .from("conversas")
+      .select("id")
+      .eq("dono_id", marketingDonoId)
+      .eq("membro_id", user.id)
+      .eq("papel", "marketing")
+      .maybeSingle();
+    if (conversaMarketing) chatHref = `/chat/${conversaMarketing.id}`;
   }
   const unreadTotal = await getUnreadTotal();
 
@@ -88,12 +101,17 @@ export default async function DashboardLayout({
         userEmail={user.email ?? ""}
         userId={user.id}
         temColaboracoes={
-          !!colaboracao && !restritoFinanceiro && !restritoRH && !restritoComercial
+          !!colaboracao &&
+          !restritoFinanceiro &&
+          !restritoRH &&
+          !restritoComercial &&
+          !restritoMarketing
         }
         tiposAtivos={tiposAtivos}
         restritoFinanceiro={restritoFinanceiro}
         restritoRH={restritoRH}
         restritoComercial={restritoComercial}
+        restritoMarketing={restritoMarketing}
         chatHref={chatHref}
         unreadTotal={unreadTotal}
       />

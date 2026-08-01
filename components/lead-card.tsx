@@ -29,6 +29,7 @@ import { FollowupFields } from "@/components/followup-fields";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { LeadDetailDialog } from "@/components/lead-detail-dialog";
 import { ConvertLeadDialog } from "@/components/convert-lead-dialog";
+import type { CampanhaOption } from "@/components/leads-board";
 
 const RESULTADO_LABEL = {
   sem_resposta: "Sem resposta",
@@ -51,11 +52,13 @@ export function LeadCard({
   lead,
   propostas = [],
   followups = [],
+  campanhas = [],
   autoOpenDetail = false,
 }: {
   lead: Lead;
   propostas?: Proposta[];
   followups?: FollowupLead[];
+  campanhas?: CampanhaOption[];
   autoOpenDetail?: boolean;
 }) {
   const [mode, setMode] = useState<"view" | "edit" | "marcar" | "followup">(
@@ -96,7 +99,7 @@ export function LeadCard({
         action={updateFormAction}
         className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4"
       >
-        <LeadFields lead={lead} />
+        <LeadFields lead={lead} campanhas={campanhas} />
         {lead.status === "abordado" && (
           <>
             <ResultadoFields lead={lead} />

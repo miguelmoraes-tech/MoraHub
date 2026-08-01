@@ -3,7 +3,7 @@ export type HubMode = "business" | "pessoal";
 export const HUB_MODE_COOKIE = "hub-mode";
 
 export const MODE_HOME_ROUTE: Record<HubMode, string> = {
-  business: "/dashboard/financeiro",
+  business: "/dashboard",
   pessoal: "/pessoal",
 };
 
@@ -15,7 +15,8 @@ export type AccountType =
   | "advogado"
   | "financeiro"
   | "rh"
-  | "comercial";
+  | "comercial"
+  | "marketing";
 
 /** Missing/unrecognized values (e.g. accounts predating this column) fall back to business. */
 export function accountTypeToHubMode(tipo: string | null | undefined): HubMode {
@@ -35,7 +36,8 @@ export function isCollaboratorAccountType(tipo: string | null | undefined): bool
     tipo === "advogado" ||
     tipo === "financeiro" ||
     tipo === "rh" ||
-    tipo === "comercial"
+    tipo === "comercial" ||
+    tipo === "marketing"
   );
 }
 
@@ -48,6 +50,7 @@ export const ACCOUNT_TYPE_HOME_ROUTE: Record<AccountType, string> = {
   financeiro: "/colaborador",
   rh: "/colaborador",
   comercial: "/colaborador",
+  marketing: "/colaborador",
 };
 
 /**

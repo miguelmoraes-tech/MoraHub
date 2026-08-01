@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { Lead, LeadTipoContato } from "@/lib/types";
+import type { CampanhaOption } from "@/components/leads-board";
+import { CAMPANHA_STATUS_LABEL } from "@/components/marketing/campanha-labels";
 
 const TIPO_CONTATO_OPTIONS: { value: LeadTipoContato; label: string }[] = [
   { value: "whatsapp", label: "WhatsApp" },
@@ -9,7 +11,13 @@ const TIPO_CONTATO_OPTIONS: { value: LeadTipoContato; label: string }[] = [
   { value: "ambos", label: "Ambos" },
 ];
 
-export function LeadFields({ lead }: { lead?: Lead }) {
+export function LeadFields({
+  lead,
+  campanhas = [],
+}: {
+  lead?: Lead;
+  campanhas?: CampanhaOption[];
+}) {
   const [temSite, setTemSite] = useState(lead?.tem_site ?? false);
   const [temInsta, setTemInsta] = useState(lead?.tem_insta ?? false);
   const [tipoContato, setTipoContato] = useState<LeadTipoContato>(
@@ -140,6 +148,22 @@ export function LeadFields({ lead }: { lead?: Lead }) {
             className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         </div>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-zinc-400">Campanha de origem</label>
+        <select
+          name="campanha_id"
+          defaultValue={lead?.campanha_id ?? ""}
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+        >
+          <option value="">Sem campanha vinculada</option>
+          {campanhas.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nome} · {CAMPANHA_STATUS_LABEL[c.status]}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { Home, Gavel, Calculator, Briefcase, Users2, LineChart, ArrowRight } from "lucide-react";
+import { Home, Gavel, Calculator, Briefcase, Users2, LineChart, Megaphone, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
@@ -7,6 +7,7 @@ import { filtrarContasPorPapel, getContasVinculadas, nomeConta } from "@/lib/col
 import { entrarFinanceiro } from "@/app/colaborador/financeiro/actions";
 import { entrarRH } from "@/app/colaborador/rh/actions";
 import { entrarComercial } from "@/app/colaborador/comercial/actions";
+import { entrarMarketing } from "@/app/colaborador/marketing/actions";
 
 const WORKSPACE_META: Record<
   "advogado" | "contador",
@@ -63,6 +64,8 @@ export default async function ColaboradorPickerPage() {
   const contaRH = filtrarContasPorPapel(contas, "rh")[0];
   // Same rule for Comercial — a unique index enforces a single active link.
   const contaComercial = filtrarContasPorPapel(contas, "comercial")[0];
+  // Same rule for Marketing — a unique index enforces a single active link.
+  const contaMarketing = filtrarContasPorPapel(contas, "marketing")[0];
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
@@ -184,6 +187,28 @@ export default async function ColaboradorPickerPage() {
                 </span>
                 <span className="block truncate text-xs text-zinc-500">
                   Funil de vendas, leads e follow-ups
+                </span>
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-600" />
+            </button>
+          </form>
+        )}
+
+        {contaMarketing && (
+          <form action={entrarMarketing.bind(null, contaMarketing.dono_id)}>
+            <button
+              type="submit"
+              className="flex w-full items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3.5 text-left transition-colors hover:bg-zinc-900"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pink-500/20 text-pink-300">
+                <Megaphone className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-pink-200">
+                  Marketing — {nomeConta(contaMarketing)}
+                </span>
+                <span className="block truncate text-xs text-zinc-500">
+                  Calendário de conteúdo e campanhas
                 </span>
               </span>
               <ArrowRight className="h-4 w-4 shrink-0 text-zinc-600" />

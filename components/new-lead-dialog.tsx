@@ -4,8 +4,9 @@ import { useActionState, useEffect, useRef } from "react";
 import { Plus, X } from "lucide-react";
 import { createLead } from "@/app/(dashboard)/leads/actions";
 import { LeadFields } from "@/components/lead-fields";
+import type { CampanhaOption } from "@/components/leads-board";
 
-export function NewLeadDialog() {
+export function NewLeadDialog({ campanhas = [] }: { campanhas?: CampanhaOption[] }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(createLead, undefined);
@@ -50,7 +51,7 @@ export function NewLeadDialog() {
             action={formAction}
             className="max-h-[calc(100vh-8rem)] space-y-4 overflow-y-auto px-5 py-4"
           >
-            <LeadFields />
+            <LeadFields campanhas={campanhas} />
 
             {state && "error" in state && (
               <p className="rounded-lg border border-rose-900/50 bg-rose-950/40 px-3 py-2 text-sm text-rose-300">

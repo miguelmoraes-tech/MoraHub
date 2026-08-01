@@ -39,6 +39,9 @@ import {
   Clock,
   FileBarChart,
   LifeBuoy,
+  Megaphone,
+  CalendarDays,
+  Flag,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
@@ -56,12 +59,14 @@ type NavItem = {
 type Accent = "copper" | "petrol";
 
 const DASHBOARD_ITEMS: NavItem[] = [
+  { label: "Visão Geral", href: "/dashboard", icon: LayoutGrid, enabled: true },
   { label: "Financeiro", href: "/dashboard/financeiro", icon: Wallet, enabled: true },
   { label: "Clientes", href: "/dashboard/clientes", icon: LayoutDashboard, enabled: true },
   { label: "Leads", href: "/dashboard/leads", icon: Target, enabled: true },
 ];
 
 const GESTAO_ITEMS: NavItem[] = [
+  { label: "Metas / OKRs", href: "/metas", icon: Flag, enabled: true },
   { label: "Clientes", href: "/clientes", icon: Users, enabled: true },
   { label: "Leads", href: "/leads", icon: Target, enabled: true },
   { label: "Renegados", href: "/renegados", icon: UserX, enabled: true },
@@ -110,6 +115,13 @@ const RH_ITEMS: NavItem[] = [
   { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
 ];
 
+const MARKETING_ITEMS: NavItem[] = [
+  { label: "Visão Geral", href: "/marketing", icon: LayoutGrid, enabled: true },
+  { label: "Calendário de Conteúdo", href: "/marketing/calendario", icon: CalendarDays, enabled: true },
+  { label: "Campanhas", href: "/marketing/campanhas", icon: Megaphone, enabled: true },
+  { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
+];
+
 const SUPORTE_ITEMS: NavItem[] = [
   { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
 ];
@@ -155,7 +167,11 @@ function NavGroup({
         {items.map((item) => {
           const isActive =
             item.enabled &&
-            (item.href === "/pessoal" || item.href === "/rh" || item.href === "/comercial"
+            (item.href === "/pessoal" ||
+            item.href === "/rh" ||
+            item.href === "/comercial" ||
+            item.href === "/marketing" ||
+            item.href === "/dashboard"
               ? pathname === item.href
               : pathname.startsWith(item.href));
           const Icon = item.icon;
@@ -207,6 +223,7 @@ export function Sidebar({
   restritoFinanceiro,
   restritoRH,
   restritoComercial,
+  restritoMarketing,
   chatHref,
   unreadTotal,
 }: {
@@ -217,13 +234,14 @@ export function Sidebar({
   restritoFinanceiro?: boolean;
   restritoRH?: boolean;
   restritoComercial?: boolean;
+  restritoMarketing?: boolean;
   chatHref: string;
   unreadTotal: number;
 }) {
   const pathname = usePathname();
   const isPessoal = pathname.startsWith("/pessoal");
   const accent: Accent = isPessoal ? "petrol" : "copper";
-  const restrito = restritoFinanceiro || restritoRH || restritoComercial;
+  const restrito = restritoFinanceiro || restritoRH || restritoComercial || restritoMarketing;
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
@@ -259,6 +277,11 @@ export function Sidebar({
             Comercial
           </span>
         )}
+        {restritoMarketing && (
+          <span className="rounded-full border border-pink-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-pink-400">
+            Marketing
+          </span>
+        )}
       </div>
 
       {!restrito && (
@@ -276,6 +299,8 @@ export function Sidebar({
             <NavGroup title="RH" items={RH_ITEMS} accent="copper" />
           ) : restritoComercial ? (
             <NavGroup title="Comercial" items={COMERCIAL_ITEMS} accent="copper" />
+          ) : restritoMarketing ? (
+            <NavGroup title="Marketing" items={MARKETING_ITEMS} accent="copper" />
           ) : isPessoal ? (
             <>
               <NavGroup title="Painel" items={PAINEL_ITEMS} accent={accent} />
@@ -292,6 +317,7 @@ export function Sidebar({
               <NavGroup title="Gestão" items={GESTAO_ITEMS} accent={accent} />
               <NavGroup title="Comercial" items={COMERCIAL_ITEMS} accent={accent} />
               <NavGroup title="RH" items={RH_ITEMS} accent={accent} />
+              <NavGroup title="Marketing" items={MARKETING_ITEMS} accent={accent} />
               <NavGroup title="Suporte" items={SUPORTE_ITEMS} accent={accent} />
             </>
           )}

@@ -40,6 +40,7 @@ function parseLeadForm(formData: FormData) {
     abordado_por: textOrNull(formData.get("abordado_por")) ?? undefined,
     nicho: textOrNull(formData.get("nicho")) ?? undefined,
     tipo_contato: formData.get("tipo_contato"),
+    campanha_id: textOrNull(formData.get("campanha_id")) ?? undefined,
   });
 }
 
@@ -67,6 +68,7 @@ export async function createLead(
     abordado_por: parsed.data.abordado_por ?? null,
     nicho: parsed.data.nicho ?? null,
     tipo_contato: parsed.data.tipo_contato,
+    campanha_id: parsed.data.campanha_id ?? null,
     status: "abordar",
   });
   if (error) return { error: "Não foi possível criar o lead." };
@@ -96,6 +98,7 @@ export async function updateLead(
     abordado_por: parsed.data.abordado_por ?? null,
     nicho: parsed.data.nicho ?? null,
     tipo_contato: parsed.data.tipo_contato,
+    campanha_id: parsed.data.campanha_id ?? null,
   };
 
   if (formData.has("resultado")) {

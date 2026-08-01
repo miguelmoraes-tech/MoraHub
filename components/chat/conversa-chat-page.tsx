@@ -16,6 +16,7 @@ const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
   financeiro: "Financeiro",
   rh: "RH",
   comercial: "Comercial",
+  marketing: "Marketing",
 };
 
 export async function ConversaChatPage({
@@ -58,14 +59,18 @@ export async function ConversaChatPage({
       ? "/juridico"
       : conversa?.papel === "rh"
         ? "/rh"
-        : "/contas-pagar");
+        : conversa?.papel === "marketing"
+          ? "/marketing"
+          : "/contas-pagar");
   const resolvedBackLabel =
     backLabel ??
     (conversa && user.id === conversa.dono_id
       ? "Voltar ao Jurídico & Contábil"
       : conversa?.papel === "rh"
         ? "Voltar ao RH"
-        : "Voltar ao financeiro");
+        : conversa?.papel === "marketing"
+          ? "Voltar ao Marketing"
+          : "Voltar ao financeiro");
 
   if (!conversa) {
     return (

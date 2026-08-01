@@ -1,8 +1,9 @@
-import { Wallet, TrendingUp, Receipt, Scale, Handshake, ArrowLeftRight, ArrowUpRight, ArrowDownRight, Users2 } from "lucide-react";
+import { Wallet, TrendingUp, Receipt, Scale, Handshake, ArrowLeftRight, ArrowUpRight, ArrowDownRight, Users2, Megaphone } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveDonoId } from "@/lib/financeiro";
 import { getRHOverview } from "@/lib/rh/get-overview";
+import { getMarketingOverview } from "@/lib/marketing/get-overview";
 import { StatCard } from "@/components/stat-card";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { todayISO } from "@/lib/vencimentos/dates";
@@ -41,6 +42,7 @@ export default async function DashboardFinanceiroPage() {
   const [
     [{ data: comprovantes }, { data: gastos }, { data: propostas }, { data: clientes }],
     rhOverview,
+    marketingOverview,
   ] = await Promise.all([
     Promise.all([
       supabase
@@ -65,6 +67,7 @@ export default async function DashboardFinanceiroPage() {
       ]
     >,
     getRHOverview(donoId),
+    getMarketingOverview(donoId),
   ]);
 
   const comprovantesList = comprovantes ?? [];
@@ -187,6 +190,46 @@ export default async function DashboardFinanceiroPage() {
           <div>
             <p className="text-xl font-semibold text-zinc-100">{rhOverview.vagasAbertasCount}</p>
             <p className="text-xs text-zinc-500">vagas abertas</p>
+          </div>
+        </div>
+      </Link>
+
+      <Link
+        href="/marketing"
+        className="block rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
+      >
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+          <Megaphone className="h-4 w-4 text-zinc-500" />
+          Marketing
+        </h2>
+        <div className="mt-3 grid grid-cols-3 gap-3">
+          <div>
+            <p className="text-xl font-semibold text-zinc-100">
+              {marketingOverview.conteudoPublicadoSemana}
+            </p>
+            <p className="text-xs text-zinc-500">conteúdo publicado essa semana</p>
+          </div>
+          <div>
+            <p className="text-xl font-semibold text-zinc-100">
+              {marketingOverview.campanhasAtivasCount}
+            </p>
+            <p className="text-xs text-zinc-500">campanhas ativas</p>
+          </div>
+          <div>
+            <p
+              className={`text-xl font-semibold ${
+                marketingOverview.roiMedioAtivas === null
+                  ? "text-zinc-100"
+                  : marketingOverview.roiMedioAtivas >= 0
+                    ? "text-emerald-400"
+                    : "text-rose-400"
+              }`}
+            >
+              {marketingOverview.roiMedioAtivas !== null
+                ? `${marketingOverview.roiMedioAtivas.toFixed(1)}%`
+                : "—"}
+            </p>
+            <p className="text-xs text-zinc-500">ROI médio</p>
           </div>
         </div>
       </Link>

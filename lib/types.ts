@@ -182,6 +182,7 @@ export interface Lead {
   ultimo_contato: string | null;
   proximo_followup: string | null;
   intervalo_followup_dias: number | null;
+  campanha_id: string | null;
 }
 
 export type FollowupCanal = "whatsapp" | "ligacao" | "email" | "presencial" | "outro";
@@ -307,7 +308,13 @@ export interface Proposta {
   created_at: string;
 }
 
-export type ColaboradorPapel = "contador" | "advogado" | "financeiro" | "rh" | "comercial";
+export type ColaboradorPapel =
+  | "contador"
+  | "advogado"
+  | "financeiro"
+  | "rh"
+  | "comercial"
+  | "marketing";
 export type ConviteStatus = "pendente" | "aceito" | "recusado" | "expirado";
 export type MembroStatus = "ativo" | "removido";
 
@@ -787,6 +794,43 @@ export interface TicketResposta {
   created_at: string;
 }
 
+export type MetaOkrTipo = "objetivo" | "resultado_chave";
+export type MetaOkrSetor =
+  | "geral"
+  | "financeiro"
+  | "comercial"
+  | "marketing"
+  | "rh"
+  | "juridico"
+  | "contabil"
+  | "tecnico";
+export type MetaOkrUnidade = "numero" | "reais" | "percentual" | "clientes" | "outro";
+export type MetaOkrStatus =
+  | "nao_iniciado"
+  | "em_andamento"
+  | "concluido"
+  | "atrasado"
+  | "cancelado";
+
+export interface MetaOkr {
+  id: string;
+  user_id: string;
+  parent_okr_id: string | null;
+  tipo: MetaOkrTipo;
+  titulo: string;
+  descricao: string | null;
+  setor: MetaOkrSetor;
+  periodo_inicio: string | null;
+  periodo_fim: string | null;
+  valor_meta: number | null;
+  valor_atual: number;
+  unidade: MetaOkrUnidade;
+  status: MetaOkrStatus;
+  responsavel_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Shape returned by get_colaboradores_do_dono_by_id() — same as
  * ColaboradorVinculado but callable for a dono other than auth.uid(), as
  * long as the caller is that dono or an active membro of theirs. */
@@ -799,3 +843,72 @@ export interface ColaboradorParaAtribuicao {
   nome: string | null;
   email: string | null;
 }
+
+export type CalendarioConteudoTipo =
+  | "post"
+  | "video"
+  | "artigo"
+  | "email"
+  | "stories"
+  | "outro";
+
+export type CalendarioConteudoCanal =
+  | "instagram"
+  | "facebook"
+  | "linkedin"
+  | "tiktok"
+  | "youtube"
+  | "blog"
+  | "email"
+  | "outro";
+
+export type CalendarioConteudoStatus =
+  | "planejado"
+  | "em_producao"
+  | "agendado"
+  | "publicado"
+  | "cancelado";
+
+export interface CalendarioConteudo {
+  id: string;
+  user_id: string;
+  titulo: string;
+  tipo: CalendarioConteudoTipo;
+  canal: CalendarioConteudoCanal;
+  data_publicacao: string | null;
+  status: CalendarioConteudoStatus;
+  conteudo: string | null;
+  link_publicado: string | null;
+  responsavel_id: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CampanhaCanal =
+  | "meta_ads"
+  | "google_ads"
+  | "linkedin_ads"
+  | "tiktok_ads"
+  | "organico"
+  | "outro";
+
+export type CampanhaStatus = "planejada" | "ativa" | "pausada" | "encerrada";
+
+export interface Campanha {
+  id: string;
+  user_id: string;
+  nome: string;
+  canal: CampanhaCanal;
+  status: CampanhaStatus;
+  data_inicio: string | null;
+  data_fim: string | null;
+  orcamento_planejado: number | null;
+  valor_gasto: number;
+  cliques: number;
+  impressoes: number;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+

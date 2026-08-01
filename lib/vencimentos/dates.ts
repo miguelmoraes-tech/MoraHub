@@ -27,6 +27,12 @@ export function diffInDays(fromISO: string, toISOValue: string): number {
   return Math.round((toMs - fromMs) / 86_400_000);
 }
 
+/** `days` days before `fromISO` (YYYY-MM-DD). */
+export function subtractDaysISO(fromISO: string, days: number): string {
+  const { y, m, d } = parseISODate(fromISO);
+  return new Date(Date.UTC(y, m, d) - days * 86_400_000).toISOString().slice(0, 10);
+}
+
 /**
  * Next occurrence (on or after `todayISOValue`) of a recurring date whose
  * day-of-month (Mensal) or day-and-month (Anual) is taken from `referenceISO`.

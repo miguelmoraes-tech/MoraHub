@@ -18,6 +18,7 @@ const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
   financeiro: "Financeiro",
   rh: "RH",
   comercial: "Comercial",
+  marketing: "Marketing",
 };
 
 const CONVITE_STATUS_LABEL: Record<Convite["status"], string> = {

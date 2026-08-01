@@ -58,7 +58,7 @@ function ConviteColaboradorForm({ onDone }: { onDone: () => void }) {
   );
   const [copied, setCopied] = useState(false);
   const [papel, setPapel] = useState<
-    "contador" | "advogado" | "financeiro" | "rh" | "comercial"
+    "contador" | "advogado" | "financeiro" | "rh" | "comercial" | "marketing"
   >("contador");
   const created = state && "ok" in state ? state : null;
 
@@ -132,6 +132,7 @@ function ConviteColaboradorForm({ onDone }: { onDone: () => void }) {
           <option value="financeiro">Financeiro</option>
           <option value="rh">RH</option>
           <option value="comercial">Comercial</option>
+          <option value="marketing">Marketing</option>
         </select>
         {papel === "financeiro" && (
           <p className="text-xs text-zinc-500">
@@ -153,6 +154,13 @@ function ConviteColaboradorForm({ onDone }: { onDone: () => void }) {
             Funcionário interno com acesso a vendas, funil de leads e
             comissões desta empresa. Como o Financeiro e o RH, só pode estar
             vinculado a uma empresa por vez.
+          </p>
+        )}
+        {papel === "marketing" && (
+          <p className="text-xs text-zinc-500">
+            Funcionário interno com acesso ao calendário de conteúdo e às
+            campanhas desta empresa. Como o Financeiro, o RH e o Comercial,
+            só pode estar vinculado a uma empresa por vez.
           </p>
         )}
       </div>

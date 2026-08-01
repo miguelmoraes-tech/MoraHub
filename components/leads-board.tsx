@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Target, AlertTriangle } from "lucide-react";
-import type { Lead, Proposta, FollowupLead } from "@/lib/types";
+import type { Lead, Proposta, FollowupLead, Campanha } from "@/lib/types";
 import { LeadCard } from "@/components/lead-card";
 import { NewLeadDialog } from "@/components/new-lead-dialog";
+
+export type CampanhaOption = Pick<Campanha, "id" | "nome" | "status" | "canal">;
 import { ExportButton } from "@/components/export-button";
 import { SegmentFilter } from "@/components/segment-filter";
 import { todayISO } from "@/lib/vencimentos/dates";
@@ -18,10 +20,12 @@ export function LeadsBoard({
   leads,
   propostas = [],
   followups = [],
+  campanhas = [],
 }: {
   leads: Lead[];
   propostas?: Proposta[];
   followups?: FollowupLead[];
+  campanhas?: CampanhaOption[];
 }) {
   const searchParams = useSearchParams();
   const highlightLeadId = searchParams.get("lead");
@@ -115,7 +119,7 @@ export function LeadsBoard({
         </div>
         <div className="flex items-center gap-2">
           <ExportButton href={exportHref} />
-          <NewLeadDialog />
+          <NewLeadDialog campanhas={campanhas} />
         </div>
       </div>
 
@@ -231,6 +235,7 @@ export function LeadsBoard({
               lead={lead}
               propostas={propostasPorLead.get(lead.id) ?? []}
               followups={followupsPorLead.get(lead.id) ?? []}
+              campanhas={campanhas}
               autoOpenDetail={lead.id === highlightLeadId}
             />
           ))}

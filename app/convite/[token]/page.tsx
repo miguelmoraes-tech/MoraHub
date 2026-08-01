@@ -19,6 +19,7 @@ const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
   financeiro: "Financeiro",
   rh: "RH",
   comercial: "Comercial",
+  marketing: "Marketing",
 };
 
 const PAPEL_ACESSO_DESCRICAO: Record<ColaboradorPapel, string> = {
@@ -28,6 +29,7 @@ const PAPEL_ACESSO_DESCRICAO: Record<ColaboradorPapel, string> = {
     "com acesso às seções financeiras da empresa (Contas a Pagar, Contas a Receber, Orçamento e Fluxo de Caixa) e à Folha de Pagamento",
   rh: "com acesso ao módulo de RH da empresa (Departamentos, Funcionários, Férias, Benefícios, Recrutamento, Avaliações, Ponto e Folha de Pagamento)",
   comercial: "com acesso a vendas, funil de leads e comissões da empresa",
+  marketing: "com acesso ao calendário de conteúdo e às campanhas de marketing da empresa",
 };
 
 export default async function ConvitePage({

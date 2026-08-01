@@ -9,14 +9,9 @@ import {
   MODE_HOME_ROUTE,
   accountTypeToHubMode,
   isCollaboratorAccountType,
-  type HubMode,
 } from "@/lib/hub-mode";
 
 const HUB_MODE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
-
-function businessLoginRoute(mode: HubMode) {
-  return mode === "pessoal" ? MODE_HOME_ROUTE.pessoal : "/clientes";
-}
 
 /** Only accept same-origin relative paths (e.g. "/convite/abc"), to avoid an open redirect. */
 function safeRedirect(value: FormDataEntryValue | null): string | null {
@@ -93,7 +88,7 @@ export async function login(
   const lastMode = cookieStore.get(HUB_MODE_COOKIE)?.value;
 
   if (lastMode === "pessoal" || lastMode === "business") {
-    redirect(businessLoginRoute(lastMode));
+    redirect(MODE_HOME_ROUTE[lastMode]);
   }
 
   // No cookie yet (e.g. first login on a new device) — fall back to the
@@ -105,7 +100,7 @@ export async function login(
     maxAge: HUB_MODE_COOKIE_MAX_AGE,
     sameSite: "lax",
   });
-  redirect(businessLoginRoute(mode));
+  redirect(MODE_HOME_ROUTE[mode]);
 }
 
 const SignupSchema = z.object({
@@ -113,7 +108,16 @@ const SignupSchema = z.object({
   email: z.email({ error: "Informe um e-mail válido." }),
   password: z.string().min(6, { error: "A senha deve ter pelo menos 6 caracteres." }),
   tipoConta: z.enum(
-    ["empresarial", "pessoal", "contador", "advogado", "financeiro", "rh", "comercial"],
+    [
+      "empresarial",
+      "pessoal",
+      "contador",
+      "advogado",
+      "financeiro",
+      "rh",
+      "comercial",
+      "marketing",
+    ],
     { error: "Selecione o tipo de conta." }
   ),
 });
