@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { buildXlsxResponse, type ExportColumn } from "@/lib/export/xlsx";
 import { formatDate } from "@/lib/format";
 import type { Cliente, ClienteStatus } from "@/lib/types";
@@ -33,8 +34,13 @@ export async function GET(request: NextRequest) {
   }
 
   const segmento = request.nextUrl.searchParams.get("segmento");
+  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
 
-  let query = supabase.from("clientes").select("*").order("nome");
+  let query = supabase
+    .from("clientes")
+    .select("*")
+    .eq("workspace_id", workspaceId ?? "")
+    .order("nome");
   if (segmento) query = query.eq("segmento", segmento);
 
   const { data: clientes } = (await query) as { data: Cliente[] | null };

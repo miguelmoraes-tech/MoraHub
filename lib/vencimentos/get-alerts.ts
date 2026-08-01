@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
 import { todayISO, diffInDays, nextOccurrence } from "@/lib/vencimentos/dates";
 import type { VencimentoAlerta } from "@/lib/vencimentos/types";
 
@@ -70,6 +71,7 @@ type LeadFollowupRow = {
 export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
   const supabase = await createClient();
   const hoje = todayISO();
+  const workspaceId = await getEffectiveWorkspaceIdGeral();
 
   const [
     { data: assinaturas },
@@ -103,7 +105,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
       .select("id, titulo, prazo")
       .eq("status", "pendente")
       .not("prazo", "is", null),
-    supabase.from("clientes").select("id, nome"),
+    supabase.from("clientes").select("id, nome").eq("workspace_id", workspaceId ?? ""),
     supabase
       .from("propriedade_intelectual")
       .select("id, cliente_id, nome, data_renovacao")
@@ -117,6 +119,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
     supabase
       .from("leads")
       .select("id, nome, status, resultado, proximo_followup")
+      .eq("workspace_id", workspaceId ?? "")
       .not("proximo_followup", "is", null)
       .neq("status", "convertido"),
   ])) as [

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getClienteArquivoSignedUrls } from "@/lib/supabase/storage";
+import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
 import {
   DocumentosBoard,
   type DocumentoComArquivo,
@@ -8,6 +9,7 @@ import type { Cliente, Documento, ModeloContrato } from "@/lib/types";
 
 export default async function DocumentosPage() {
   const supabase = await createClient();
+  const workspaceId = await getEffectiveWorkspaceIdGeral();
 
   const [{ data: documentos }, { data: clientes }, { data: modelos }] =
     (await Promise.all([
@@ -15,7 +17,7 @@ export default async function DocumentosPage() {
         .from("documentos")
         .select("*")
         .order("created_at", { ascending: false }),
-      supabase.from("clientes").select("*").order("nome"),
+      supabase.from("clientes").select("*").eq("workspace_id", workspaceId ?? "").order("nome"),
       supabase
         .from("modelos_contrato")
         .select("*")

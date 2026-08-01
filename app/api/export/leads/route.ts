@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { buildXlsxResponse, type ExportColumn } from "@/lib/export/xlsx";
 import { formatDate } from "@/lib/format";
 import type { Lead } from "@/lib/types";
@@ -63,8 +64,13 @@ export async function GET(request: NextRequest) {
   }
 
   const nicho = request.nextUrl.searchParams.get("nicho");
+  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
 
-  let query = supabase.from("leads").select("*").order("nome");
+  let query = supabase
+    .from("leads")
+    .select("*")
+    .eq("workspace_id", workspaceId ?? "")
+    .order("nome");
   if (nicho) query = query.eq("nicho", nicho);
 
   const { data: leads } = (await query) as { data: Lead[] | null };

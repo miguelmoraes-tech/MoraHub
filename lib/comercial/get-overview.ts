@@ -30,7 +30,7 @@ const LEADS_POR_STATUS_VAZIO: Record<LeadStatus, number> = {
 };
 
 export async function getComercialOverview(
-  donoId: string | null
+  workspaceId: string | null
 ): Promise<ComercialOverview> {
   const vazio: ComercialOverview = {
     leadsPorStatus: { ...LEADS_POR_STATUS_VAZIO },
@@ -38,7 +38,7 @@ export async function getComercialOverview(
     followupsPendentesCount: 0,
     followupsPendentesLista: [],
   };
-  if (!donoId) return vazio;
+  if (!workspaceId) return vazio;
 
   const supabase = await createClient();
   const hoje = todayISO();
@@ -46,7 +46,7 @@ export async function getComercialOverview(
   const { data: leads } = (await supabase
     .from("leads")
     .select("id, nome, status, resultado, proximo_followup")
-    .eq("user_id", donoId)) as { data: LeadOverviewRow[] | null };
+    .eq("workspace_id", workspaceId)) as { data: LeadOverviewRow[] | null };
 
   const leadsList = leads ?? [];
 

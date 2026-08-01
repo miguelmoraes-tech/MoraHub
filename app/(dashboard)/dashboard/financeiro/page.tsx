@@ -2,6 +2,7 @@ import { Wallet, TrendingUp, Receipt, Scale, Handshake, ArrowLeftRight, ArrowUpR
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveDonoId } from "@/lib/financeiro";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { getRHOverview } from "@/lib/rh/get-overview";
 import { getMarketingOverview } from "@/lib/marketing/get-overview";
 import { StatCard } from "@/components/stat-card";
@@ -38,6 +39,7 @@ export default async function DashboardFinanceiroPage() {
   const supabase = await createClient();
   const mesAtual = todayISO().slice(0, 7);
   const donoId = await getEffectiveDonoId();
+  const workspaceId = donoId ? await getWorkspaceIdPadrao(donoId, "empresarial") : null;
 
   const [
     [{ data: comprovantes }, { data: gastos }, { data: propostas }, { data: clientes }],
@@ -56,8 +58,9 @@ export default async function DashboardFinanceiroPage() {
       supabase
         .from("propostas")
         .select("valor")
+        .eq("workspace_id", workspaceId ?? "")
         .in("status", ["enviada", "em_negociacao"]),
-      supabase.from("clientes").select("id, nome"),
+      supabase.from("clientes").select("id, nome").eq("workspace_id", workspaceId ?? ""),
     ]) as Promise<
       [
         { data: ComprovanteRow[] | null },

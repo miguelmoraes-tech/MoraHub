@@ -13,7 +13,7 @@ import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { StatusChip } from "@/components/status-chip";
 import { CampanhaFields } from "@/components/marketing/campanha-fields";
 import { CAMPANHA_CANAL_LABEL, CAMPANHA_STATUS_LABEL, CAMPANHA_STATUS_TONE } from "@/components/marketing/campanha-labels";
-import { computeCampanhaDerived, type CampanhaMetrics } from "@/lib/marketing/campanha-metrics";
+import { computeCampanhaDerived, type CampanhaMetrics } from "@/lib/marketing/campanha-metrics-shared";
 
 function NewCampanhaForm() {
   const [open, setOpen] = useState(false);

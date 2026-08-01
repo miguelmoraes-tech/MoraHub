@@ -9,6 +9,7 @@ import {
   ProcessosReadonlyList,
 } from "@/components/juridico/juridico-readonly-lists";
 import { getConversasComoDono, getUnreadCountsByConversa } from "@/lib/chat";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { todayISO, diffInDays } from "@/lib/vencimentos/dates";
 import type {
   ColaboradorVinculado,
@@ -25,6 +26,7 @@ export default async function JuridicoPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const workspaceId = user ? await getWorkspaceIdPadrao(user.id, "empresarial") : null;
 
   const [
     { data: items },
@@ -45,7 +47,7 @@ export default async function JuridicoPage() {
       .select("*")
       .order("data_renovacao", { ascending: true }),
     supabase.from("processos").select("*").order("proximo_prazo", { ascending: true }),
-    supabase.from("clientes").select("id, nome"),
+    supabase.from("clientes").select("id, nome").eq("workspace_id", workspaceId ?? ""),
     supabase.from("modelos_contrato").select("id", { count: "exact", head: true }),
   ])) as [
     { data: Juridico[] | null },

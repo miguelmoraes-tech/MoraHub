@@ -1,24 +1,8 @@
 import type { createClient } from "@/lib/supabase/server";
-import type { Campanha } from "@/lib/types";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
+import type { CampanhaMetrics } from "@/lib/marketing/campanha-metrics-shared";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
-
-export interface CampanhaMetrics {
-  leadsGerados: number;
-  clientesConvertidos: number;
-  receitaGerada: number;
-}
-
-export interface CampanhaDerived {
-  custoPorLead: number | null;
-  roi: number | null;
-}
-
-const METRICS_VAZIO: CampanhaMetrics = {
-  leadsGerados: 0,
-  clientesConvertidos: 0,
-  receitaGerada: 0,
-};
 
 type LeadRow = { id: string; campanha_id: string | null; status: string };
 type ClienteRow = { id: string; lead_origem_id: string | null };
@@ -38,16 +22,18 @@ export async function getCampanhaMetricsMap(
   const result = new Map<string, CampanhaMetrics>();
   if (campanhaIds.length === 0) return result;
 
+  const workspaceId = await getWorkspaceIdPadrao(donoId, "empresarial");
+
   const [{ data: leads }, { data: clientes }] = (await Promise.all([
     supabase
       .from("leads")
       .select("id, campanha_id, status")
-      .eq("user_id", donoId)
+      .eq("workspace_id", workspaceId ?? "")
       .in("campanha_id", campanhaIds),
     supabase
       .from("clientes")
       .select("id, lead_origem_id")
-      .eq("user_id", donoId)
+      .eq("workspace_id", workspaceId ?? "")
       .not("lead_origem_id", "is", null),
   ])) as [{ data: LeadRow[] | null }, { data: ClienteRow[] | null }];
 
@@ -108,15 +94,4 @@ export async function getCampanhaMetricsMap(
   }
 
   return result;
-}
-
-/** Custo por lead e ROI (%), derivados de valor_gasto + métricas agregadas. */
-export function computeCampanhaDerived(
-  campanha: Pick<Campanha, "valor_gasto">,
-  metrics: CampanhaMetrics = METRICS_VAZIO
-): CampanhaDerived {
-  const valorGasto = campanha.valor_gasto ?? 0;
-  const custoPorLead = metrics.leadsGerados > 0 ? valorGasto / metrics.leadsGerados : null;
-  const roi = valorGasto > 0 ? ((metrics.receitaGerada - valorGasto) / valorGasto) * 100 : null;
-  return { custoPorLead, roi };
 }

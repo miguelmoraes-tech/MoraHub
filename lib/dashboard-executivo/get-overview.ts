@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { todayISO, diffInDays, recurringMonthKeysInWindow, subtractDaysISO } from "@/lib/vencimentos/dates";
 import { getRHOverview, type RHOverview } from "@/lib/rh/get-overview";
 import { getMarketingOverview, type MarketingOverview } from "@/lib/marketing/get-overview";
@@ -65,6 +66,7 @@ export async function getDashboardExecutivoOverview(
   const [anoAtual, mesNum] = mesAtual.split("-").map(Number);
   const proximoMesKey =
     mesNum === 12 ? `${anoAtual + 1}-01` : `${anoAtual}-${String(mesNum + 1).padStart(2, "0")}`;
+  const workspaceId = donoId ? await getWorkspaceIdPadrao(donoId, "empresarial") : null;
 
   if (!donoId) {
     const [rh, marketing, metas] = await Promise.all([
@@ -126,7 +128,7 @@ export async function getDashboardExecutivoOverview(
         .select("valor, recorrencia, proxima_cobranca, status")
         .eq("user_id", donoId)
         .eq("status", "ativa"),
-      supabase.from("leads").select("status").eq("user_id", donoId),
+      supabase.from("leads").select("status").eq("workspace_id", workspaceId ?? ""),
       supabase.from("compliance_juridico").select("status").eq("user_id", donoId),
       supabase.from("processos").select("fase, proximo_prazo").eq("user_id", donoId),
       supabase

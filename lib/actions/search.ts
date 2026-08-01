@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
 
 export type BuscaResultado = {
   id: string;
@@ -47,6 +48,7 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
   if (termo.length < 2) return vazio();
 
   const supabase = await createClient();
+  const workspaceId = await getEffectiveWorkspaceIdGeral();
   const pattern = `%${sanitizeTermo(termo)}%`;
   const ate = LIMITE_POR_GRUPO + 1;
 
@@ -62,6 +64,7 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
     supabase
       .from("clientes")
       .select("id, nome, contato, email, responsavel, segmento")
+      .eq("workspace_id", workspaceId ?? "")
       .or(
         `nome.ilike.${pattern},contato.ilike.${pattern},email.ilike.${pattern},responsavel.ilike.${pattern},segmento.ilike.${pattern}`
       )
@@ -96,6 +99,7 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
     supabase
       .from("leads")
       .select("id, nome, nicho, contato")
+      .eq("workspace_id", workspaceId ?? "")
       .or(`nome.ilike.${pattern},nicho.ilike.${pattern},contato.ilike.${pattern}`)
       .order("nome")
       .limit(ate),

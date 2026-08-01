@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { todayISO } from "@/lib/vencimentos/dates";
-import { getCampanhaMetricsMap, computeCampanhaDerived } from "@/lib/marketing/campanha-metrics";
+import { getCampanhaMetricsMap } from "@/lib/marketing/campanha-metrics";
+import { computeCampanhaDerived } from "@/lib/marketing/campanha-metrics-shared";
 import type { Campanha } from "@/lib/types";
 
 type ConteudoRow = { id: string; data_publicacao: string | null; status: string };
