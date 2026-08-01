@@ -1,4 +1,4 @@
-import { Home, Gavel, Calculator, Briefcase, Users2, ArrowRight } from "lucide-react";
+import { Home, Gavel, Calculator, Briefcase, Users2, LineChart, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
@@ -6,6 +6,7 @@ import { HUB_MODE_COOKIE, MODE_HOME_ROUTE, accountTypeHubMode, type AccountType,
 import { filtrarContasPorPapel, getContasVinculadas, nomeConta } from "@/lib/colaborador";
 import { entrarFinanceiro } from "@/app/colaborador/financeiro/actions";
 import { entrarRH } from "@/app/colaborador/rh/actions";
+import { entrarComercial } from "@/app/colaborador/comercial/actions";
 
 const WORKSPACE_META: Record<
   "advogado" | "contador",
@@ -60,6 +61,8 @@ export default async function ColaboradorPickerPage() {
   const contaFinanceiro = filtrarContasPorPapel(contas, "financeiro")[0];
   // Same rule for RH — a unique index enforces a single active rh link.
   const contaRH = filtrarContasPorPapel(contas, "rh")[0];
+  // Same rule for Comercial — a unique index enforces a single active link.
+  const contaComercial = filtrarContasPorPapel(contas, "comercial")[0];
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
@@ -159,6 +162,28 @@ export default async function ColaboradorPickerPage() {
                 </span>
                 <span className="block truncate text-xs text-zinc-500">
                   Departamentos, Funcionários, Férias, Benefícios, Recrutamento, Avaliações, Ponto e Folha de Pagamento
+                </span>
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-zinc-600" />
+            </button>
+          </form>
+        )}
+
+        {contaComercial && (
+          <form action={entrarComercial.bind(null, contaComercial.dono_id)}>
+            <button
+              type="submit"
+              className="flex w-full items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3.5 text-left transition-colors hover:bg-zinc-900"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-teal-300">
+                <LineChart className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-teal-200">
+                  Comercial — {nomeConta(contaComercial)}
+                </span>
+                <span className="block truncate text-xs text-zinc-500">
+                  Funil de vendas, leads e follow-ups
                 </span>
               </span>
               <ArrowRight className="h-4 w-4 shrink-0 text-zinc-600" />

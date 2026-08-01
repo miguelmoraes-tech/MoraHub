@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Target } from "lucide-react";
-import type { Lead, Proposta } from "@/lib/types";
+import { Target, AlertTriangle } from "lucide-react";
+import type { Lead, Proposta, FollowupLead } from "@/lib/types";
 import { LeadCard } from "@/components/lead-card";
 import { NewLeadDialog } from "@/components/new-lead-dialog";
 import { ExportButton } from "@/components/export-button";
 import { SegmentFilter } from "@/components/segment-filter";
+import { todayISO } from "@/lib/vencimentos/dates";
+import { isFollowupPendente } from "@/lib/leads";
 
 const PREVIA_OPTIONS = ["Prévia enviada", "Prévia pendente"];
 const CONTATO_OPTIONS = ["WhatsApp/Ambos", "Só ligação"];
@@ -15,9 +17,11 @@ const CONTATO_OPTIONS = ["WhatsApp/Ambos", "Só ligação"];
 export function LeadsBoard({
   leads,
   propostas = [],
+  followups = [],
 }: {
   leads: Lead[];
   propostas?: Proposta[];
+  followups?: FollowupLead[];
 }) {
   const searchParams = useSearchParams();
   const highlightLeadId = searchParams.get("lead");
@@ -35,6 +39,8 @@ export function LeadsBoard({
   const [contatoFiltro, setContatoFiltro] = useState<
     "" | "whatsapp" | "ligacao"
   >("");
+  const [somenteAtrasados, setSomenteAtrasados] = useState(false);
+  const hoje = todayISO();
 
   const nichos = useMemo(
     () =>
@@ -60,12 +66,18 @@ export function LeadsBoard({
         previaFiltro === "enviada" ? lead.previa_enviada : !lead.previa_enviada
       )
     : abordados;
-  const list =
+  const listaBase =
     tab === "abordar"
       ? aAbordar
       : tab === "abordado"
         ? abordadosFiltrados
         : convertidos;
+  const list = somenteAtrasados
+    ? listaBase.filter((lead) => isFollowupPendente(lead, hoje))
+    : listaBase;
+  const atrasadosCount = porContato.filter((lead) =>
+    isFollowupPendente(lead, hoje)
+  ).length;
 
   const propostasPorLead = useMemo(() => {
     const map = new Map<string, Proposta[]>();
@@ -77,6 +89,16 @@ export function LeadsBoard({
     }
     return map;
   }, [propostas]);
+
+  const followupsPorLead = useMemo(() => {
+    const map = new Map<string, FollowupLead[]>();
+    for (const followup of followups) {
+      const lista = map.get(followup.lead_id) ?? [];
+      lista.push(followup);
+      map.set(followup.lead_id, lista);
+    }
+    return map;
+  }, [followups]);
 
   const exportHref = nicho
     ? `/api/export/leads?nicho=${encodeURIComponent(nicho)}`
@@ -186,6 +208,19 @@ export function LeadsBoard({
             }
           />
         )}
+
+        <button
+          type="button"
+          onClick={() => setSomenteAtrasados((v) => !v)}
+          className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+            somenteAtrasados
+              ? "border-rose-700/60 bg-rose-950/40 text-rose-300"
+              : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Follow-up atrasado{atrasadosCount > 0 ? ` (${atrasadosCount})` : ""}
+        </button>
       </div>
 
       {list.length > 0 ? (
@@ -195,6 +230,7 @@ export function LeadsBoard({
               key={lead.id}
               lead={lead}
               propostas={propostasPorLead.get(lead.id) ?? []}
+              followups={followupsPorLead.get(lead.id) ?? []}
               autoOpenDetail={lead.id === highlightLeadId}
             />
           ))}
@@ -203,11 +239,13 @@ export function LeadsBoard({
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-zinc-800 py-20 text-center">
           <Target className="h-8 w-8 text-zinc-700" />
           <p className="text-sm text-zinc-500">
-            {tab === "abordar"
-              ? "Nenhum lead para abordar."
-              : tab === "abordado"
-                ? "Nenhum lead abordado ainda."
-                : "Nenhum lead convertido ainda."}
+            {somenteAtrasados
+              ? "Nenhum lead com follow-up atrasado."
+              : tab === "abordar"
+                ? "Nenhum lead para abordar."
+                : tab === "abordado"
+                  ? "Nenhum lead abordado ainda."
+                  : "Nenhum lead convertido ainda."}
           </p>
         </div>
       )}

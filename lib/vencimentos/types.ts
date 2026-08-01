@@ -5,7 +5,8 @@ export type VencimentoTipo =
   | "contrato"
   | "juridico"
   | "propriedade_intelectual"
-  | "ferias";
+  | "ferias"
+  | "lead_followup";
 
 export interface VencimentoAlerta {
   id: string;

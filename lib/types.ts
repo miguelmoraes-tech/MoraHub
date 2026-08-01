@@ -167,6 +167,22 @@ export interface Lead {
   data_previa: string | null;
   tipo_contato: LeadTipoContato;
   created_at: string;
+  ultimo_contato: string | null;
+  proximo_followup: string | null;
+  intervalo_followup_dias: number | null;
+}
+
+export type FollowupCanal = "whatsapp" | "ligacao" | "email" | "presencial" | "outro";
+
+export interface FollowupLead {
+  id: string;
+  user_id: string;
+  lead_id: string;
+  data_contato: string;
+  canal: FollowupCanal | null;
+  resumo: string | null;
+  proximo_followup: string | null;
+  created_at: string;
 }
 
 export interface Renegado {
@@ -279,7 +295,7 @@ export interface Proposta {
   created_at: string;
 }
 
-export type ColaboradorPapel = "contador" | "advogado" | "financeiro" | "rh";
+export type ColaboradorPapel = "contador" | "advogado" | "financeiro" | "rh" | "comercial";
 export type ConviteStatus = "pendente" | "aceito" | "recusado" | "expirado";
 export type MembroStatus = "ativo" | "removido";
 

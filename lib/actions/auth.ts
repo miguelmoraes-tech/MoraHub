@@ -113,7 +113,7 @@ const SignupSchema = z.object({
   email: z.email({ error: "Informe um e-mail válido." }),
   password: z.string().min(6, { error: "A senha deve ter pelo menos 6 caracteres." }),
   tipoConta: z.enum(
-    ["empresarial", "pessoal", "contador", "advogado", "financeiro", "rh"],
+    ["empresarial", "pessoal", "contador", "advogado", "financeiro", "rh", "comercial"],
     { error: "Selecione o tipo de conta." }
   ),
 });

@@ -12,7 +12,7 @@ import {
   Send,
   Phone,
 } from "lucide-react";
-import type { Lead, Proposta } from "@/lib/types";
+import type { Lead, Proposta, FollowupLead } from "@/lib/types";
 import { updateLead, deleteLead } from "@/app/(dashboard)/leads/actions";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { LeadFields } from "@/components/lead-fields";
@@ -21,6 +21,7 @@ import { PreviaFields } from "@/components/previa-fields";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { ConvertLeadDialog } from "@/components/convert-lead-dialog";
 import { PropostasSection } from "@/components/propostas-section";
+import { LeadFollowupSection } from "@/components/lead-followup-section";
 import { formatDate } from "@/lib/format";
 
 const STATUS_LABEL: Record<Lead["status"], string> = {
@@ -49,10 +50,12 @@ const TIPO_CONTATO_LABEL = {
 export function LeadDetailDialog({
   lead,
   propostas = [],
+  followups = [],
   autoOpen = false,
 }: {
   lead: Lead;
   propostas?: Proposta[];
+  followups?: FollowupLead[];
   autoOpen?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -254,6 +257,12 @@ export function LeadDetailDialog({
                     <p className="text-sm text-zinc-600">Sem descrição.</p>
                   )}
                 </div>
+
+                <LeadFollowupSection
+                  leadId={lead.id}
+                  intervaloFollowupDias={lead.intervalo_followup_dias}
+                  followups={followups}
+                />
 
                 <PropostasSection leadId={lead.id} propostas={propostas} />
 

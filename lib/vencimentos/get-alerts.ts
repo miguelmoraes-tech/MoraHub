@@ -20,6 +20,12 @@ function mensagemVencer(dias: number, nome: string) {
   return `Faltam ${pluralDias(dias)} para vencer ${nome}`;
 }
 
+function mensagemFollowup(dias: number, nome: string) {
+  if (dias < 0) return `Follow-up com ${nome} está atrasado há ${pluralDias(-dias)}`;
+  if (dias === 0) return `Follow-up com ${nome} é hoje`;
+  return `Faltam ${pluralDias(dias)} para o follow-up com ${nome}`;
+}
+
 type AssinaturaRow = {
   id: string;
   cliente_id: string;
@@ -53,6 +59,13 @@ type FeriaRow = {
   periodo_aquisitivo_fim: string;
 };
 type FuncionarioNomeRow = { id: string; nome: string };
+type LeadFollowupRow = {
+  id: string;
+  nome: string;
+  status: string;
+  resultado: string | null;
+  proximo_followup: string;
+};
 
 export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
   const supabase = await createClient();
@@ -68,6 +81,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
     { data: propriedadesIntelectuais },
     { data: ferias },
     { data: funcionarios },
+    { data: leadsFollowup },
   ] = (await Promise.all([
     supabase
       .from("assinaturas")
@@ -100,6 +114,11 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
       .eq("status", "pendente")
       .not("periodo_aquisitivo_fim", "is", null),
     supabase.from("funcionarios").select("id, nome"),
+    supabase
+      .from("leads")
+      .select("id, nome, status, resultado, proximo_followup")
+      .not("proximo_followup", "is", null)
+      .neq("status", "convertido"),
   ])) as [
     { data: AssinaturaRow[] | null },
     { data: GastoRecorrenteRow[] | null },
@@ -110,6 +129,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
     { data: PropriedadeIntelectualRow[] | null },
     { data: FeriaRow[] | null },
     { data: FuncionarioNomeRow[] | null },
+    { data: LeadFollowupRow[] | null },
   ];
 
   const clienteNome = new Map((clientes ?? []).map((c) => [c.id, c.nome]));
@@ -205,6 +225,19 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
       data: f.periodo_aquisitivo_fim,
       diasRestantes: dias,
       mensagem: mensagemVencer(dias, nome),
+    });
+  }
+
+  for (const l of leadsFollowup ?? []) {
+    if (l.resultado === "negou") continue;
+    const dias = diffInDays(hoje, l.proximo_followup);
+    if (dias > JANELA_DIAS) continue;
+    alertas.push({
+      id: `lead_followup-${l.id}`,
+      tipo: "lead_followup",
+      data: l.proximo_followup,
+      diasRestantes: dias,
+      mensagem: mensagemFollowup(dias, l.nome),
     });
   }
 

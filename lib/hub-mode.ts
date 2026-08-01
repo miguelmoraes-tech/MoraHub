@@ -14,7 +14,8 @@ export type AccountType =
   | "contador"
   | "advogado"
   | "financeiro"
-  | "rh";
+  | "rh"
+  | "comercial";
 
 /** Missing/unrecognized values (e.g. accounts predating this column) fall back to business. */
 export function accountTypeToHubMode(tipo: string | null | undefined): HubMode {
@@ -22,14 +23,20 @@ export function accountTypeToHubMode(tipo: string | null | undefined): HubMode {
 }
 
 /**
- * Contador/advogado/financeiro/rh accounts have no business or pessoal hub
- * of their own by default — they land on the linked-accounts picker instead
- * of a HubMode home. Financeiro and RH differ from contador/advogado in that
- * each is capped at one active link (enforced by a DB unique index), not
- * several — see lib/financeiro.ts and lib/rh.ts.
+ * Contador/advogado/financeiro/rh/comercial accounts have no business or
+ * pessoal hub of their own by default — they land on the linked-accounts
+ * picker instead of a HubMode home. Financeiro, RH and Comercial differ from
+ * contador/advogado in that each is capped at one active link (enforced by a
+ * DB unique index), not several — see lib/financeiro.ts and lib/rh.ts.
  */
 export function isCollaboratorAccountType(tipo: string | null | undefined): boolean {
-  return tipo === "contador" || tipo === "advogado" || tipo === "financeiro" || tipo === "rh";
+  return (
+    tipo === "contador" ||
+    tipo === "advogado" ||
+    tipo === "financeiro" ||
+    tipo === "rh" ||
+    tipo === "comercial"
+  );
 }
 
 /** Where activating/switching to each account type sends the user. */
@@ -40,6 +47,7 @@ export const ACCOUNT_TYPE_HOME_ROUTE: Record<AccountType, string> = {
   advogado: "/colaborador",
   financeiro: "/colaborador",
   rh: "/colaborador",
+  comercial: "/colaborador",
 };
 
 /**

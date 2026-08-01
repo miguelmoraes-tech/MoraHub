@@ -11,17 +11,21 @@ import {
   Send,
   Phone,
 } from "lucide-react";
-import type { Lead, Proposta } from "@/lib/types";
+import type { Lead, Proposta, FollowupLead } from "@/lib/types";
 import { formatDate } from "@/lib/format";
+import { isFollowupPendente } from "@/lib/leads";
+import { todayISO, diffInDays } from "@/lib/vencimentos/dates";
 import {
   updateLead,
   marcarAbordado,
+  registrarFollowup,
   deleteLead,
 } from "@/app/(dashboard)/leads/actions";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { LeadFields } from "@/components/lead-fields";
 import { ResultadoFields } from "@/components/resultado-fields";
 import { PreviaFields } from "@/components/previa-fields";
+import { FollowupFields } from "@/components/followup-fields";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { LeadDetailDialog } from "@/components/lead-detail-dialog";
 import { ConvertLeadDialog } from "@/components/convert-lead-dialog";
@@ -46,13 +50,17 @@ const STATUS_TONE: Record<Lead["status"], ChipTone> = {
 export function LeadCard({
   lead,
   propostas = [],
+  followups = [],
   autoOpenDetail = false,
 }: {
   lead: Lead;
   propostas?: Proposta[];
+  followups?: FollowupLead[];
   autoOpenDetail?: boolean;
 }) {
-  const [mode, setMode] = useState<"view" | "edit" | "marcar">("view");
+  const [mode, setMode] = useState<"view" | "edit" | "marcar" | "followup">(
+    "view"
+  );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const updateAction = updateLead.bind(null, lead.id);
@@ -68,6 +76,19 @@ export function LeadCard({
     undefined
   );
   useActionSuccess(marcarState, () => setMode("view"));
+
+  const followupAction = registrarFollowup.bind(null, lead.id);
+  const [followupState, followupFormAction, followupPending] = useActionState(
+    followupAction,
+    undefined
+  );
+  useActionSuccess(followupState, () => setMode("view"));
+
+  const hoje = todayISO();
+  const followupPendente = isFollowupPendente(lead, hoje);
+  const followupDias = lead.proximo_followup
+    ? diffInDays(lead.proximo_followup, hoje)
+    : null;
 
   if (mode === "edit") {
     return (
@@ -99,6 +120,39 @@ export function LeadCard({
             className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
           >
             {updatePending ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  if (mode === "followup") {
+    return (
+      <form
+        action={followupFormAction}
+        className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4"
+      >
+        <p className="text-sm font-medium text-zinc-200">
+          Registrar contato com &quot;{lead.nome}&quot;
+        </p>
+        <FollowupFields intervaloFollowupDias={lead.intervalo_followup_dias} />
+        {followupState && "error" in followupState && (
+          <p className="text-xs text-rose-400">{followupState.error}</p>
+        )}
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setMode("view")}
+            className="rounded-md px-2.5 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={followupPending}
+            className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
+          >
+            {followupPending ? "Salvando..." : "Confirmar"}
           </button>
         </div>
       </form>
@@ -153,6 +207,7 @@ export function LeadCard({
           <LeadDetailDialog
             lead={lead}
             propostas={propostas}
+            followups={followups}
             autoOpen={autoOpenDetail}
           />
           <StatusChip tone={STATUS_TONE[lead.status]}>
@@ -169,6 +224,14 @@ export function LeadCard({
 
       <div className="flex flex-wrap items-center gap-2">
         {lead.nicho && <StatusChip tone="copper">{lead.nicho}</StatusChip>}
+        {followupPendente && (
+          <StatusChip tone={followupDias! > 0 ? "rose" : "amber"}>
+            <Phone className="h-3 w-3" />
+            {followupDias! > 0
+              ? `Follow-up atrasado ${followupDias}d`
+              : "Follow-up hoje"}
+          </StatusChip>
+        )}
         {lead.tipo_contato === "ligacao" && (
           <StatusChip tone="amber">
             <Phone className="h-3 w-3" />
@@ -277,6 +340,16 @@ export function LeadCard({
 
         {!confirmingDelete && (
           <div className="flex items-center gap-3">
+            {lead.status !== "convertido" && (
+              <button
+                type="button"
+                onClick={() => setMode("followup")}
+                className="flex items-center gap-1.5 text-xs font-medium text-sky-400 hover:text-sky-300"
+              >
+                <Phone className="h-3.5 w-3.5" />
+                Registrar contato
+              </button>
+            )}
             {lead.status === "abordar" && (
               <button
                 type="button"

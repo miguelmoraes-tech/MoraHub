@@ -32,3 +32,13 @@ export const LeadPreviaSchema = z.object({
 });
 
 export type LeadPreviaInput = z.infer<typeof LeadPreviaSchema>;
+
+export const FollowupLeadSchema = z.object({
+  canal: z.enum(["whatsapp", "ligacao", "email", "presencial", "outro"], {
+    error: "Selecione o canal do contato.",
+  }),
+  resumo: z.string().min(1, { error: "Descreva rapidamente o que foi falado." }),
+  proximo_followup: z.string().min(1, { error: "Informe a data do próximo follow-up." }),
+});
+
+export type FollowupLeadInput = z.infer<typeof FollowupLeadSchema>;

@@ -57,9 +57,9 @@ function ConviteColaboradorForm({ onDone }: { onDone: () => void }) {
     undefined
   );
   const [copied, setCopied] = useState(false);
-  const [papel, setPapel] = useState<"contador" | "advogado" | "financeiro" | "rh">(
-    "contador"
-  );
+  const [papel, setPapel] = useState<
+    "contador" | "advogado" | "financeiro" | "rh" | "comercial"
+  >("contador");
   const created = state && "ok" in state ? state : null;
 
   async function handleCopy() {
@@ -131,6 +131,7 @@ function ConviteColaboradorForm({ onDone }: { onDone: () => void }) {
           <option value="advogado">Advogado</option>
           <option value="financeiro">Financeiro</option>
           <option value="rh">RH</option>
+          <option value="comercial">Comercial</option>
         </select>
         {papel === "financeiro" && (
           <p className="text-xs text-zinc-500">
@@ -145,6 +146,13 @@ function ConviteColaboradorForm({ onDone }: { onDone: () => void }) {
             (Departamentos, Funcionários, Férias, Benefícios, Recrutamento,
             Avaliações e Ponto). Como o Financeiro, só pode estar vinculado a
             uma empresa por vez.
+          </p>
+        )}
+        {papel === "comercial" && (
+          <p className="text-xs text-zinc-500">
+            Funcionário interno com acesso a vendas, funil de leads e
+            comissões desta empresa. Como o Financeiro e o RH, só pode estar
+            vinculado a uma empresa por vez.
           </p>
         )}
       </div>

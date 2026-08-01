@@ -7,6 +7,7 @@ import { PageTransition } from "@/components/page-transition";
 import { getVencimentoAlertas } from "@/lib/vencimentos/get-alerts";
 import { getFinanceiroDonoId } from "@/lib/financeiro";
 import { getRHDonoId } from "@/lib/rh";
+import { getComercialDonoId } from "@/lib/comercial";
 import { getUnreadTotal } from "@/lib/chat";
 import type { AccountType } from "@/lib/hub-mode";
 
@@ -33,6 +34,8 @@ export default async function DashboardLayout({
   // wins the restricted-sidebar view in that edge case, same as before RH
   // existed; nothing about their actual data access depends on this choice.
   const restritoRH = !!rhDonoId && !restritoFinanceiro;
+  const comercialDonoId = await getComercialDonoId();
+  const restritoComercial = !!comercialDonoId && !restritoFinanceiro && !restritoRH;
 
   const { data: colaboracao } = await supabase
     .from("membros")
@@ -67,6 +70,15 @@ export default async function DashboardLayout({
       .eq("papel", "rh")
       .maybeSingle();
     if (conversaRH) chatHref = `/chat/${conversaRH.id}`;
+  } else if (restritoComercial && comercialDonoId) {
+    const { data: conversaComercial } = await supabase
+      .from("conversas")
+      .select("id")
+      .eq("dono_id", comercialDonoId)
+      .eq("membro_id", user.id)
+      .eq("papel", "comercial")
+      .maybeSingle();
+    if (conversaComercial) chatHref = `/chat/${conversaComercial.id}`;
   }
   const unreadTotal = await getUnreadTotal();
 
@@ -75,10 +87,13 @@ export default async function DashboardLayout({
       <Sidebar
         userEmail={user.email ?? ""}
         userId={user.id}
-        temColaboracoes={!!colaboracao && !restritoFinanceiro && !restritoRH}
+        temColaboracoes={
+          !!colaboracao && !restritoFinanceiro && !restritoRH && !restritoComercial
+        }
         tiposAtivos={tiposAtivos}
         restritoFinanceiro={restritoFinanceiro}
         restritoRH={restritoRH}
+        restritoComercial={restritoComercial}
         chatHref={chatHref}
         unreadTotal={unreadTotal}
       />

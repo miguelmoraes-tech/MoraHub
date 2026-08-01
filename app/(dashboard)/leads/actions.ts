@@ -7,8 +7,11 @@ import {
   LeadSchema,
   LeadResultadoSchema,
   LeadPreviaSchema,
+  FollowupLeadSchema,
 } from "@/lib/validations/lead";
 import { ClienteSchema } from "@/lib/validations/cliente";
+import { getEffectiveDonoIdForComercial } from "@/lib/comercial";
+import { todayISO } from "@/lib/vencimentos/dates";
 import type { ActionState } from "@/lib/actions/types";
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -171,6 +174,52 @@ export async function marcarAbordado(
   if (error) return { error: "Não foi possível atualizar o lead." };
 
   revalidatePath("/leads");
+  return { ok: true };
+}
+
+export async function registrarFollowup(
+  leadId: string,
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = FollowupLeadSchema.safeParse({
+    canal: formData.get("canal"),
+    resumo: formData.get("resumo"),
+    proximo_followup: formData.get("proximo_followup"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const { supabase, user } = await requireUser();
+  if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  const donoId = await getEffectiveDonoIdForComercial();
+  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+
+  const { error: followupError } = await supabase.from("followups_lead").insert({
+    user_id: donoId,
+    lead_id: leadId,
+    canal: parsed.data.canal,
+    resumo: parsed.data.resumo,
+    proximo_followup: parsed.data.proximo_followup,
+  });
+  if (followupError) return { error: "Não foi possível registrar o contato." };
+
+  const { error: leadError } = await supabase
+    .from("leads")
+    .update({
+      ultimo_contato: todayISO(),
+      proximo_followup: parsed.data.proximo_followup,
+    })
+    .eq("id", leadId);
+  if (leadError) {
+    return {
+      error: "Contato registrado, mas não foi possível atualizar o lead.",
+    };
+  }
+
+  revalidatePath("/leads");
+  revalidatePath("/comercial");
   return { ok: true };
 }
 

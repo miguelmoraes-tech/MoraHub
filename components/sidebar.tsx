@@ -89,6 +89,11 @@ const FINANCEIRO_ITEMS: NavItem[] = [
   { label: "Folha de Pagamento", href: "/rh/folha", icon: Banknote, enabled: true },
 ];
 
+const COMERCIAL_ITEMS: NavItem[] = [
+  { label: "Visão Geral", href: "/comercial", icon: LayoutGrid, enabled: true },
+  { label: "Funil de Vendas", href: "/leads", icon: Target, enabled: true },
+];
+
 const RH_ITEMS: NavItem[] = [
   { label: "Visão Geral", href: "/rh", icon: LayoutGrid, enabled: true },
   { label: "Departamentos", href: "/rh/departamentos", icon: Building2, enabled: true },
@@ -142,7 +147,7 @@ function NavGroup({
         {items.map((item) => {
           const isActive =
             item.enabled &&
-            (item.href === "/pessoal" || item.href === "/rh"
+            (item.href === "/pessoal" || item.href === "/rh" || item.href === "/comercial"
               ? pathname === item.href
               : pathname.startsWith(item.href));
           const Icon = item.icon;
@@ -193,6 +198,7 @@ export function Sidebar({
   tiposAtivos,
   restritoFinanceiro,
   restritoRH,
+  restritoComercial,
   chatHref,
   unreadTotal,
 }: {
@@ -202,13 +208,14 @@ export function Sidebar({
   tiposAtivos: AccountType[];
   restritoFinanceiro?: boolean;
   restritoRH?: boolean;
+  restritoComercial?: boolean;
   chatHref: string;
   unreadTotal: number;
 }) {
   const pathname = usePathname();
   const isPessoal = pathname.startsWith("/pessoal");
   const accent: Accent = isPessoal ? "petrol" : "copper";
-  const restrito = restritoFinanceiro || restritoRH;
+  const restrito = restritoFinanceiro || restritoRH || restritoComercial;
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
@@ -239,6 +246,11 @@ export function Sidebar({
             RH
           </span>
         )}
+        {restritoComercial && (
+          <span className="rounded-full border border-teal-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-teal-400">
+            Comercial
+          </span>
+        )}
       </div>
 
       {!restrito && (
@@ -254,6 +266,8 @@ export function Sidebar({
             <NavGroup title="Financeiro" items={FINANCEIRO_ITEMS} accent="copper" />
           ) : restritoRH ? (
             <NavGroup title="RH" items={RH_ITEMS} accent="copper" />
+          ) : restritoComercial ? (
+            <NavGroup title="Comercial" items={COMERCIAL_ITEMS} accent="copper" />
           ) : isPessoal ? (
             <>
               <NavGroup title="Painel" items={PAINEL_ITEMS} accent={accent} />
@@ -268,6 +282,7 @@ export function Sidebar({
             <>
               <NavGroup title="Dashboards" items={DASHBOARD_ITEMS} accent={accent} />
               <NavGroup title="Gestão" items={GESTAO_ITEMS} accent={accent} />
+              <NavGroup title="Comercial" items={COMERCIAL_ITEMS} accent={accent} />
               <NavGroup title="RH" items={RH_ITEMS} accent={accent} />
             </>
           )}

@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Building2, Home, Calculator, Scale, Briefcase, Users2 } from "lucide-react";
+import { Building2, Home, Calculator, Scale, Briefcase, Users2, LineChart } from "lucide-react";
 import type { AccountType } from "@/lib/hub-mode";
 
 export const ACCOUNT_TYPES: {
@@ -45,6 +45,13 @@ export const ACCOUNT_TYPES: {
     description:
       "Para gerenciar pessoas, contratação e folha de uma empresa — vinculada a apenas um negócio por vez, como o Financeiro",
     icon: Users2,
+  },
+  {
+    value: "comercial",
+    label: "Conta Comercial",
+    description:
+      "Para gerenciar vendas, funil de leads e comissões de uma empresa — vinculada a apenas um negócio por vez, como o Financeiro",
+    icon: LineChart,
   },
 ];
 
@@ -107,5 +114,13 @@ export const ACCOUNT_TYPE_STYLES: Record<
     button: "bg-amber-600 hover:bg-amber-500",
     current: "border-amber-400 bg-amber-600/10",
     accentText: "text-amber-400",
+  },
+  comercial: {
+    card: "border-teal-600/40 bg-teal-600/10 hover:bg-teal-600/15",
+    iconBg: "bg-teal-400",
+    text: "text-teal-200",
+    button: "bg-teal-600 hover:bg-teal-500",
+    current: "border-teal-400 bg-teal-600/10",
+    accentText: "text-teal-400",
   },
 };
