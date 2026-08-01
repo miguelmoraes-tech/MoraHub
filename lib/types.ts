@@ -410,6 +410,23 @@ export interface ContaReceber {
   created_at: string;
 }
 
+export type LancamentoExtratoTipo = "credito" | "debito";
+export type StatusConciliacao = "pendente" | "conciliado" | "ignorado";
+
+export interface LancamentoExtrato {
+  id: string;
+  user_id: string;
+  data: string;
+  descricao: string;
+  valor: number;
+  tipo: LancamentoExtratoTipo;
+  status_conciliacao: StatusConciliacao;
+  gasto_id: string | null;
+  comprovante_id: string | null;
+  arquivo_origem: string | null;
+  created_at: string;
+}
+
 export interface Orcamento {
   id: string;
   user_id: string;

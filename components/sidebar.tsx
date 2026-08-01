@@ -37,6 +37,7 @@ import {
   Briefcase,
   ClipboardCheck,
   Clock,
+  FileBarChart,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
@@ -73,6 +74,8 @@ const GESTAO_ITEMS: NavItem[] = [
   { label: "Orçamento", href: "/orcamentos", icon: PieChart, enabled: true },
   { label: "Fluxo de Caixa", href: "/fluxo-caixa", icon: LineChart, enabled: true },
   { label: "Rentabilidade", href: "/rentabilidade", icon: TrendingUp, enabled: true },
+  { label: "Conciliação Bancária", href: "/conciliacao", icon: Landmark, enabled: true },
+  { label: "DRE", href: "/dre", icon: FileBarChart, enabled: true },
 ];
 
 const FINANCEIRO_ITEMS: NavItem[] = [
