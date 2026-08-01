@@ -10,7 +10,7 @@ import {
   FollowupLeadSchema,
 } from "@/lib/validations/lead";
 import { ClienteSchema } from "@/lib/validations/cliente";
-import { getEffectiveDonoIdForComercial } from "@/lib/comercial";
+import { getEffectiveDonoIdForComercial, getEffectiveWorkspaceIdForComercial } from "@/lib/comercial";
 import { todayISO } from "@/lib/vencimentos/dates";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -53,11 +53,16 @@ export async function createLead(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
-  if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  const { supabase } = await requireUser();
+  const [donoId, workspaceId] = await Promise.all([
+    getEffectiveDonoIdForComercial(),
+    getEffectiveWorkspaceIdForComercial(),
+  ]);
+  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const { error } = await supabase.from("leads").insert({
-    user_id: user.id,
+    user_id: donoId,
+    workspace_id: workspaceId,
     nome: parsed.data.nome,
     contato: parsed.data.contato ?? null,
     tem_site: parsed.data.tem_site,
@@ -196,11 +201,15 @@ export async function registrarFollowup(
 
   const { supabase, user } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
-  const donoId = await getEffectiveDonoIdForComercial();
+  const [donoId, workspaceId] = await Promise.all([
+    getEffectiveDonoIdForComercial(),
+    getEffectiveWorkspaceIdForComercial(),
+  ]);
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const { error: followupError } = await supabase.from("followups_lead").insert({
     user_id: donoId,
+    workspace_id: workspaceId,
     lead_id: leadId,
     canal: parsed.data.canal,
     resumo: parsed.data.resumo,
@@ -251,13 +260,18 @@ export async function convertLeadToCliente(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
-  if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  const { supabase } = await requireUser();
+  const [donoId, workspaceId] = await Promise.all([
+    getEffectiveDonoIdForComercial(),
+    getEffectiveWorkspaceIdForComercial(),
+  ]);
+  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const { data: cliente, error } = await supabase
     .from("clientes")
     .insert({
-      user_id: user.id,
+      user_id: donoId,
+      workspace_id: workspaceId,
       nome: parsed.data.nome,
       telefone: parsed.data.telefone ?? null,
       email: parsed.data.email ?? null,

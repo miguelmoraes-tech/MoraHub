@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 
 /** Which company a comercial-linked session is currently acting on. */
 export const COMERCIAL_DONO_COOKIE = "comercial-dono-id";
@@ -48,4 +49,34 @@ export async function getEffectiveDonoIdForComercial(): Promise<string | null> {
     data: { user },
   } = await supabase.auth.getUser();
   return user?.id ?? null;
+}
+
+/**
+ * Workspace ('empresarial') que as telas de Comercial (Funil de Vendas,
+ * Follow-ups) devem enxergar: o do vínculo `membros` específico quando uma
+ * sessão comercial está ativa, senão o workspace padrão do próprio usuário.
+ */
+export async function getEffectiveWorkspaceIdForComercial(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const donoIdCookie = cookieStore.get(COMERCIAL_DONO_COOKIE)?.value;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  if (donoIdCookie) {
+    const { data } = await supabase
+      .from("membros")
+      .select("workspace_id")
+      .eq("dono_id", donoIdCookie)
+      .eq("membro_id", user.id)
+      .eq("papel", "comercial")
+      .eq("status", "ativo")
+      .maybeSingle();
+    return (data as { workspace_id: string | null } | null)?.workspace_id ?? null;
+  }
+
+  return getWorkspaceIdPadrao(user.id, "empresarial");
 }

@@ -1,22 +1,33 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForComercial } from "@/lib/comercial";
+import { getEffectiveDonoIdForComercial, getEffectiveWorkspaceIdForComercial } from "@/lib/comercial";
 import { LeadsBoard } from "@/components/leads-board";
 import { todayISO, subtractDaysISO } from "@/lib/vencimentos/dates";
 import type { Lead, Proposta, FollowupLead, Campanha } from "@/lib/types";
 
 export default async function LeadsPage() {
   const supabase = await createClient();
-  const donoId = await getEffectiveDonoIdForComercial();
+  const [donoId, workspaceId] = await Promise.all([
+    getEffectiveDonoIdForComercial(),
+    getEffectiveWorkspaceIdForComercial(),
+  ]);
   const noventaDiasAtras = subtractDaysISO(todayISO(), 90);
 
   const [{ data: leads }, { data: propostas }, { data: followups }, { data: campanhas }] =
     (await Promise.all([
-      supabase.from("leads").select("*").eq("user_id", donoId ?? "").order("nome"),
-      supabase.from("propostas").select("*").not("lead_id", "is", null),
+      supabase
+        .from("leads")
+        .select("*")
+        .eq("workspace_id", workspaceId ?? "")
+        .order("nome"),
+      supabase
+        .from("propostas")
+        .select("*")
+        .eq("workspace_id", workspaceId ?? "")
+        .not("lead_id", "is", null),
       supabase
         .from("followups_lead")
         .select("*")
-        .eq("user_id", donoId ?? "")
+        .eq("workspace_id", workspaceId ?? "")
         .order("data_contato", { ascending: false }),
       // Campanhas ativas/recentes — só resolve para dono ou colaborador de
       // marketing vinculado (RLS "dono ou marketing vinculado"); um

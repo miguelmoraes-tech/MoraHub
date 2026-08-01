@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { PropostaSchema } from "@/lib/validations/proposta";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import type { ActionState } from "@/lib/actions/types";
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -50,9 +51,11 @@ export async function createProposta(
 
   const { supabase, user } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
 
   const { error } = await supabase.from("propostas").insert({
     user_id: user.id,
+    workspace_id: workspaceId,
     lead_id: leadId,
     cliente_id: clienteId,
     titulo: parsed.data.titulo,

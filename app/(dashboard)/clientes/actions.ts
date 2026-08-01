@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ClienteSchema } from "@/lib/validations/cliente";
+import { getEffectiveDonoIdGeral, getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
 import type { ActionState } from "@/lib/actions/types";
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -43,8 +44,12 @@ export async function createCliente(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
-  if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  const { supabase } = await requireUser();
+  const [donoId, workspaceId] = await Promise.all([
+    getEffectiveDonoIdGeral(),
+    getEffectiveWorkspaceIdGeral(),
+  ]);
+  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const { error } = await supabase.from("clientes").insert({
     nome: parsed.data.nome,
@@ -56,7 +61,8 @@ export async function createCliente(
     segmento: parsed.data.segmento ?? null,
     abordado_por: parsed.data.abordado_por ?? null,
     responsavel: parsed.data.responsavel ?? null,
-    user_id: user.id,
+    user_id: donoId,
+    workspace_id: workspaceId,
   });
 
   if (error) return { error: "Não foi possível criar o cliente." };

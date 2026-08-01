@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { JuridicoSchema } from "@/lib/validations/juridico";
 import { ConviteSchema } from "@/lib/validations/colaborador";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import type { ActionState } from "@/lib/actions/types";
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -130,12 +131,19 @@ export async function convidarColaborador(
     return { error: "Já existe um convite pendente para esse e-mail." };
   }
 
+  // Todo colaborador (financeiro/rh/comercial/marketing/contador/advogado)
+  // atua sobre o lado empresarial do dono — o convite já nasce vinculado a
+  // um workspace específico (hoje sempre o padrão, já que o seletor de
+  // múltiplos workspaces ainda não existe) em vez de nascer sem nenhum.
+  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
+
   const { data: convite, error } = await supabase
     .from("convites")
     .insert({
       dono_id: user.id,
       email_convidado: parsed.data.email,
       papel: parsed.data.papel,
+      workspace_id: workspaceId,
     })
     .select("token")
     .single();
