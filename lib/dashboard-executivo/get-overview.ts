@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { todayISO, diffInDays, recurringMonthKeysInWindow, subtractDaysISO } from "@/lib/vencimentos/dates";
 import { getRHOverview, type RHOverview } from "@/lib/rh/get-overview";
 import { getMarketingOverview, type MarketingOverview } from "@/lib/marketing/get-overview";
-import { getSuporteData, computeSuporteOverview, nowMs, type SuporteOverview } from "@/lib/tickets";
+import { getSuporteData } from "@/lib/tickets";
+import { computeSuporteOverview, nowMs, type SuporteOverview } from "@/lib/tickets-shared";
 import {
   getMetasOverview,
   getMetaResumoPorSetor,

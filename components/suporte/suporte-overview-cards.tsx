@@ -1,6 +1,6 @@
 import { AlertTriangle, Inbox, Clock, CheckCircle2 } from "lucide-react";
 import { VisaoGeralCards, type VisaoGeralCard } from "@/components/juridico/visao-geral-cards";
-import type { SuporteOverview } from "@/lib/tickets";
+import type { SuporteOverview } from "@/lib/tickets-shared";
 
 function formatHoras(horas: number | null) {
   if (horas === null) return "—";

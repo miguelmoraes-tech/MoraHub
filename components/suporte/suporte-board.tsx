@@ -11,7 +11,7 @@ import type {
 import { TicketCard } from "@/components/suporte/ticket-card";
 import { NovoTicketDialog } from "@/components/suporte/novo-ticket-dialog";
 import { SuporteOverviewCards } from "@/components/suporte/suporte-overview-cards";
-import type { SuporteOverview } from "@/lib/tickets";
+import type { SuporteOverview } from "@/lib/tickets-shared";
 
 const STATUS_TABS: { value: Ticket["status"]; label: string }[] = [
   { value: "aberto", label: "Aberto" },

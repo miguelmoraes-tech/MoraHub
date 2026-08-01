@@ -3,12 +3,8 @@ import {
   getContasVinculadas,
   nomeConta,
 } from "@/lib/colaborador";
-import {
-  getSuporteData,
-  getColaboradoresParaResponsavel,
-  computeSuporteOverview,
-  nowMs,
-} from "@/lib/tickets";
+import { getSuporteData, getColaboradoresParaResponsavel } from "@/lib/tickets";
+import { computeSuporteOverview, nowMs } from "@/lib/tickets-shared";
 import { SuporteBoard } from "@/components/suporte/suporte-board";
 
 export default async function AdvogadoSuportePage() {

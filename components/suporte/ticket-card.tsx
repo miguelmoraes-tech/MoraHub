@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { formatDate } from "@/lib/format";
-import { isSlaEstourado } from "@/lib/tickets";
+import { isSlaEstourado } from "@/lib/tickets-shared";
 import type { Ticket } from "@/lib/types";
 
 const CATEGORIA_LABEL: Record<Ticket["categoria"], string> = {
