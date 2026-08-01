@@ -38,6 +38,7 @@ import {
   ClipboardCheck,
   Clock,
   FileBarChart,
+  LifeBuoy,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
@@ -87,11 +88,13 @@ const FINANCEIRO_ITEMS: NavItem[] = [
   // The one RH screen Financeiro keeps — it's also where contas_pagar sync
   // lives. The rest of RH_ITEMS below is exclusive to the rh papel.
   { label: "Folha de Pagamento", href: "/rh/folha", icon: Banknote, enabled: true },
+  { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
 ];
 
 const COMERCIAL_ITEMS: NavItem[] = [
   { label: "Visão Geral", href: "/comercial", icon: LayoutGrid, enabled: true },
   { label: "Funil de Vendas", href: "/leads", icon: Target, enabled: true },
+  { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
 ];
 
 const RH_ITEMS: NavItem[] = [
@@ -104,6 +107,11 @@ const RH_ITEMS: NavItem[] = [
   { label: "Recrutamento", href: "/rh/recrutamento", icon: Briefcase, enabled: true },
   { label: "Avaliações", href: "/rh/avaliacoes", icon: ClipboardCheck, enabled: true },
   { label: "Ponto", href: "/rh/ponto", icon: Clock, enabled: true },
+  { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
+];
+
+const SUPORTE_ITEMS: NavItem[] = [
+  { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
 ];
 
 const PAINEL_ITEMS: NavItem[] = [
@@ -284,6 +292,7 @@ export function Sidebar({
               <NavGroup title="Gestão" items={GESTAO_ITEMS} accent={accent} />
               <NavGroup title="Comercial" items={COMERCIAL_ITEMS} accent={accent} />
               <NavGroup title="RH" items={RH_ITEMS} accent={accent} />
+              <NavGroup title="Suporte" items={SUPORTE_ITEMS} accent={accent} />
             </>
           )}
         </div>

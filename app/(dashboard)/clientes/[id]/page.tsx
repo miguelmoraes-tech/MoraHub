@@ -12,6 +12,7 @@ import { AcessosSection } from "@/components/acessos-section";
 import { InfraestruturaSection } from "@/components/infraestrutura-section";
 import { ProjetosSection } from "@/components/projetos-section";
 import { ManutencoesSection } from "@/components/manutencoes-section";
+import { BackupsSection } from "@/components/backups-section";
 import { PropostasSection } from "@/components/propostas-section";
 import { LeadOrigemCard } from "@/components/lead-origem-card";
 import { RentabilidadeClienteCard } from "@/components/rentabilidade-cliente-card";
@@ -26,6 +27,7 @@ import type {
   Infraestrutura,
   Projeto,
   Manutencao,
+  Backup,
   Proposta,
   Gasto,
 } from "@/lib/types";
@@ -48,6 +50,7 @@ export default async function ClienteDetailPage({
     { data: infraestrutura },
     { data: projetos },
     { data: manutencoes },
+    { data: backups },
     { data: propostas },
     { data: gastos },
   ] = (await Promise.all([
@@ -93,6 +96,11 @@ export default async function ClienteDetailPage({
       .eq("cliente_id", id)
       .order("data", { ascending: false }),
     supabase
+      .from("backups")
+      .select("*")
+      .eq("cliente_id", id)
+      .order("data", { ascending: false }),
+    supabase
       .from("propostas")
       .select("*")
       .eq("cliente_id", id)
@@ -112,6 +120,7 @@ export default async function ClienteDetailPage({
     { data: Infraestrutura[] | null },
     { data: Projeto[] | null },
     { data: Manutencao[] | null },
+    { data: Backup[] | null },
     { data: Proposta[] | null },
     { data: Gasto[] | null },
   ];
@@ -191,6 +200,11 @@ export default async function ClienteDetailPage({
       <ManutencoesSection
         clienteId={id}
         manutencoes={manutencoes ?? []}
+        projetos={projetosList}
+      />
+      <BackupsSection
+        clienteId={id}
+        backups={backups ?? []}
         projetos={projetosList}
       />
     </div>

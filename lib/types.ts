@@ -144,6 +144,18 @@ export interface Manutencao {
   created_at: string;
 }
 
+export interface Backup {
+  id: string;
+  user_id: string;
+  cliente_id: string;
+  projeto_id: string | null;
+  data: string;
+  tipo: string | null;
+  local: string | null;
+  link_ou_arquivo: string | null;
+  created_at: string;
+}
+
 export type LeadStatus = "abordar" | "abordado" | "convertido";
 export type LeadResultado = "sem_resposta" | "negou";
 export type LeadTipoContato = "whatsapp" | "ligacao" | "ambos";
@@ -733,3 +745,57 @@ export interface ControlePonto {
   created_at: string;
 }
 
+export type TicketCategoria =
+  | "tecnico"
+  | "financeiro"
+  | "juridico"
+  | "contabil"
+  | "geral"
+  | "outro";
+export type TicketPrioridade = "baixa" | "media" | "alta" | "urgente";
+export type TicketStatus =
+  | "aberto"
+  | "em_andamento"
+  | "aguardando_cliente"
+  | "resolvido"
+  | "fechado";
+
+export interface Ticket {
+  id: string;
+  user_id: string;
+  cliente_id: string | null;
+  titulo: string;
+  descricao: string | null;
+  categoria: TicketCategoria;
+  prioridade: TicketPrioridade;
+  status: TicketStatus;
+  sla_horas: number | null;
+  responsavel_id: string | null;
+  data_abertura: string;
+  data_primeira_resposta: string | null;
+  data_resolucao: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TicketResposta {
+  id: string;
+  ticket_id: string;
+  autor_id: string;
+  conteudo: string;
+  interna: boolean;
+  created_at: string;
+}
+
+/** Shape returned by get_colaboradores_do_dono_by_id() — same as
+ * ColaboradorVinculado but callable for a dono other than auth.uid(), as
+ * long as the caller is that dono or an active membro of theirs. */
+export interface ColaboradorParaAtribuicao {
+  id: string;
+  membro_id: string;
+  papel: ColaboradorPapel;
+  status: MembroStatus;
+  created_at: string;
+  nome: string | null;
+  email: string | null;
+}

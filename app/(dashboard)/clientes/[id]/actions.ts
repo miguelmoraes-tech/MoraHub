@@ -14,6 +14,7 @@ import { AcessoSchema } from "@/lib/validations/acesso";
 import { InfraestruturaSchema } from "@/lib/validations/infraestrutura";
 import { ProjetoSchema } from "@/lib/validations/projeto";
 import { ManutencaoSchema } from "@/lib/validations/manutencao";
+import { BackupSchema } from "@/lib/validations/backup";
 import type { ActionState } from "@/lib/actions/types";
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -796,5 +797,81 @@ export async function deleteManutencao(
 ) {
   const { supabase } = await requireUser();
   await supabase.from("manutencoes").delete().eq("id", manutencaoId);
+  revalidatePath(`/clientes/${clienteId}`);
+}
+
+// ---------- Backups ----------
+
+export async function createBackup(
+  clienteId: string,
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = BackupSchema.safeParse({
+    projeto_id: textOrNull(formData.get("projeto_id")) ?? undefined,
+    data: formData.get("data"),
+    tipo: textOrNull(formData.get("tipo")) ?? undefined,
+    local: textOrNull(formData.get("local")) ?? undefined,
+    link_ou_arquivo: textOrNull(formData.get("link_ou_arquivo")) ?? undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const { supabase, user } = await requireUser();
+  if (!user) return { error: "Sessão expirada. Faça login novamente." };
+
+  const { error } = await supabase.from("backups").insert({
+    cliente_id: clienteId,
+    user_id: user.id,
+    projeto_id: parsed.data.projeto_id ?? null,
+    data: parsed.data.data,
+    tipo: parsed.data.tipo ?? null,
+    local: parsed.data.local ?? null,
+    link_ou_arquivo: parsed.data.link_ou_arquivo ?? null,
+  });
+  if (error) return { error: "Não foi possível salvar o backup." };
+
+  revalidatePath(`/clientes/${clienteId}`);
+  return { ok: true };
+}
+
+export async function updateBackup(
+  clienteId: string,
+  backupId: string,
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = BackupSchema.safeParse({
+    projeto_id: textOrNull(formData.get("projeto_id")) ?? undefined,
+    data: formData.get("data"),
+    tipo: textOrNull(formData.get("tipo")) ?? undefined,
+    local: textOrNull(formData.get("local")) ?? undefined,
+    link_ou_arquivo: textOrNull(formData.get("link_ou_arquivo")) ?? undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase
+    .from("backups")
+    .update({
+      projeto_id: parsed.data.projeto_id ?? null,
+      data: parsed.data.data,
+      tipo: parsed.data.tipo ?? null,
+      local: parsed.data.local ?? null,
+      link_ou_arquivo: parsed.data.link_ou_arquivo ?? null,
+    })
+    .eq("id", backupId);
+  if (error) return { error: "Não foi possível atualizar o backup." };
+
+  revalidatePath(`/clientes/${clienteId}`);
+  return { ok: true };
+}
+
+export async function deleteBackup(clienteId: string, backupId: string) {
+  const { supabase } = await requireUser();
+  await supabase.from("backups").delete().eq("id", backupId);
   revalidatePath(`/clientes/${clienteId}`);
 }

@@ -16,6 +16,7 @@ import {
   FileStack,
   Landmark,
   FileBarChart,
+  LifeBuoy,
 } from "lucide-react";
 /** These workspaces only exist for advogado/contador — financeiro works
  * inside the regular empresarial dashboard instead (see lib/financeiro.ts). */
@@ -56,6 +57,11 @@ const NAV_ITEMS: Record<WorkspacePapel, NavItem[]> = {
       href: "/colaborador/advogado/modelos-contrato",
       icon: FileStack,
     },
+    {
+      label: "Suporte",
+      href: "/colaborador/advogado/suporte",
+      icon: LifeBuoy,
+    },
   ],
   contador: [
     { label: "Painel geral", href: "/colaborador/contador", icon: LayoutGrid },
@@ -83,6 +89,11 @@ const NAV_ITEMS: Record<WorkspacePapel, NavItem[]> = {
       label: "DRE",
       href: "/colaborador/contador/dre",
       icon: FileBarChart,
+    },
+    {
+      label: "Suporte",
+      href: "/colaborador/contador/suporte",
+      icon: LifeBuoy,
     },
   ],
 };
