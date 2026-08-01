@@ -14,6 +14,8 @@ import { ProjetosSection } from "@/components/projetos-section";
 import { ManutencoesSection } from "@/components/manutencoes-section";
 import { PropostasSection } from "@/components/propostas-section";
 import { LeadOrigemCard } from "@/components/lead-origem-card";
+import { RentabilidadeClienteCard } from "@/components/rentabilidade-cliente-card";
+import { calcularRentabilidade, custoPorProjeto } from "@/lib/rentabilidade";
 import type {
   Cliente,
   Contrato,
@@ -25,6 +27,7 @@ import type {
   Projeto,
   Manutencao,
   Proposta,
+  Gasto,
 } from "@/lib/types";
 
 export default async function ClienteDetailPage({
@@ -46,6 +49,7 @@ export default async function ClienteDetailPage({
     { data: projetos },
     { data: manutencoes },
     { data: propostas },
+    { data: gastos },
   ] = (await Promise.all([
     supabase.from("clientes").select("*").eq("id", id).single(),
     supabase
@@ -93,6 +97,11 @@ export default async function ClienteDetailPage({
       .select("*")
       .eq("cliente_id", id)
       .order("versao", { ascending: false }),
+    supabase
+      .from("gastos")
+      .select("*")
+      .eq("cliente_id", id)
+      .order("data", { ascending: false }),
   ])) as [
     { data: Cliente | null },
     { data: Contrato[] | null },
@@ -104,6 +113,7 @@ export default async function ClienteDetailPage({
     { data: Projeto[] | null },
     { data: Manutencao[] | null },
     { data: Proposta[] | null },
+    { data: Gasto[] | null },
   ];
 
   if (!cliente) notFound();
@@ -121,6 +131,13 @@ export default async function ClienteDetailPage({
   const contratosList = contratos ?? [];
   const comprovantesList = comprovantes ?? [];
   const projetosList = projetos ?? [];
+  const gastosList = gastos ?? [];
+
+  const rentabilidade = calcularRentabilidade(
+    comprovantesList.reduce((sum, c) => sum + c.valor, 0),
+    gastosList.reduce((sum, g) => sum + g.valor, 0)
+  );
+  const custosPorProjeto = Object.fromEntries(custoPorProjeto(gastosList));
 
   const signedUrls = await getClienteArquivoSignedUrls([
     ...contratosList.map((c) => c.arquivo_path),
@@ -155,6 +172,7 @@ export default async function ClienteDetailPage({
       {leadOrigem && (
         <LeadOrigemCard lead={leadOrigem} convertidoEm={cliente.created_at} />
       )}
+      <RentabilidadeClienteCard rentabilidade={rentabilidade} />
       <PropostasSection clienteId={id} propostas={propostas ?? []} />
       <AssinaturasSection clienteId={id} assinaturas={assinaturas ?? []} />
       <ContratosSection clienteId={id} contratos={contratosComArquivo} />
@@ -165,7 +183,11 @@ export default async function ClienteDetailPage({
         clienteId={id}
         infraestrutura={infraestrutura ?? []}
       />
-      <ProjetosSection clienteId={id} projetos={projetosList} />
+      <ProjetosSection
+        clienteId={id}
+        projetos={projetosList}
+        custosPorProjeto={custosPorProjeto}
+      />
       <ManutencoesSection
         clienteId={id}
         manutencoes={manutencoes ?? []}

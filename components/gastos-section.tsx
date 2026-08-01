@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Receipt, Plus, Pencil, Trash2 } from "lucide-react";
-import type { Gasto, Cliente } from "@/lib/types";
+import type { Gasto, Cliente, Projeto } from "@/lib/types";
 import {
   createGasto,
   updateGasto,
@@ -14,10 +14,15 @@ import { useActionSuccess } from "@/lib/hooks/use-action-success";
 function GastoFields({
   gasto,
   clientes,
+  projetos,
 }: {
   gasto?: Gasto;
   clientes: Cliente[];
+  projetos: Projeto[];
 }) {
+  const [clienteId, setClienteId] = useState(gasto?.cliente_id ?? "");
+  const projetosDoCliente = projetos.filter((p) => p.cliente_id === clienteId);
+
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <div className="col-span-2 space-y-1">
@@ -83,13 +88,37 @@ function GastoFields({
         </label>
         <select
           name="cliente_id"
-          defaultValue={gasto?.cliente_id ?? ""}
+          value={clienteId}
+          onChange={(e) => setClienteId(e.target.value)}
           className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         >
           <option value="">Nenhum</option>
           {clientes.map((cliente) => (
             <option key={cliente.id} value={cliente.id}>
               {cliente.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-zinc-400">
+          Projeto (opcional)
+        </label>
+        <select
+          key={clienteId}
+          name="projeto_id"
+          defaultValue={
+            projetosDoCliente.some((p) => p.id === gasto?.projeto_id)
+              ? gasto?.projeto_id ?? ""
+              : ""
+          }
+          disabled={!clienteId}
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500 disabled:opacity-50"
+        >
+          <option value="">Nenhum</option>
+          {projetosDoCliente.map((projeto) => (
+            <option key={projeto.id} value={projeto.id}>
+              {projeto.nome}
             </option>
           ))}
         </select>
@@ -109,7 +138,13 @@ function GastoFields({
   );
 }
 
-function NewGastoForm({ clientes }: { clientes: Cliente[] }) {
+function NewGastoForm({
+  clientes,
+  projetos,
+}: {
+  clientes: Cliente[];
+  projetos: Projeto[];
+}) {
   const [open, setOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(createGasto, undefined);
@@ -139,7 +174,7 @@ function NewGastoForm({ clientes }: { clientes: Cliente[] }) {
       action={formAction}
       className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3"
     >
-      <GastoFields clientes={clientes} />
+      <GastoFields clientes={clientes} projetos={projetos} />
       {state && "error" in state && (
         <p className="text-xs text-rose-400">{state.error}</p>
       )}
@@ -163,7 +198,15 @@ function NewGastoForm({ clientes }: { clientes: Cliente[] }) {
   );
 }
 
-function GastoRow({ gasto, clientes }: { gasto: Gasto; clientes: Cliente[] }) {
+function GastoRow({
+  gasto,
+  clientes,
+  projetos,
+}: {
+  gasto: Gasto;
+  clientes: Cliente[];
+  projetos: Projeto[];
+}) {
   const [editing, setEditing] = useState(false);
   const action = updateGasto.bind(null, gasto.id);
   const [state, formAction, pending] = useActionState(action, undefined);
@@ -176,7 +219,7 @@ function GastoRow({ gasto, clientes }: { gasto: Gasto; clientes: Cliente[] }) {
         action={formAction}
         className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3"
       >
-        <GastoFields gasto={gasto} clientes={clientes} />
+        <GastoFields gasto={gasto} clientes={clientes} projetos={projetos} />
         {state && "error" in state && (
           <p className="text-xs text-rose-400">{state.error}</p>
         )}
@@ -201,10 +244,12 @@ function GastoRow({ gasto, clientes }: { gasto: Gasto; clientes: Cliente[] }) {
   }
 
   const cliente = clientes.find((c) => c.id === gasto.cliente_id);
+  const projeto = projetos.find((p) => p.id === gasto.projeto_id);
   const detalhes = [
     gasto.tipo === "fixo" ? "Fixo" : "Pontual",
     gasto.recorrencia,
     cliente?.nome,
+    projeto?.nome,
     gasto.categoria,
   ]
     .filter(Boolean)
@@ -243,9 +288,11 @@ function GastoRow({ gasto, clientes }: { gasto: Gasto; clientes: Cliente[] }) {
 export function GastosSection({
   gastos,
   clientes,
+  projetos,
 }: {
   gastos: Gasto[];
   clientes: Cliente[];
+  projetos: Projeto[];
 }) {
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
@@ -256,7 +303,7 @@ export function GastosSection({
             {gastos.length} gasto(s) registrado(s)
           </p>
         </div>
-        <NewGastoForm clientes={clientes} />
+        <NewGastoForm clientes={clientes} projetos={projetos} />
       </div>
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
@@ -268,7 +315,12 @@ export function GastosSection({
         {gastos.length > 0 ? (
           <div className="space-y-2">
             {gastos.map((gasto) => (
-              <GastoRow key={gasto.id} gasto={gasto} clientes={clientes} />
+              <GastoRow
+                key={gasto.id}
+                gasto={gasto}
+                clientes={clientes}
+                projetos={projetos}
+              />
             ))}
           </div>
         ) : (

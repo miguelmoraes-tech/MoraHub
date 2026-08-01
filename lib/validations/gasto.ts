@@ -10,6 +10,7 @@ export const GastoSchema = z.object({
   }),
   recorrencia: z.enum(["Mensal", "Anual", "Único"]).optional(),
   cliente_id: z.string().optional(),
+  projeto_id: z.string().optional(),
   categoria: z.string().optional(),
   data: z.string().min(1, { error: "Informe a data." }),
 });

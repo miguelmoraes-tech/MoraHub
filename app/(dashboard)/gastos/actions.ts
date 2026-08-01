@@ -26,6 +26,7 @@ function parseGastoForm(formData: FormData) {
     tipo: formData.get("tipo") ?? "pontual",
     recorrencia: textOrNull(formData.get("recorrencia")) ?? undefined,
     cliente_id: textOrNull(formData.get("cliente_id")) ?? undefined,
+    projeto_id: textOrNull(formData.get("projeto_id")) ?? undefined,
     categoria: textOrNull(formData.get("categoria")) ?? undefined,
     data: formData.get("data"),
   });
@@ -50,6 +51,7 @@ export async function createGasto(
     tipo: parsed.data.tipo,
     recorrencia: parsed.data.recorrencia ?? null,
     cliente_id: parsed.data.cliente_id ?? null,
+    projeto_id: parsed.data.projeto_id ?? null,
     categoria: parsed.data.categoria ?? null,
     data: parsed.data.data,
   });
@@ -78,6 +80,7 @@ export async function updateGasto(
       tipo: parsed.data.tipo,
       recorrencia: parsed.data.recorrencia ?? null,
       cliente_id: parsed.data.cliente_id ?? null,
+      projeto_id: parsed.data.projeto_id ?? null,
       categoria: parsed.data.categoria ?? null,
       data: parsed.data.data,
     })

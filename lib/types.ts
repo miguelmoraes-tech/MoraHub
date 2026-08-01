@@ -197,6 +197,7 @@ export interface Gasto {
   tipo: GastoTipo;
   recorrencia: Recorrencia | null;
   cliente_id: string | null;
+  projeto_id: string | null;
   categoria: string | null;
   data: string;
   created_at: string;

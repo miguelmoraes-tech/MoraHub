@@ -72,6 +72,7 @@ const GESTAO_ITEMS: NavItem[] = [
   { label: "Contas a Receber", href: "/contas-receber", icon: HandCoins, enabled: true },
   { label: "Orçamento", href: "/orcamentos", icon: PieChart, enabled: true },
   { label: "Fluxo de Caixa", href: "/fluxo-caixa", icon: LineChart, enabled: true },
+  { label: "Rentabilidade", href: "/rentabilidade", icon: TrendingUp, enabled: true },
 ];
 
 const FINANCEIRO_ITEMS: NavItem[] = [
@@ -79,6 +80,7 @@ const FINANCEIRO_ITEMS: NavItem[] = [
   { label: "Contas a Receber", href: "/contas-receber", icon: HandCoins, enabled: true },
   { label: "Orçamento", href: "/orcamentos", icon: PieChart, enabled: true },
   { label: "Fluxo de Caixa", href: "/fluxo-caixa", icon: LineChart, enabled: true },
+  { label: "Rentabilidade", href: "/rentabilidade", icon: TrendingUp, enabled: true },
   // The one RH screen Financeiro keeps — it's also where contas_pagar sync
   // lives. The rest of RH_ITEMS below is exclusive to the rh papel.
   { label: "Folha de Pagamento", href: "/rh/folha", icon: Banknote, enabled: true },

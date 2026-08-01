@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveDonoId } from "@/lib/financeiro";
-import { todayISO } from "@/lib/vencimentos/dates";
+import { todayISO, recurringMonthKeysInWindow } from "@/lib/vencimentos/dates";
 import { FluxoCaixaView, type FluxoCaixaMes } from "@/components/fluxo-caixa-view";
-import type { ContaPagar, ContaReceber } from "@/lib/types";
+import type { Assinatura, ContaPagar, ContaReceber, Gasto } from "@/lib/types";
 
 const MESES = [
   "Janeiro",
@@ -29,67 +29,124 @@ export default async function FluxoCaixaPage() {
   const donoId = await getEffectiveDonoId();
   const supabase = await createClient();
 
-  const [{ data: contasPagar }, { data: contasReceber }] = donoId
+  const [
+    { data: contasPagar },
+    { data: contasReceber },
+    { data: assinaturas },
+    { data: gastosFixos },
+  ] = donoId
     ? await Promise.all([
-        supabase.from("contas_pagar").select("*").eq("user_id", donoId).neq("status", "pago"),
+        supabase
+          .from("contas_pagar")
+          .select("valor, data_vencimento")
+          .eq("user_id", donoId),
         supabase
           .from("contas_receber")
-          .select("*")
+          .select("valor, data_vencimento")
           .eq("user_id", donoId)
-          .neq("status", "recebido"),
+          .in("status", ["pendente", "recebido"]),
+        supabase
+          .from("assinaturas")
+          .select("valor, recorrencia, proxima_cobranca")
+          .eq("user_id", donoId)
+          .eq("status", "ativa"),
+        supabase
+          .from("gastos")
+          .select("valor, recorrencia, data")
+          .eq("user_id", donoId)
+          .eq("tipo", "fixo"),
       ])
-    : [{ data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const hoje = todayISO();
   const [anoAtual, mesAtual] = hoje.slice(0, 7).split("-").map(Number);
   const mesAtualIndex0 = mesAtual - 1;
-  const chaveMesAtual = `${anoAtual}-${pad(mesAtual)}`;
 
+  const monthKeys: string[] = [];
   const buckets = new Map<
     string,
-    { label: string; totalPagar: number; totalReceber: number }
+    {
+      label: string;
+      contasReceber: number;
+      assinaturas: number;
+      contasPagar: number;
+      gastosFixos: number;
+    }
   >();
   for (let i = 0; i < JANELA_MESES; i++) {
     const mIndex = mesAtualIndex0 + i;
     const ano = anoAtual + Math.floor(mIndex / 12);
     const mes = (mIndex % 12) + 1;
     const chave = `${ano}-${pad(mes)}`;
+    monthKeys.push(chave);
     buckets.set(chave, {
       label: `${MESES[mes - 1]}/${ano}`,
-      totalPagar: 0,
-      totalReceber: 0,
+      contasReceber: 0,
+      assinaturas: 0,
+      contasPagar: 0,
+      gastosFixos: 0,
     });
   }
 
-  /** Overdue-and-unsettled items collapse into the current month's bucket. */
-  function bucketChave(dataVencimento: string) {
-    const chave = dataVencimento.slice(0, 7);
-    if (chave < chaveMesAtual) return chaveMesAtual;
-    return buckets.has(chave) ? chave : null;
+  for (const conta of (contasPagar ?? []) as Pick<
+    ContaPagar,
+    "valor" | "data_vencimento"
+  >[]) {
+    const bucket = buckets.get(conta.data_vencimento.slice(0, 7));
+    if (bucket) bucket.contasPagar += conta.valor;
   }
 
-  for (const conta of (contasPagar ?? []) as ContaPagar[]) {
-    const chave = bucketChave(conta.data_vencimento);
-    if (!chave) continue;
-    const bucket = buckets.get(chave)!;
-    bucket.totalPagar += conta.valor;
+  for (const conta of (contasReceber ?? []) as Pick<
+    ContaReceber,
+    "valor" | "data_vencimento"
+  >[]) {
+    const bucket = buckets.get(conta.data_vencimento.slice(0, 7));
+    if (bucket) bucket.contasReceber += conta.valor;
   }
 
-  for (const conta of (contasReceber ?? []) as ContaReceber[]) {
-    const chave = bucketChave(conta.data_vencimento);
-    if (!chave) continue;
-    const bucket = buckets.get(chave)!;
-    bucket.totalReceber += conta.valor;
+  for (const assinatura of (assinaturas ?? []) as Pick<
+    Assinatura,
+    "valor" | "recorrencia" | "proxima_cobranca"
+  >[]) {
+    const chaves = recurringMonthKeysInWindow(
+      assinatura.proxima_cobranca,
+      assinatura.recorrencia,
+      monthKeys
+    );
+    for (const chave of chaves) {
+      buckets.get(chave)!.assinaturas += assinatura.valor ?? 0;
+    }
+  }
+
+  for (const gasto of (gastosFixos ?? []) as Pick<
+    Gasto,
+    "valor" | "recorrencia" | "data"
+  >[]) {
+    const chaves = recurringMonthKeysInWindow(
+      gasto.data,
+      gasto.recorrencia,
+      monthKeys
+    );
+    for (const chave of chaves) {
+      buckets.get(chave)!.gastosFixos += gasto.valor;
+    }
   }
 
   let saldoAcumulado = 0;
-  const meses: FluxoCaixaMes[] = [...buckets.values()].map((bucket) => {
-    const saldoMes = bucket.totalReceber - bucket.totalPagar;
+  const meses: FluxoCaixaMes[] = monthKeys.map((chave) => {
+    const bucket = buckets.get(chave)!;
+    const totalEntradas = bucket.contasReceber + bucket.assinaturas;
+    const totalSaidas = bucket.contasPagar + bucket.gastosFixos;
+    const saldoMes = totalEntradas - totalSaidas;
     saldoAcumulado += saldoMes;
     return {
       label: bucket.label,
-      totalPagar: bucket.totalPagar,
-      totalReceber: bucket.totalReceber,
+      contasReceber: bucket.contasReceber,
+      assinaturas: bucket.assinaturas,
+      contasPagar: bucket.contasPagar,
+      gastosFixos: bucket.gastosFixos,
+      totalEntradas,
+      totalSaidas,
       saldoMes,
       saldoAcumulado,
     };

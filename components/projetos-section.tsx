@@ -9,6 +9,7 @@ import {
   ExternalLink,
   GitBranch,
   FileText,
+  Receipt,
 } from "lucide-react";
 import type { Projeto, ProjetoStatus } from "@/lib/types";
 import {
@@ -18,6 +19,7 @@ import {
 } from "@/app/(dashboard)/clientes/[id]/actions";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
+import { formatCurrency } from "@/lib/format";
 
 const STATUS_LABEL: Record<ProjetoStatus, string> = {
   planejado: "Planejado",
@@ -202,9 +204,11 @@ function NewProjetoForm({ clienteId }: { clienteId: string }) {
 function ProjetoRow({
   clienteId,
   projeto,
+  custoTotal,
 }: {
   clienteId: string;
   projeto: Projeto;
+  custoTotal: number;
 }) {
   const [editing, setEditing] = useState(false);
   const action = updateProjeto.bind(null, clienteId, projeto.id);
@@ -258,6 +262,12 @@ function ProjetoRow({
         )}
         {projeto.escopo && (
           <p className="mt-1 text-xs text-zinc-500">{projeto.escopo}</p>
+        )}
+        {custoTotal > 0 && (
+          <p className="mt-1 flex items-center gap-1 text-xs text-rose-400">
+            <Receipt className="h-3 w-3" />
+            Custo do projeto: {formatCurrency(custoTotal)}
+          </p>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-1">
@@ -317,9 +327,11 @@ function ProjetoRow({
 export function ProjetosSection({
   clienteId,
   projetos,
+  custosPorProjeto = {},
 }: {
   clienteId: string;
   projetos: Projeto[];
+  custosPorProjeto?: Record<string, number>;
 }) {
   return (
     <div id="projetos" className="scroll-mt-6 rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
@@ -338,6 +350,7 @@ export function ProjetosSection({
               key={projeto.id}
               clienteId={clienteId}
               projeto={projeto}
+              custoTotal={custosPorProjeto[projeto.id] ?? 0}
             />
           ))}
         </div>

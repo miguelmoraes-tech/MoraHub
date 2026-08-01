@@ -54,3 +54,38 @@ export function nextOccurrence(
   if (candidateThisYear >= todayISOValue) return candidateThisYear;
   return toISO(today.y + 1, ref.m, ref.d);
 }
+
+function ymKey(iso: string) {
+  return iso.slice(0, 7);
+}
+
+function ymToIndex(ym: string) {
+  const [y, m] = ym.split("-").map(Number);
+  return y * 12 + (m - 1);
+}
+
+/**
+ * Which of `windowMonthKeys` (each "YYYY-MM") a recurring item lands in,
+ * given its reference date and recurrence. "Único" (or a missing/unrecognized
+ * recorrencia) yields at most the single month the reference date falls in;
+ * "Mensal"/"Anual" step forward from the reference month indefinitely.
+ */
+export function recurringMonthKeysInWindow(
+  referenceISO: string | null,
+  recorrencia: "Mensal" | "Anual" | "Único" | null,
+  windowMonthKeys: string[]
+): string[] {
+  if (!referenceISO) return [];
+  const refIndex = ymToIndex(ymKey(referenceISO));
+  const step = recorrencia === "Mensal" ? 1 : recorrencia === "Anual" ? 12 : null;
+
+  if (step === null) {
+    const key = ymKey(referenceISO);
+    return windowMonthKeys.includes(key) ? [key] : [];
+  }
+
+  return windowMonthKeys.filter((key) => {
+    const index = ymToIndex(key);
+    return index >= refIndex && (index - refIndex) % step === 0;
+  });
+}
