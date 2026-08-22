@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { GastoSchema } from "@/lib/validations/gasto";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -46,6 +47,7 @@ export async function createGasto(
 
   const { error } = await supabase.from("gastos").insert({
     user_id: user.id,
+    workspace_id: await getWorkspaceIdPadrao(user.id, "empresarial"),
     nome: parsed.data.nome,
     valor: parsed.data.valor,
     tipo: parsed.data.tipo,

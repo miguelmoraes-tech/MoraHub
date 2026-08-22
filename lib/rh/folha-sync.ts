@@ -1,4 +1,5 @@
 import { todayISO } from "@/lib/vencimentos/dates";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import type { createClient } from "@/lib/supabase/server";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -49,6 +50,7 @@ export async function gerarFolhaDoMes(
   const pendentes = (funcionarios ?? []).filter((f) => !jaTemFolha.has(f.id));
   const vencimento = calcularVencimento(mesReferenciaISO, diaVencimento);
   const mes = mesLabel(mesReferenciaISO);
+  const workspaceId = await getWorkspaceIdPadrao(donoId, "empresarial");
 
   let criados = 0;
   for (const funcionario of pendentes) {
@@ -58,6 +60,7 @@ export async function gerarFolhaDoMes(
       .from("contas_pagar")
       .insert({
         user_id: donoId,
+        workspace_id: workspaceId,
         descricao: `Folha de pagamento — ${funcionario.nome} — ${mes}`,
         valor: salarioBruto,
         categoria: "Folha de pagamento",

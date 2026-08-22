@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
+import { getEffectiveDonoId, getEffectiveWorkspaceId } from "@/lib/financeiro";
 import { OrcamentoSchema } from "@/lib/validations/orcamento";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -37,10 +37,12 @@ export async function createOrcamento(
 
   const donoId = await getEffectiveDonoId();
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  const workspaceId = await getEffectiveWorkspaceId();
 
   const supabase = await createClient();
   const { error } = await supabase.from("orcamentos").insert({
     user_id: donoId,
+    workspace_id: workspaceId,
     categoria: parsed.data.categoria,
     mes_referencia: parsed.data.mes_referencia,
     valor_planejado: parsed.data.valor_planejado,

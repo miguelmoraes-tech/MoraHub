@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
+import { getEffectiveDonoId, getEffectiveWorkspaceId } from "@/lib/financeiro";
 import {
   OrcamentosBoard,
   type OrcamentoComRealizado,
@@ -8,6 +8,7 @@ import type { Gasto, Orcamento } from "@/lib/types";
 
 export default async function OrcamentosPage() {
   const donoId = await getEffectiveDonoId();
+  const workspaceId = await getEffectiveWorkspaceId();
   const supabase = await createClient();
 
   const [{ data: orcamentos }, { data: gastos }] = donoId
@@ -15,9 +16,9 @@ export default async function OrcamentosPage() {
         supabase
           .from("orcamentos")
           .select("*")
-          .eq("user_id", donoId)
+          .eq("workspace_id", workspaceId ?? "")
           .order("mes_referencia", { ascending: false }),
-        supabase.from("gastos").select("*").eq("user_id", donoId),
+        supabase.from("gastos").select("*").eq("workspace_id", workspaceId ?? ""),
       ])
     : [{ data: [] }, { data: [] }];
 

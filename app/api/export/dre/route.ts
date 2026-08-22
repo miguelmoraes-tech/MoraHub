@@ -4,6 +4,7 @@ import { buildXlsxResponse, type ExportColumn } from "@/lib/export/xlsx";
 import { computeDre } from "@/lib/dre/compute";
 import { getEffectiveDonoId } from "@/lib/financeiro";
 import { filtrarContasPorPapel, getContasVinculadas } from "@/lib/colaborador";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import type { Comprovante, Gasto } from "@/lib/types";
 
 type DreRow = { label: string; valor: number };
@@ -39,13 +40,19 @@ export async function GET(request: NextRequest) {
 
   const donoId = await resolveDonoId(request.nextUrl.searchParams.get("donoId"));
   if (!donoId) return new Response("Conta inválida.", { status: 403 });
+  const workspaceId = await getWorkspaceIdPadrao(donoId, "empresarial");
 
   const [{ data: gastos }, { data: comprovantes }] = await Promise.all([
-    supabase.from("gastos").select("*").eq("user_id", donoId).gte("data", start).lte("data", end),
+    supabase
+      .from("gastos")
+      .select("*")
+      .eq("workspace_id", workspaceId ?? "")
+      .gte("data", start)
+      .lte("data", end),
     supabase
       .from("comprovantes")
       .select("*")
-      .eq("user_id", donoId)
+      .eq("workspace_id", workspaceId ?? "")
       .gte("data", start)
       .lte("data", end),
   ]);

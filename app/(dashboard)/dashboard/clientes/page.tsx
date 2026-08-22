@@ -41,7 +41,7 @@ export default async function DashboardClientesPage() {
         .select("id, nome, status, created_at, lead_origem_id")
         .eq("workspace_id", workspaceId ?? "")
         .order("created_at", { ascending: false }),
-      supabase.from("assinaturas").select("status"),
+      supabase.from("assinaturas").select("status").eq("workspace_id", workspaceId ?? ""),
       supabase.from("leads").select("status").eq("workspace_id", workspaceId ?? ""),
     ])) as [
       { data: ClienteRow[] | null },

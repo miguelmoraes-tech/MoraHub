@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { filtrarContasPorPapel, getContasVinculadas } from "@/lib/colaborador";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { parseOfx } from "@/lib/ofx/parse";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -61,10 +62,11 @@ export async function importarOfx(
     return { error: "Nenhum lançamento encontrado nesse arquivo OFX." };
   }
 
+  const workspaceId = await getWorkspaceIdPadrao(donoId, "empresarial");
   const { data: existentes } = await supabase
     .from("lancamentos_extrato")
     .select("data, descricao, valor, tipo")
-    .eq("user_id", donoId);
+    .eq("workspace_id", workspaceId ?? "");
   const chavesExistentes = new Set(
     ((existentes ?? []) as { data: string; descricao: string; valor: number; tipo: string }[]).map(
       (l) => `${l.data}|${l.valor}|${l.tipo}|${l.descricao}`
@@ -75,6 +77,7 @@ export async function importarOfx(
     .filter((t) => !chavesExistentes.has(`${t.data}|${t.valor}|${t.tipo}|${t.descricao}`))
     .map((t) => ({
       user_id: donoId,
+      workspace_id: workspaceId,
       data: t.data,
       descricao: t.descricao,
       valor: t.valor,

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceIdDoCliente } from "@/lib/workspace";
 import {
   uploadClienteArquivo,
   removeClienteArquivo,
@@ -70,6 +71,7 @@ export async function createContrato(
   const { error } = await supabase.from("contratos").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: await getWorkspaceIdDoCliente(clienteId),
     descricao: parsed.data.descricao,
     valor: parsed.data.valor,
     data: parsed.data.data ?? null,
@@ -200,6 +202,7 @@ export async function createComprovante(
   const { error } = await supabase.from("comprovantes").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: await getWorkspaceIdDoCliente(clienteId),
     descricao: parsed.data.descricao,
     valor: parsed.data.valor,
     data: parsed.data.data ?? null,
@@ -380,6 +383,7 @@ export async function createAssinatura(
   const { error } = await supabase.from("assinaturas").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: await getWorkspaceIdDoCliente(clienteId),
     plano: parsed.data.plano,
     valor: parsed.data.valor ?? null,
     recorrencia: parsed.data.recorrencia,

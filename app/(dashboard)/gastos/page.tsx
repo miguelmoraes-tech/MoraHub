@@ -9,7 +9,11 @@ export default async function GastosPage() {
 
   const [{ data: gastos }, { data: clientes }, { data: projetos }] =
     (await Promise.all([
-      supabase.from("gastos").select("*").order("data", { ascending: false }),
+      supabase
+        .from("gastos")
+        .select("*")
+        .eq("workspace_id", workspaceId ?? "")
+        .order("data", { ascending: false }),
       supabase.from("clientes").select("*").eq("workspace_id", workspaceId ?? "").order("nome"),
       supabase.from("projetos").select("*").order("nome"),
     ])) as [

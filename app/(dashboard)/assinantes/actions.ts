@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceIdDoCliente } from "@/lib/workspace";
 import { AssinanteSchema } from "@/lib/validations/assinante";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -45,6 +46,7 @@ export async function createAssinante(
 
   const { error } = await supabase.from("assinaturas").insert({
     user_id: user.id,
+    workspace_id: await getWorkspaceIdDoCliente(parsed.data.cliente_id),
     cliente_id: parsed.data.cliente_id,
     plano: parsed.data.plano,
     valor: parsed.data.valor ?? null,

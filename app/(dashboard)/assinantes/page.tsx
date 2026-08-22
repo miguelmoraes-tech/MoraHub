@@ -11,6 +11,7 @@ export default async function AssinantesPage() {
     supabase
       .from("assinaturas")
       .select("*")
+      .eq("workspace_id", workspaceId ?? "")
       .order("plano", { ascending: true }),
     supabase.from("clientes").select("*").eq("workspace_id", workspaceId ?? "").order("nome"),
   ])) as [{ data: Assinatura[] | null }, { data: Cliente[] | null }];

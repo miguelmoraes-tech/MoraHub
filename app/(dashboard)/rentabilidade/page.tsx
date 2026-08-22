@@ -1,12 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
+import { getEffectiveDonoId, getEffectiveWorkspaceId } from "@/lib/financeiro";
 import { rankearClientesPorRentabilidade } from "@/lib/rentabilidade";
 import { RentabilidadeBoard } from "@/components/rentabilidade-board";
 
 export default async function RentabilidadePage() {
   const donoId = await getEffectiveDonoId();
-  const workspaceId = donoId ? await getWorkspaceIdPadrao(donoId, "empresarial") : null;
+  const workspaceId = await getEffectiveWorkspaceId();
   const supabase = await createClient();
 
   const [{ data: clientes }, { data: comprovantes }, { data: gastos }] =
@@ -19,11 +18,11 @@ export default async function RentabilidadePage() {
           supabase
             .from("comprovantes")
             .select("cliente_id, valor")
-            .eq("user_id", donoId),
+            .eq("workspace_id", workspaceId ?? ""),
           supabase
             .from("gastos")
             .select("cliente_id, valor")
-            .eq("user_id", donoId),
+            .eq("workspace_id", workspaceId ?? ""),
         ])
       : [{ data: [] }, { data: [] }, { data: [] }];
 

@@ -58,7 +58,7 @@ export async function getCampanhaMetricsMap(
       ? ((await supabase
           .from("comprovantes")
           .select("cliente_id, valor")
-          .eq("user_id", donoId)
+          .eq("workspace_id", workspaceId ?? "")
           .in("cliente_id", todosClienteIds)) as { data: ComprovanteRow[] | null })
       : { data: [] as ComprovanteRow[] };
 

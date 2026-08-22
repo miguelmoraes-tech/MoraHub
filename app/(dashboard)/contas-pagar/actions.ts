@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
+import { getEffectiveDonoId, getEffectiveWorkspaceId } from "@/lib/financeiro";
 import { syncFolhaFromContaPagar } from "@/lib/rh/folha-sync";
 import { ContaPagarSchema } from "@/lib/validations/conta-pagar";
 import type { ActionState } from "@/lib/actions/types";
@@ -37,10 +37,12 @@ export async function createContaPagar(
 
   const donoId = await getEffectiveDonoId();
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  const workspaceId = await getEffectiveWorkspaceId();
 
   const supabase = await createClient();
   const { error } = await supabase.from("contas_pagar").insert({
     user_id: donoId,
+    workspace_id: workspaceId,
     descricao: parsed.data.descricao,
     valor: parsed.data.valor,
     fornecedor: parsed.data.fornecedor ?? null,

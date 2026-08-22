@@ -21,3 +21,20 @@ export async function getWorkspaceIdPadrao(
     .maybeSingle();
   return data?.id ?? null;
 }
+
+/**
+ * Workspace de um cliente específico — usado ao criar registros filhos
+ * (contratos, comprovantes, assinaturas...) para que herdem o mesmo
+ * workspace do cliente pai em vez do workspace padrão de quem está
+ * criando (que pode divergir quando o cliente pertence a outro workspace
+ * do mesmo dono).
+ */
+export async function getWorkspaceIdDoCliente(clienteId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("clientes")
+    .select("workspace_id")
+    .eq("id", clienteId)
+    .maybeSingle();
+  return (data as { workspace_id: string | null } | null)?.workspace_id ?? null;
+}

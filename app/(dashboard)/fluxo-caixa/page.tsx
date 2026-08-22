@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
+import { getEffectiveDonoId, getEffectiveWorkspaceId } from "@/lib/financeiro";
 import { todayISO, recurringMonthKeysInWindow } from "@/lib/vencimentos/dates";
 import { FluxoCaixaView, type FluxoCaixaMes } from "@/components/fluxo-caixa-view";
 import type { Assinatura, ContaPagar, ContaReceber, Gasto } from "@/lib/types";
@@ -27,6 +27,7 @@ function pad(n: number) {
 
 export default async function FluxoCaixaPage() {
   const donoId = await getEffectiveDonoId();
+  const workspaceId = await getEffectiveWorkspaceId();
   const supabase = await createClient();
 
   const [
@@ -39,21 +40,21 @@ export default async function FluxoCaixaPage() {
         supabase
           .from("contas_pagar")
           .select("valor, data_vencimento")
-          .eq("user_id", donoId),
+          .eq("workspace_id", workspaceId ?? ""),
         supabase
           .from("contas_receber")
           .select("valor, data_vencimento")
-          .eq("user_id", donoId)
+          .eq("workspace_id", workspaceId ?? "")
           .in("status", ["pendente", "recebido"]),
         supabase
           .from("assinaturas")
           .select("valor, recorrencia, proxima_cobranca")
-          .eq("user_id", donoId)
+          .eq("workspace_id", workspaceId ?? "")
           .eq("status", "ativa"),
         supabase
           .from("gastos")
           .select("valor, recorrencia, data")
-          .eq("user_id", donoId)
+          .eq("workspace_id", workspaceId ?? "")
           .eq("tipo", "fixo"),
       ])
     : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];

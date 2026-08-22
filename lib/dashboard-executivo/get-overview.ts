@@ -116,17 +116,23 @@ export async function getDashboardExecutivoOverview(
     { tickets: ticketsSuporte },
   ] = await Promise.all([
     Promise.all([
-      supabase.from("comprovantes").select("valor").eq("user_id", donoId),
-      supabase.from("gastos").select("valor, recorrencia, data, tipo").eq("user_id", donoId),
-      supabase.from("contas_pagar").select("valor, data_vencimento, status").eq("user_id", donoId),
+      supabase.from("comprovantes").select("valor").eq("workspace_id", workspaceId ?? ""),
+      supabase
+        .from("gastos")
+        .select("valor, recorrencia, data, tipo")
+        .eq("workspace_id", workspaceId ?? ""),
+      supabase
+        .from("contas_pagar")
+        .select("valor, data_vencimento, status")
+        .eq("workspace_id", workspaceId ?? ""),
       supabase
         .from("contas_receber")
         .select("valor, data_vencimento, status")
-        .eq("user_id", donoId),
+        .eq("workspace_id", workspaceId ?? ""),
       supabase
         .from("assinaturas")
         .select("valor, recorrencia, proxima_cobranca, status")
-        .eq("user_id", donoId)
+        .eq("workspace_id", workspaceId ?? "")
         .eq("status", "ativa"),
       supabase.from("leads").select("status").eq("workspace_id", workspaceId ?? ""),
       supabase.from("compliance_juridico").select("status").eq("user_id", donoId),
