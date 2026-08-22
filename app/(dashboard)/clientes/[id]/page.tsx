@@ -8,10 +8,6 @@ import { ContratosSection } from "@/components/contratos-section";
 import { ComprovantesSection } from "@/components/comprovantes-section";
 import { ServicosSection } from "@/components/servicos-section";
 import { AssinaturasSection } from "@/components/assinaturas-section";
-import { AcessosSection } from "@/components/acessos-section";
-import { InfraestruturaSection } from "@/components/infraestrutura-section";
-import { ProjetosSection } from "@/components/projetos-section";
-import { ManutencoesSection } from "@/components/manutencoes-section";
 import { PropostasSection } from "@/components/propostas-section";
 import { LeadOrigemCard } from "@/components/lead-origem-card";
 import type {
@@ -20,10 +16,6 @@ import type {
   Comprovante,
   Servico,
   Assinatura,
-  Acesso,
-  Infraestrutura,
-  Projeto,
-  Manutencao,
   Proposta,
 } from "@/lib/types";
 
@@ -41,10 +33,6 @@ export default async function ClienteDetailPage({
     { data: comprovantes },
     { data: servicos },
     { data: assinaturas },
-    { data: acessos },
-    { data: infraestrutura },
-    { data: projetos },
-    { data: manutencoes },
     { data: propostas },
   ] = (await Promise.all([
     supabase.from("clientes").select("*").eq("id", id).single(),
@@ -69,26 +57,6 @@ export default async function ClienteDetailPage({
       .eq("cliente_id", id)
       .order("created_at", { ascending: false }),
     supabase
-      .from("acessos")
-      .select("*")
-      .eq("cliente_id", id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("infraestrutura")
-      .select("*")
-      .eq("cliente_id", id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("projetos")
-      .select("*")
-      .eq("cliente_id", id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("manutencoes")
-      .select("*")
-      .eq("cliente_id", id)
-      .order("data", { ascending: false }),
-    supabase
       .from("propostas")
       .select("*")
       .eq("cliente_id", id)
@@ -99,10 +67,6 @@ export default async function ClienteDetailPage({
     { data: Comprovante[] | null },
     { data: Servico[] | null },
     { data: Assinatura[] | null },
-    { data: Acesso[] | null },
-    { data: Infraestrutura[] | null },
-    { data: Projeto[] | null },
-    { data: Manutencao[] | null },
     { data: Proposta[] | null },
   ];
 
@@ -120,7 +84,6 @@ export default async function ClienteDetailPage({
 
   const contratosList = contratos ?? [];
   const comprovantesList = comprovantes ?? [];
-  const projetosList = projetos ?? [];
 
   const signedUrls = await getClienteArquivoSignedUrls([
     ...contratosList.map((c) => c.arquivo_path),
@@ -160,17 +123,6 @@ export default async function ClienteDetailPage({
       <ContratosSection clienteId={id} contratos={contratosComArquivo} />
       <ComprovantesSection clienteId={id} comprovantes={comprovantesComArquivo} />
       <ServicosSection clienteId={id} servicos={servicos ?? []} />
-      <AcessosSection clienteId={id} acessos={acessos ?? []} />
-      <InfraestruturaSection
-        clienteId={id}
-        infraestrutura={infraestrutura ?? []}
-      />
-      <ProjetosSection clienteId={id} projetos={projetosList} />
-      <ManutencoesSection
-        clienteId={id}
-        manutencoes={manutencoes ?? []}
-        projetos={projetosList}
-      />
     </div>
   );
 }

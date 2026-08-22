@@ -3,19 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Wallet,
-  Target,
-  Users,
-  UserX,
-  BadgeCheck,
-  CalendarClock,
-  Receipt,
-  Scale,
-  FileText,
-  LogOut,
-} from "lucide-react";
+import { Target, Users, UserX, LogOut } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 
 type NavItem = {
@@ -25,21 +13,10 @@ type NavItem = {
   enabled?: boolean;
 };
 
-const DASHBOARD_ITEMS: NavItem[] = [
-  { label: "Financeiro", href: "/dashboard/financeiro", icon: Wallet },
-  { label: "Clientes", href: "/dashboard/clientes", icon: LayoutDashboard },
-  { label: "Leads", href: "/dashboard/leads", icon: Target },
-];
-
 const GESTAO_ITEMS: NavItem[] = [
   { label: "Clientes", href: "/clientes", icon: Users, enabled: true },
   { label: "Leads", href: "/leads", icon: Target, enabled: true },
   { label: "Renegados", href: "/renegados", icon: UserX, enabled: true },
-  { label: "Assinantes", href: "/assinantes", icon: BadgeCheck, enabled: true },
-  { label: "Calendário", href: "/calendario", icon: CalendarClock, enabled: true },
-  { label: "Gastos", href: "/gastos", icon: Receipt, enabled: true },
-  { label: "Jurídico & Contábil", href: "/juridico", icon: Scale, enabled: true },
-  { label: "Documentos", href: "/documentos", icon: FileText, enabled: true },
 ];
 
 function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
@@ -110,7 +87,6 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-2">
-        <NavGroup title="Dashboards" items={DASHBOARD_ITEMS} />
         <NavGroup title="Gestão" items={GESTAO_ITEMS} />
       </nav>
 
