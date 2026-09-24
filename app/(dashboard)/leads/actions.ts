@@ -154,9 +154,6 @@ export async function marcarAbordado(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
-  if (parsed.data.resultado === "negou" && !parsed.data.motivo_negou) {
-    return { error: "Informe o motivo da negativa." };
-  }
 
   const { supabase } = await requireUser();
   const { error } = await supabase
@@ -165,7 +162,9 @@ export async function marcarAbordado(
       status: "abordado",
       resultado: parsed.data.resultado,
       motivo_negou:
-        parsed.data.resultado === "negou" ? parsed.data.motivo_negou : null,
+        parsed.data.resultado === "negou"
+          ? parsed.data.motivo_negou ?? null
+          : null,
     })
     .eq("id", leadId);
   if (error) return { error: "Não foi possível atualizar o lead." };

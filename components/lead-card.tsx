@@ -4,7 +4,6 @@ import { useActionState, useState } from "react";
 import {
   Pencil,
   Trash2,
-  CheckCircle2,
   Globe,
   AtSign,
   ExternalLink,
@@ -13,11 +12,7 @@ import {
 } from "lucide-react";
 import type { Lead, Proposta } from "@/lib/types";
 import { formatDate } from "@/lib/format";
-import {
-  updateLead,
-  marcarAbordado,
-  deleteLead,
-} from "@/app/(dashboard)/leads/actions";
+import { updateLead, deleteLead } from "@/app/(dashboard)/leads/actions";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { LeadFields } from "@/components/lead-fields";
 import { ResultadoFields } from "@/components/resultado-fields";
@@ -25,6 +20,7 @@ import { PreviaFields } from "@/components/previa-fields";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { LeadDetailDialog } from "@/components/lead-detail-dialog";
 import { ConvertLeadDialog } from "@/components/convert-lead-dialog";
+import { MarcarAbordadoMenu } from "@/components/marcar-abordado-menu";
 
 const RESULTADO_LABEL = {
   sem_resposta: "Sem resposta",
@@ -50,7 +46,7 @@ export function LeadCard({
   lead: Lead;
   propostas?: Proposta[];
 }) {
-  const [mode, setMode] = useState<"view" | "edit" | "marcar">("view");
+  const [mode, setMode] = useState<"view" | "edit">("view");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const updateAction = updateLead.bind(null, lead.id);
@@ -59,13 +55,6 @@ export function LeadCard({
     undefined
   );
   useActionSuccess(updateState, () => setMode("view"));
-
-  const marcarAction = marcarAbordado.bind(null, lead.id);
-  const [marcarState, marcarFormAction, marcarPending] = useActionState(
-    marcarAction,
-    undefined
-  );
-  useActionSuccess(marcarState, () => setMode("view"));
 
   if (mode === "edit") {
     return (
@@ -97,39 +86,6 @@ export function LeadCard({
             className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
           >
             {updatePending ? "Salvando..." : "Salvar"}
-          </button>
-        </div>
-      </form>
-    );
-  }
-
-  if (mode === "marcar") {
-    return (
-      <form
-        action={marcarFormAction}
-        className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4"
-      >
-        <p className="text-sm font-medium text-zinc-200">
-          Marcar &quot;{lead.nome}&quot; como abordado
-        </p>
-        <ResultadoFields />
-        {marcarState && "error" in marcarState && (
-          <p className="text-xs text-rose-400">{marcarState.error}</p>
-        )}
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setMode("view")}
-            className="rounded-md px-2.5 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={marcarPending}
-            className="rounded-md bg-copper-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-copper-500 disabled:opacity-60"
-          >
-            {marcarPending ? "Salvando..." : "Confirmar"}
           </button>
         </div>
       </form>
@@ -272,14 +228,7 @@ export function LeadCard({
         {!confirmingDelete && (
           <div className="flex items-center gap-3">
             {lead.status === "abordar" && (
-              <button
-                type="button"
-                onClick={() => setMode("marcar")}
-                className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Marcar como abordado
-              </button>
+              <MarcarAbordadoMenu leadId={lead.id} />
             )}
             {lead.status !== "convertido" && (
               <ConvertLeadDialog lead={lead} />
