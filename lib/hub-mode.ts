@@ -49,7 +49,8 @@ export const ACCOUNT_TYPE_HOME_ROUTE: Record<AccountType, string> = {
   advogado: "/colaborador",
   financeiro: "/colaborador",
   rh: "/colaborador",
-  comercial: "/colaborador",
+  // A área do vendedor, não o seletor de /colaborador (desligado).
+  comercial: "/vendedor/leads",
   marketing: "/colaborador",
 };
 

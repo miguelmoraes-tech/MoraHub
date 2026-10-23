@@ -11,6 +11,13 @@ import { getComercialDonoId } from "@/lib/comercial";
 import { getMarketingDonoId } from "@/lib/marketing";
 import { getUnreadTotal } from "@/lib/chat";
 import type { AccountType } from "@/lib/hub-mode";
+import { isRotaHabilitada } from "@/lib/modulos-habilitados";
+import { getWorkspaceIdPadrao } from "@/lib/workspace";
+import { ToastProvider } from "@/components/toast";
+import {
+  SolicitacoesVendedorProvider,
+  type SolicitacaoPendente,
+} from "@/components/vendedor/solicitacoes-provider";
 
 export default async function DashboardLayout({
   children,
@@ -26,7 +33,10 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const alertas = await getVencimentoAlertas();
+  // Vencimentos e Chat são módulos desligados (lib/modulos-habilitados.ts):
+  // sem banner, sem contador de não lidas e sem as consultas deles.
+  const vencimentosAtivo = isRotaHabilitada("/calendario");
+  const alertas = vencimentosAtivo ? await getVencimentoAlertas() : [];
   const financeiroDonoId = await getFinanceiroDonoId();
   const restritoFinanceiro = !!financeiroDonoId;
   const rhDonoId = await getRHDonoId();
@@ -93,9 +103,31 @@ export default async function DashboardLayout({
       .maybeSingle();
     if (conversaMarketing) chatHref = `/chat/${conversaMarketing.id}`;
   }
-  const unreadTotal = await getUnreadTotal();
+  const unreadTotal = isRotaHabilitada("/chat") ? await getUnreadTotal() : 0;
 
-  return (
+  // Pedidos de acesso de vendedor: só o dono do workspace empresarial os vê
+  // (RLS) — quem está numa visão restrita de colaborador não tem sino.
+  const donoEmpresarial =
+    tiposAtivos.includes("empresarial") &&
+    !restritoFinanceiro &&
+    !restritoRH &&
+    !restritoComercial &&
+    !restritoMarketing;
+  const workspaceEmpresarialId = donoEmpresarial
+    ? await getWorkspaceIdPadrao(user.id, "empresarial")
+    : null;
+  let solicitacoesPendentes: SolicitacaoPendente[] = [];
+  if (workspaceEmpresarialId) {
+    const { data } = await supabase
+      .from("solicitacoes_vendedor")
+      .select("id, email, created_at")
+      .eq("workspace_id", workspaceEmpresarialId)
+      .eq("status", "pendente")
+      .order("created_at", { ascending: true });
+    solicitacoesPendentes = (data ?? []) as SolicitacaoPendente[];
+  }
+
+  const conteudo = (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
         userEmail={user.email ?? ""}
@@ -116,10 +148,25 @@ export default async function DashboardLayout({
         unreadTotal={unreadTotal}
       />
       <main className="flex flex-1 flex-col overflow-y-auto">
-        <VencimentosBanner alertas={alertas} />
+        {vencimentosAtivo && <VencimentosBanner alertas={alertas} />}
         <WelcomeBanner />
         <PageTransition>{children}</PageTransition>
       </main>
     </div>
+  );
+
+  return (
+    <ToastProvider>
+      {workspaceEmpresarialId ? (
+        <SolicitacoesVendedorProvider
+          workspaceId={workspaceEmpresarialId}
+          initialPendentes={solicitacoesPendentes}
+        >
+          {conteudo}
+        </SolicitacoesVendedorProvider>
+      ) : (
+        conteudo
+      )}
+    </ToastProvider>
   );
 }

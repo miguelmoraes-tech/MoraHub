@@ -49,13 +49,18 @@ import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
 import { GlobalSearch } from "@/components/global-search";
 import { GlobalChatBadge } from "@/components/chat/global-chat-badge";
+import { SolicitacoesBell } from "@/components/vendedor/solicitacoes-bell";
+import { useSolicitacoes } from "@/components/vendedor/solicitacoes-provider";
 import type { AccountType } from "@/lib/hub-mode";
+import { isRotaHabilitada } from "@/lib/modulos-habilitados";
 
 type NavItem = {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   enabled?: boolean;
+  /** Counter shown at the end of the item (live, from a provider). */
+  badge?: "solicitacoes";
 };
 
 type Accent = "copper" | "petrol";
@@ -109,7 +114,7 @@ const COMERCIAL_ITEMS: NavItem[] = [
 const VENDEDORES_ITEMS: NavItem[] = [
   { label: "Agenda", href: "/agenda", icon: CalendarClock, enabled: true },
   { label: "Atividade dos vendedores", href: "/atividade-vendedores", icon: Activity, enabled: true },
-  { label: "Vendedores", href: "/vendedores", icon: UserCheck, enabled: true },
+  { label: "Vendedores", href: "/vendedores", icon: UserCheck, enabled: true, badge: "solicitacoes" },
 ];
 
 const RH_ITEMS: NavItem[] = [
@@ -167,6 +172,12 @@ function NavGroup({
   accent: Accent;
 }) {
   const pathname = usePathname();
+  const solicitacoes = useSolicitacoes();
+
+  // Módulos desligados (lib/modulos-habilitados.ts) não aparecem no menu; as
+  // listas acima ficam intactas para quando forem religados.
+  const visiveis = items.filter((item) => isRotaHabilitada(item.href));
+  if (visiveis.length === 0) return null;
 
   return (
     <div>
@@ -174,7 +185,7 @@ function NavGroup({
         {title}
       </p>
       <ul className="mt-2 space-y-0.5">
-        {items.map((item) => {
+        {visiveis.map((item) => {
           const isActive =
             item.enabled &&
             (item.href === "/pessoal" ||
@@ -215,7 +226,16 @@ function NavGroup({
                 }`}
               >
                 <Icon className="h-4 w-4" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.badge === "solicitacoes" &&
+                  solicitacoes &&
+                  solicitacoes.pendentes.length > 0 && (
+                    <span className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-copper-600 px-1 text-[10px] font-semibold text-white">
+                      {solicitacoes.pendentes.length > 99
+                        ? "99+"
+                        : solicitacoes.pendentes.length}
+                    </span>
+                  )}
               </Link>
             </li>
           );
@@ -255,7 +275,7 @@ export function Sidebar({
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
-      <div className="flex items-center gap-2.5 px-5 py-6">
+      <div className="relative flex items-center gap-2.5 px-5 py-6">
         <Image
           src="/logo.png"
           alt="Mora HUB"
@@ -292,6 +312,7 @@ export function Sidebar({
             Marketing
           </span>
         )}
+        {!restrito && !isPessoal && <SolicitacoesBell />}
       </div>
 
       {!restrito && (
@@ -325,7 +346,8 @@ export function Sidebar({
             <>
               <NavGroup title="Dashboards" items={DASHBOARD_ITEMS} accent={accent} />
               <NavGroup title="Gestão" items={GESTAO_ITEMS} accent={accent} />
-              <NavGroup title="Comercial" items={COMERCIAL_ITEMS} accent={accent} />
+              {/* "Comercial" fica de fora: Visão Geral e Suporte estão desligados e
+                  o Funil de Vendas é o mesmo /leads de Gestão. */}
               <NavGroup title="Vendedores" items={VENDEDORES_ITEMS} accent={accent} />
               <NavGroup title="RH" items={RH_ITEMS} accent={accent} />
               <NavGroup title="Marketing" items={MARKETING_ITEMS} accent={accent} />
@@ -336,12 +358,14 @@ export function Sidebar({
       </nav>
 
       <div className="border-t border-zinc-900 p-3">
-        <GlobalChatBadge
-          href={chatHref}
-          currentUserId={userId}
-          initialCount={unreadTotal}
-        />
-        {temColaboracoes && (
+        {isRotaHabilitada("/chat") && (
+          <GlobalChatBadge
+            href={chatHref}
+            currentUserId={userId}
+            initialCount={unreadTotal}
+          />
+        )}
+        {temColaboracoes && isRotaHabilitada("/colaborador") && (
           <Link
             href="/colaborador"
             className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"

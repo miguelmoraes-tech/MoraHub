@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/format";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { ConviteColaboradorDialog } from "@/components/convite-colaborador-dialog";
 import { ChatLink } from "@/components/chat/chat-link";
+import { isRotaHabilitada } from "@/lib/modulos-habilitados";
 
 const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
   contador: "Contador",
@@ -115,7 +116,8 @@ export function ColaboradoresSection({
                   </div>
                 ) : (
                   <div className="flex shrink-0 items-center gap-1">
-                    {conversaByColaborador.has(`${c.membro_id}|${c.papel}`) && (
+                    {isRotaHabilitada("/chat") &&
+                      conversaByColaborador.has(`${c.membro_id}|${c.papel}`) && (
                       <ChatLink
                         href={`/chat/${conversaByColaborador.get(`${c.membro_id}|${c.papel}`)}`}
                         conversaId={conversaByColaborador.get(`${c.membro_id}|${c.papel}`)!}

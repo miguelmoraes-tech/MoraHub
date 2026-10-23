@@ -8,14 +8,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { CheckCircle2, AlertCircle, X } from "lucide-react";
+import { CheckCircle2, AlertCircle, Bell, X } from "lucide-react";
 
-type ToastTone = "success" | "error";
+type ToastTone = "success" | "error" | "info";
 type ToastItem = { id: number; tone: ToastTone; message: string };
 
 type ToastApi = {
   success: (message: string) => void;
   error: (message: string) => void;
+  info: (message: string) => void;
 };
 
 const TOAST_DURATION_MS = 5000;
@@ -49,6 +50,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     () => ({
       success: (message) => push("success", message),
       error: (message) => push("error", message),
+      info: (message) => push("info", message),
     }),
     [push]
   );
@@ -67,11 +69,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             className={`pointer-events-auto flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm shadow-lg shadow-black/30 ${
               t.tone === "error"
                 ? "border-rose-900/60 bg-rose-950 text-rose-200"
-                : "border-emerald-900/60 bg-emerald-950 text-emerald-200"
+                : t.tone === "info"
+                  ? "border-sky-900/60 bg-sky-950 text-sky-200"
+                  : "border-emerald-900/60 bg-emerald-950 text-emerald-200"
             }`}
           >
             {t.tone === "error" ? (
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            ) : t.tone === "info" ? (
+              <Bell className="mt-0.5 h-4 w-4 shrink-0" />
             ) : (
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
             )}

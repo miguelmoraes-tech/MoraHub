@@ -11,7 +11,7 @@ import {
   type HubMode,
   type AccountType,
 } from "@/lib/hub-mode";
-import { ACCOUNT_TYPES, ACCOUNT_TYPE_STYLES } from "@/lib/account-types";
+import { ACCOUNT_TYPES, ACCOUNT_TYPE_STYLES, SWITCHER_ACCOUNT_TYPES } from "@/lib/account-types";
 import { ativarTipoConta } from "@/lib/actions/tipos-ativos";
 
 /** "Conta Jurídica" -> "Criar conta Jurídica" */
@@ -102,7 +102,7 @@ export function ModeSwitcher({
           Tipos de conta
         </p>
         <div className="space-y-1">
-          {ACCOUNT_TYPES.map((option) => {
+          {ACCOUNT_TYPES.filter((option) => SWITCHER_ACCOUNT_TYPES.includes(option.value)).map((option) => {
             const Icon = option.icon;
             const styles = ACCOUNT_TYPE_STYLES[option.value];
             const isAtivo = tiposAtivos.includes(option.value);
@@ -127,7 +127,9 @@ export function ModeSwitcher({
                       {option.label}
                     </span>
                     <span className="block truncate text-xs text-zinc-600">
-                      Ative aceitando um convite
+                      {option.value === "comercial"
+                        ? "Entre com o código do seu gestor"
+                        : "Ative aceitando um convite"}
                     </span>
                   </span>
                 </div>

@@ -8,6 +8,7 @@ import {
   isRotaDeAcessoVendedor,
   isRotaDoVendedor,
 } from "@/lib/vendedor-access";
+import { ROTA_PADRAO_DONO, isRotaHabilitada } from "@/lib/modulos-habilitados";
 
 // Exact-path routes usable without a session. Also the set a logged-in user
 // gets bounced away from (see the `user && PUBLIC_ROUTES.includes(path)`
@@ -101,6 +102,16 @@ export async function updateSession(request: NextRequest) {
         return redirectTo(url);
       }
     }
+  }
+
+  // Módulos desligados (lib/modulos-habilitados.ts) ficam inalcançáveis: o
+  // código continua no repo, mas a rota volta para o início. Quem só é
+  // vendedor já foi mandado para /vendedor/leads acima.
+  if (!onPublicRoute && !isRotaHabilitada(path)) {
+    const url = request.nextUrl.clone();
+    url.pathname = ROTA_PADRAO_DONO;
+    url.search = "";
+    return redirectTo(url);
   }
 
   if (onPublicRoute) {

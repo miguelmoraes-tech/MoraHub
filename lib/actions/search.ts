@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
+import { isRotaHabilitada } from "@/lib/modulos-habilitados";
 
 export type BuscaResultado = {
   id: string;
@@ -103,11 +104,14 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
       .or(`nome.ilike.${pattern},nicho.ilike.${pattern},contato.ilike.${pattern}`)
       .order("nome")
       .limit(ate),
-    supabase
-      .from("documentos")
-      .select("id, cliente_id, titulo")
-      .ilike("titulo", pattern)
-      .limit(ate),
+    // Documentos é um módulo desligado: sem consulta, grupo sempre vazio.
+    isRotaHabilitada("/documentos")
+      ? supabase
+          .from("documentos")
+          .select("id, cliente_id, titulo")
+          .ilike("titulo", pattern)
+          .limit(ate)
+      : Promise.resolve({ data: null }),
   ]);
 
   // Acessos/Infraestrutura/Projetos/Servicos/Documentos only carry

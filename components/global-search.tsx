@@ -1,5 +1,6 @@
 "use client";
 
+import { isRotaHabilitada } from "@/lib/modulos-habilitados";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -150,7 +151,11 @@ export function GlobalSearch() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Buscar clientes, leads, documentos..."
+              placeholder={
+                isRotaHabilitada("/documentos")
+                  ? "Buscar clientes, leads, documentos..."
+                  : "Buscar clientes, leads..."
+              }
               className="w-full bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
             />
             <button

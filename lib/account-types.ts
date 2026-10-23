@@ -48,9 +48,9 @@ export const ACCOUNT_TYPES: {
   },
   {
     value: "comercial",
-    label: "Conta Comercial",
+    label: "Vendedor",
     description:
-      "Para gerenciar vendas, funil de leads e comissões de uma empresa — vinculada a apenas um negócio por vez, como o Financeiro",
+      "Para acessar os leads de uma empresa com o código do gestor — vinculada a apenas um negócio por vez",
     icon: LineChart,
   },
   {
@@ -71,6 +71,13 @@ export const ACCOUNT_TYPES: {
  * itself, not from this list.
  */
 export const SIGNUP_ACCOUNT_TYPES: AccountType[] = ["empresarial", "pessoal"];
+
+/**
+ * Tipos listados no seletor de contas ("Tipos de conta", na sidebar e no topo
+ * de /colaborador). Os demais continuam existindo em ACCOUNT_TYPES, só não
+ * aparecem; para religar um, inclua o valor aqui.
+ */
+export const SWITCHER_ACCOUNT_TYPES: AccountType[] = ["empresarial", "pessoal", "comercial"];
 
 export const ACCOUNT_TYPE_STYLES: Record<
   AccountType,

@@ -1,10 +1,11 @@
-import { getEffectiveDonoIdGeral } from "@/lib/dono-efetivo";
-import { getDashboardExecutivoOverview } from "@/lib/dashboard-executivo/get-overview";
-import { DashboardExecutivoBoard } from "@/components/dashboard-executivo/dashboard-executivo-board";
+import { getDashboardHomeOverview } from "@/lib/dashboard-home/get-overview";
+import { DashboardHomeBoard } from "@/components/dashboard-home/dashboard-home-board";
 
-export default async function DashboardExecutivoPage() {
-  const donoId = await getEffectiveDonoIdGeral();
-  const overview = await getDashboardExecutivoOverview(donoId);
+// Home enxuta do dono: só os módulos ligados em lib/modulos-habilitados.ts.
+// O Dashboard Executivo completo (getDashboardExecutivoOverview +
+// DashboardExecutivoBoard) segue no repositório, sem uso, para ser religado.
+export default async function DashboardHomePage() {
+  const overview = await getDashboardHomeOverview();
 
-  return <DashboardExecutivoBoard overview={overview} />;
+  return <DashboardHomeBoard overview={overview} />;
 }
