@@ -1,8 +1,10 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Maximize2,
+  Eye,
   X,
   Pencil,
   Trash2,
@@ -23,6 +25,9 @@ import { ConvertLeadDialog } from "@/components/convert-lead-dialog";
 import { PropostasSection } from "@/components/propostas-section";
 import { LeadFollowupSection } from "@/components/lead-followup-section";
 import { formatDate } from "@/lib/format";
+import { LeadContato } from "@/components/lead-contato";
+import { VendedorLeadActions } from "@/components/vendedor/vendedor-lead-actions";
+import { useLeadViewTracking } from "@/lib/hooks/use-lead-view-tracking";
 
 const STATUS_LABEL: Record<Lead["status"], string> = {
   abordar: "A abordar",
@@ -52,15 +57,34 @@ export function LeadDetailDialog({
   propostas = [],
   followups = [],
   autoOpen = false,
+  readOnly = false,
+  variant = "icone",
 }: {
   lead: Lead;
   propostas?: Proposta[];
   followups?: FollowupLead[];
   autoOpen?: boolean;
+  /**
+   * Vendedor view: no edit/delete/follow-up/proposals; only "Marcar reunião"
+   * and "Converter em cliente". Opening the dialog is also audited
+   * (lead_view_start / lead_view_ping) while it stays open and visible.
+   */
+  readOnly?: boolean;
+  variant?: "icone" | "botao";
 }) {
+  const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // Mirrors the native <dialog> open state (only needed to drive the tracking
+  // hook). Starts true for the search-result auto-open so the effect below
+  // doesn't need to set state.
+  const [isOpen, setIsOpen] = useState(autoOpen);
+  // Set when an action behind the dialog changed the lead; the list is
+  // refreshed once the dialog closes (see app/vendedor/actions.ts).
+  const stale = useRef(false);
+
+  useLeadViewTracking(lead.id, readOnly && isOpen);
 
   const updateAction = updateLead.bind(null, lead.id);
   const [updateState, updateFormAction, updatePending] = useActionState(
@@ -76,21 +100,42 @@ export function LeadDetailDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function handleOpen() {
+    dialogRef.current?.showModal();
+    setIsOpen(true);
+  }
+
   function handleClose() {
     setMode("view");
     setConfirmingDelete(false);
+    setIsOpen(false);
+    if (stale.current) {
+      stale.current = false;
+      router.refresh();
+    }
   }
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        title="Ver detalhes"
-        className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-      >
-        <Maximize2 className="h-3.5 w-3.5" />
-      </button>
+      {variant === "botao" ? (
+        <button
+          type="button"
+          onClick={handleOpen}
+          className="flex items-center gap-1.5 text-xs font-medium text-copper-400 hover:text-copper-300"
+        >
+          <Eye className="h-3.5 w-3.5" />
+          Abrir lead
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={handleOpen}
+          title="Ver detalhes"
+          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+        >
+          <Maximize2 className="h-3.5 w-3.5" />
+        </button>
+      )}
 
       <dialog
         ref={dialogRef}
@@ -112,7 +157,7 @@ export function LeadDetailDialog({
           </div>
 
           <div className="px-5 py-4">
-            {mode === "edit" ? (
+            {mode === "edit" && !readOnly ? (
               <form action={updateFormAction} className="space-y-4">
                 <LeadFields lead={lead} />
                 {lead.status === "abordado" && (
@@ -168,14 +213,7 @@ export function LeadDetailDialog({
                 </div>
 
                 <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-xs font-medium text-zinc-500">
-                      Contato
-                    </dt>
-                    <dd className="text-sm text-zinc-200">
-                      {lead.contato || "Não informado"}
-                    </dd>
-                  </div>
+                  <LeadContato contato={lead.contato} variant="detalhe" />
                   <div>
                     <dt className="text-xs font-medium text-zinc-500">
                       Tipo de contato
@@ -258,6 +296,30 @@ export function LeadDetailDialog({
                   )}
                 </div>
 
+                {readOnly ? (
+                  <>
+                  <LeadFollowupSection
+                    leadId={lead.id}
+                    intervaloFollowupDias={lead.intervalo_followup_dias}
+                    followups={followups}
+                    proximoFollowup={lead.status === "convertido" ? null : lead.proximo_followup}
+                    readOnly
+                  />
+                  <div className="border-t border-zinc-800/80 pt-3.5">
+                    <VendedorLeadActions
+                      lead={lead}
+                      onChanged={() => {
+                        stale.current = true;
+                      }}
+                      onConverted={() => {
+                        stale.current = true;
+                        dialogRef.current?.close();
+                      }}
+                    />
+                  </div>
+                  </>
+                ) : (
+                  <>
                 <LeadFollowupSection
                   leadId={lead.id}
                   intervaloFollowupDias={lead.intervalo_followup_dias}
@@ -310,6 +372,8 @@ export function LeadDetailDialog({
                     </button>
                   </div>
                 </div>
+                  </>
+                )}
               </div>
             )}
           </div>

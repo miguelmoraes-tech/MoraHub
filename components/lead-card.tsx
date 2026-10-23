@@ -28,6 +28,7 @@ import { PreviaFields } from "@/components/previa-fields";
 import { FollowupFields } from "@/components/followup-fields";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { LeadDetailDialog } from "@/components/lead-detail-dialog";
+import { LeadContato } from "@/components/lead-contato";
 import { ConvertLeadDialog } from "@/components/convert-lead-dialog";
 import type { CampanhaOption } from "@/components/leads-board";
 
@@ -53,12 +54,15 @@ export function LeadCard({
   propostas = [],
   followups = [],
   campanhas = [],
+  readOnly = false,
   autoOpenDetail = false,
 }: {
   lead: Lead;
   propostas?: Proposta[];
   followups?: FollowupLead[];
   campanhas?: CampanhaOption[];
+  /** Vendedor view: only the "open lead" action is available. */
+  readOnly?: boolean;
   autoOpenDetail?: boolean;
 }) {
   const [mode, setMode] = useState<"view" | "edit" | "marcar" | "followup">(
@@ -93,7 +97,7 @@ export function LeadCard({
     ? diffInDays(lead.proximo_followup, hoje)
     : null;
 
-  if (mode === "edit") {
+  if (mode === "edit" && !readOnly) {
     return (
       <form
         action={updateFormAction}
@@ -202,17 +206,19 @@ export function LeadCard({
           <h3 className="truncate text-sm font-semibold text-zinc-100">
             {lead.nome}
           </h3>
-          {lead.contato && (
-            <p className="truncate text-xs text-zinc-500">{lead.contato}</p>
-          )}
+          {/* To hide the contact from vendedores until they open the lead,
+              pass oculto={readOnly} here. */}
+          <LeadContato contato={lead.contato} variant="card" />
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <LeadDetailDialog
-            lead={lead}
-            propostas={propostas}
-            followups={followups}
-            autoOpen={autoOpenDetail}
-          />
+          {!readOnly && (
+            <LeadDetailDialog
+              lead={lead}
+              propostas={propostas}
+              followups={followups}
+              autoOpen={autoOpenDetail}
+            />
+          )}
           <StatusChip tone={STATUS_TONE[lead.status]}>
             {STATUS_LABEL[lead.status]}
           </StatusChip>
@@ -233,6 +239,11 @@ export function LeadCard({
             {followupDias! > 0
               ? `Follow-up atrasado ${followupDias}d`
               : "Follow-up hoje"}
+          </StatusChip>
+        )}
+        {readOnly && lead.proximo_followup && lead.status !== "convertido" && (
+          <StatusChip tone="zinc">
+            Próx. follow-up · {formatDate(lead.proximo_followup)}
           </StatusChip>
         )}
         {lead.tipo_contato === "ligacao" && (
@@ -302,6 +313,17 @@ export function LeadCard({
         <p className="text-xs text-zinc-600">abordado por {lead.abordado_por}</p>
       )}
 
+      {readOnly ? (
+        <div className="mt-auto flex items-center justify-end border-t border-zinc-800/80 pt-3">
+          <LeadDetailDialog
+            lead={lead}
+            followups={followups}
+            readOnly
+            variant="botao"
+            autoOpen={autoOpenDetail}
+          />
+        </div>
+      ) : (
       <div className="mt-auto flex items-center justify-between border-t border-zinc-800/80 pt-3">
         {confirmingDelete ? (
           <div className="flex items-center gap-2 text-xs">
@@ -369,6 +391,7 @@ export function LeadCard({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -10,6 +10,13 @@ import {
   accountTypeToHubMode,
   isCollaboratorAccountType,
 } from "@/lib/hub-mode";
+import {
+  ACESSO_VENDEDOR_CODIGO,
+  VENDEDOR_HOME,
+  getVendedorAcesso,
+  isComercialSemVinculo,
+} from "@/lib/vendedor-access";
+import { COMERCIAL_DONO_COOKIE, COMERCIAL_DONO_COOKIE_MAX_AGE } from "@/lib/comercial";
 
 const HUB_MODE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
@@ -52,6 +59,27 @@ export async function login(
   const redirectTo = safeRedirect(formData.get("redirectTo"));
   if (redirectTo) {
     redirect(redirectTo);
+  }
+
+  // A vendedor (invited 'comercial', no company of their own) always lands
+  // in their own area — the proxy keeps them there afterwards.
+  const acesso = await getVendedorAcesso(supabase, data.user.id);
+  if (acesso.somenteVendedor) {
+    const cookieStore = await cookies();
+    if (!cookieStore.get(COMERCIAL_DONO_COOKIE)?.value) {
+      cookieStore.set(COMERCIAL_DONO_COOKIE, acesso.vinculos[0].dono_id, {
+        path: "/",
+        maxAge: COMERCIAL_DONO_COOKIE_MAX_AGE,
+        sameSite: "lax",
+      });
+    }
+    redirect(VENDEDOR_HOME);
+  }
+
+  // A vendedor who signed up but isn't linked to a company yet: the only
+  // place for them is the screen to type the gestor's code (or wait for it).
+  if (await isComercialSemVinculo(supabase, data.user, acesso)) {
+    redirect(ACESSO_VENDEDOR_CODIGO);
   }
 
   const { data: perfil } = await supabase
@@ -190,6 +218,11 @@ export async function signup(
   const redirectTo = safeRedirect(formData.get("redirectTo"));
   if (redirectTo) {
     redirect(redirectTo);
+  }
+
+  // A new vendedor has no company yet: straight to typing the gestor's code.
+  if (tipoConta === "comercial") {
+    redirect(ACESSO_VENDEDOR_CODIGO);
   }
 
   // Accountants/lawyers don't own a Business/Pessoal hub by default — send

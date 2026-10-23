@@ -7,6 +7,7 @@ import {
   COMERCIAL_DONO_COOKIE,
   COMERCIAL_DONO_COOKIE_MAX_AGE,
 } from "@/lib/comercial";
+import { VENDEDOR_HOME } from "@/lib/vendedor-access";
 
 export async function entrarComercial(donoId: string) {
   const supabase = await createClient();
@@ -32,5 +33,5 @@ export async function entrarComercial(donoId: string) {
     maxAge: COMERCIAL_DONO_COOKIE_MAX_AGE,
     sameSite: "lax",
   });
-  redirect("/comercial");
+  redirect(VENDEDOR_HOME);
 }

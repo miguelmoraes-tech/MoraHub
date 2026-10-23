@@ -28,7 +28,8 @@ const PAPEL_ACESSO_DESCRICAO: Record<ColaboradorPapel, string> = {
   financeiro:
     "com acesso às seções financeiras da empresa (Contas a Pagar, Contas a Receber, Orçamento e Fluxo de Caixa) e à Folha de Pagamento",
   rh: "com acesso ao módulo de RH da empresa (Departamentos, Funcionários, Férias, Benefícios, Recrutamento, Avaliações, Ponto e Folha de Pagamento)",
-  comercial: "com acesso a vendas, funil de leads e comissões da empresa",
+  comercial:
+    "com acesso à lista de leads da empresa (somente leitura), para marcar reuniões e converter leads em clientes",
   marketing: "com acesso ao calendário de conteúdo e às campanhas de marketing da empresa",
 };
 
@@ -130,7 +131,7 @@ export default async function ConvitePage({
                       Já tenho conta
                     </Link>
                     <Link
-                      href={`/signup?redirect=${encodeURIComponent(redirectParam)}&email=${encodeURIComponent(convite.email_convidado)}`}
+                      href={`/signup?redirect=${encodeURIComponent(redirectParam)}&email=${encodeURIComponent(convite.email_convidado)}&papel=${convite.papel}`}
                       className="flex-1 rounded-lg border border-zinc-700 px-3.5 py-2 text-center text-sm font-medium text-zinc-200 hover:bg-zinc-800"
                     >
                       Criar conta

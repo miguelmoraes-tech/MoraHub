@@ -43,12 +43,17 @@ export function ColaboradoresSection({
   conversaByColaborador,
   unreadByConversa,
   currentUserId,
+  papelFixo,
+  titulo = "Colaboradores",
 }: {
   convites: Convite[];
   colaboradores: ColaboradorVinculado[];
   conversaByColaborador: Map<string, string>;
   unreadByConversa: Map<string, number>;
   currentUserId: string;
+  /** Lists and invites only this papel (used by the dedicated Vendedores page). */
+  papelFixo?: ColaboradorPapel;
+  titulo?: string;
 }) {
   const [confirmando, setConfirmando] = useState<Confirmando>(null);
 
@@ -57,9 +62,9 @@ export function ColaboradoresSection({
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
           <UserCheck className="h-4 w-4 text-zinc-500" />
-          Colaboradores
+          {titulo}
         </div>
-        <ConviteColaboradorDialog />
+        <ConviteColaboradorDialog papelFixo={papelFixo} />
       </div>
 
       <div className="mb-5 space-y-2">

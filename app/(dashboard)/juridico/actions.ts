@@ -151,6 +151,7 @@ export async function convidarColaborador(
   if (error || !convite) return { error: "Não foi possível criar o convite." };
 
   revalidatePath("/juridico");
+  revalidatePath("/vendedores");
 
   const origin = await getOrigin();
   return { ok: true, inviteUrl: `${origin}/convite/${convite.token}` };
@@ -160,6 +161,7 @@ export async function removerColaborador(membroId: string) {
   const { supabase } = await requireUser();
   await supabase.from("membros").update({ status: "removido" }).eq("id", membroId);
   revalidatePath("/juridico");
+  revalidatePath("/vendedores");
 }
 
 export async function cancelarConvite(conviteId: string) {
@@ -176,4 +178,5 @@ export async function cancelarConvite(conviteId: string) {
     .eq("status", "pendente");
 
   revalidatePath("/juridico");
+  revalidatePath("/vendedores");
 }

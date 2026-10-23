@@ -18,7 +18,7 @@ const STATUS_TONE: Record<ClienteStatus, ChipTone> = {
 };
 
 export function ClienteCard({ cliente }: { cliente: Cliente }) {
-  const contato = cliente.telefone ?? cliente.email;
+  const contato = cliente.telefone ?? cliente.contato ?? cliente.email;
 
   return (
     <Link

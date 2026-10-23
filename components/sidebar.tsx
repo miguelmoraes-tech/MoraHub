@@ -42,6 +42,8 @@ import {
   Megaphone,
   CalendarDays,
   Flag,
+  Activity,
+  UserCheck,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
@@ -100,6 +102,14 @@ const COMERCIAL_ITEMS: NavItem[] = [
   { label: "Visão Geral", href: "/comercial", icon: LayoutGrid, enabled: true },
   { label: "Funil de Vendas", href: "/leads", icon: Target, enabled: true },
   { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
+];
+
+// Owner-only entries for the vendedor feature (the vendedor's own menu lives
+// in components/vendedor/vendedor-sidebar.tsx).
+const VENDEDORES_ITEMS: NavItem[] = [
+  { label: "Agenda", href: "/agenda", icon: CalendarClock, enabled: true },
+  { label: "Atividade dos vendedores", href: "/atividade-vendedores", icon: Activity, enabled: true },
+  { label: "Vendedores", href: "/vendedores", icon: UserCheck, enabled: true },
 ];
 
 const RH_ITEMS: NavItem[] = [
@@ -316,6 +326,7 @@ export function Sidebar({
               <NavGroup title="Dashboards" items={DASHBOARD_ITEMS} accent={accent} />
               <NavGroup title="Gestão" items={GESTAO_ITEMS} accent={accent} />
               <NavGroup title="Comercial" items={COMERCIAL_ITEMS} accent={accent} />
+              <NavGroup title="Vendedores" items={VENDEDORES_ITEMS} accent={accent} />
               <NavGroup title="RH" items={RH_ITEMS} accent={accent} />
               <NavGroup title="Marketing" items={MARKETING_ITEMS} accent={accent} />
               <NavGroup title="Suporte" items={SUPORTE_ITEMS} accent={accent} />

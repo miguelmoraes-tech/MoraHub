@@ -14,7 +14,7 @@ const STATUS_LABEL: Record<ClienteStatus, string> = {
 
 const COLUMNS: ExportColumn<Cliente>[] = [
   { header: "Nome", value: (c) => c.nome },
-  { header: "Telefone", value: (c) => c.telefone },
+  { header: "Telefone", value: (c) => c.telefone ?? c.contato },
   { header: "E-mail", value: (c) => c.email },
   { header: "Status", value: (c) => STATUS_LABEL[c.status] },
   { header: "Segmento", value: (c) => c.segmento },

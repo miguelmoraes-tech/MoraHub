@@ -1,13 +1,14 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Phone, Plus } from "lucide-react";
+import { CalendarClock, Phone, Plus } from "lucide-react";
 import type { FollowupLead } from "@/lib/types";
 import { registrarFollowup } from "@/app/(dashboard)/leads/actions";
 import { formatDate } from "@/lib/format";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { FollowupFields } from "@/components/followup-fields";
+import { diffInDays, todayISO } from "@/lib/vencimentos/dates";
 
 const CANAL_LABEL: Record<string, string> = {
   whatsapp: "WhatsApp",
@@ -81,13 +82,22 @@ export function LeadFollowupSection({
   intervaloFollowupDias,
   followups,
   autoOpenForm = false,
+  readOnly = false,
+  proximoFollowup = null,
 }: {
   leadId: string;
   intervaloFollowupDias: number | null;
   followups: FollowupLead[];
   autoOpenForm?: boolean;
+  /** Vendedor view: history + next follow-up only, no "Registrar contato". */
+  readOnly?: boolean;
+  /** leads.proximo_followup — highlighted at the top (readOnly view). */
+  proximoFollowup?: string | null;
 }) {
-  const [open, setOpen] = useState(autoOpenForm);
+  const [open, setOpen] = useState(autoOpenForm && !readOnly);
+  const diasParaProximo = proximoFollowup
+    ? diffInDays(todayISO(), proximoFollowup)
+    : null;
   const ordenados = ordenarFollowups(followups);
   const ultimo = ordenados[0];
 
@@ -106,7 +116,7 @@ export function LeadFollowupSection({
             </p>
           )}
         </div>
-        {!open && (
+        {!open && !readOnly && (
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -118,7 +128,31 @@ export function LeadFollowupSection({
         )}
       </div>
 
-      {open && (
+      {readOnly && proximoFollowup && diasParaProximo !== null && (
+        <div
+          className={`mb-4 flex items-center gap-2 rounded-lg border px-3 py-2.5 ${
+            diasParaProximo < 0
+              ? "border-rose-900/60 bg-rose-950/30 text-rose-300"
+              : diasParaProximo === 0
+                ? "border-amber-900/60 bg-amber-950/30 text-amber-300"
+                : "border-copper-500/30 bg-copper-500/10 text-copper-300"
+          }`}
+        >
+          <CalendarClock className="h-4 w-4 shrink-0" />
+          <p className="text-sm font-semibold">
+            Próximo follow-up: {formatDate(proximoFollowup)}
+            <span className="ml-2 text-xs font-normal opacity-80">
+              {diasParaProximo < 0
+                ? `atrasado ${-diasParaProximo}d`
+                : diasParaProximo === 0
+                  ? "hoje"
+                  : `em ${diasParaProximo}d`}
+            </span>
+          </p>
+        </div>
+      )}
+
+      {open && !readOnly && (
         <div className="mb-4">
           <NewFollowupForm
             leadId={leadId}

@@ -5,6 +5,11 @@ export interface Cliente {
   user_id: string;
   nome: string;
   telefone: string | null;
+  /**
+   * Written only by the converter_lead_em_cliente RPC (lead.contato lands
+   * here, not in `telefone`) — screens fall back to it when `telefone` is empty.
+   */
+  contato: string | null;
   email: string | null;
   resumo: string | null;
   site_link: string | null;
@@ -12,6 +17,7 @@ export interface Cliente {
   segmento: string | null;
   abordado_por: string | null;
   responsavel: string | null;
+  vendedor_id: string | null;
   lead_origem_id: string | null;
   created_at: string;
 }
@@ -183,6 +189,59 @@ export interface Lead {
   proximo_followup: string | null;
   intervalo_followup_dias: number | null;
   campanha_id: string | null;
+  workspace_id: string | null;
+  /** Vendedor (membro 'comercial') who claimed the lead; null while unassigned. */
+  vendedor_id: string | null;
+  estagio_funil: string | null;
+}
+
+export type ReuniaoCanal = "presencial" | "video" | "telefone" | "whatsapp";
+export type ReuniaoStatus =
+  | "agendada"
+  | "realizada"
+  | "cancelada"
+  | "nao_compareceu";
+
+/** `reunioes` row — written only through the agendar_reuniao/atualizar_reuniao RPCs. */
+export interface Reuniao {
+  id: string;
+  workspace_id: string;
+  lead_id: string;
+  vendedor_id: string | null;
+  data_hora: string;
+  duracao_min: number;
+  canal: ReuniaoCanal;
+  local_link: string | null;
+  observacoes: string | null;
+  status: ReuniaoStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+/** `lead_views` row — one vendedor "session" on a lead; readable only by the dono. */
+export interface LeadView {
+  id: string;
+  workspace_id: string;
+  lead_id: string;
+  user_id: string;
+  started_at: string;
+  last_seen_at: string;
+  duracao_seg: number;
+}
+
+/** Shape returned by the relatorio_atividade_vendedores() RPC (bigints arrive as numbers). */
+export interface AtividadeVendedorRow {
+  vendedor_id: string;
+  vendedor_email: string | null;
+  lead_id: string;
+  lead_nome: string;
+  aberturas: number;
+  total_seg: number;
+  primeira_abertura: string;
+  ultima_abertura: string;
+  tem_reuniao: boolean;
+  convertido: boolean;
+  lead_atribuido_a: string | null;
 }
 
 export type FollowupCanal = "whatsapp" | "ligacao" | "email" | "presencial" | "outro";

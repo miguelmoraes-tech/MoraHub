@@ -21,11 +21,14 @@ export function LeadsBoard({
   propostas = [],
   followups = [],
   campanhas = [],
+  readOnly = false,
 }: {
   leads: Lead[];
   propostas?: Proposta[];
   followups?: FollowupLead[];
   campanhas?: CampanhaOption[];
+  /** Vendedor view: same list, but no create/edit/delete/export/status changes. */
+  readOnly?: boolean;
 }) {
   const searchParams = useSearchParams();
   const highlightLeadId = searchParams.get("lead");
@@ -117,10 +120,12 @@ export function LeadsBoard({
             {porContato.length} lead(s) no total
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <ExportButton href={exportHref} />
-          <NewLeadDialog campanhas={campanhas} />
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-2">
+            <ExportButton href={exportHref} />
+            <NewLeadDialog campanhas={campanhas} />
+          </div>
+        )}
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -236,6 +241,7 @@ export function LeadsBoard({
               propostas={propostasPorLead.get(lead.id) ?? []}
               followups={followupsPorLead.get(lead.id) ?? []}
               campanhas={campanhas}
+              readOnly={readOnly}
               autoOpenDetail={lead.id === highlightLeadId}
             />
           ))}

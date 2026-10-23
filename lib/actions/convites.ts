@@ -1,7 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { VENDEDOR_HOME, getVendedorAcesso } from "@/lib/vendedor-access";
+import { COMERCIAL_DONO_COOKIE, COMERCIAL_DONO_COOKIE_MAX_AGE } from "@/lib/comercial";
 
 export type ConviteResponseState = { error: string } | undefined;
 
@@ -30,6 +33,24 @@ export async function aceitarConvite(
   });
 
   if (error || !donoId) return { error: friendlyError(error?.message) };
+
+  // Someone whose only role is the 'comercial' they just accepted goes
+  // straight to the vendedor area instead of the colaborador picker.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    const acesso = await getVendedorAcesso(supabase, user.id);
+    if (acesso.somenteVendedor && acesso.vinculos.some((v) => v.dono_id === donoId)) {
+      const cookieStore = await cookies();
+      cookieStore.set(COMERCIAL_DONO_COOKIE, donoId, {
+        path: "/",
+        maxAge: COMERCIAL_DONO_COOKIE_MAX_AGE,
+        sameSite: "lax",
+      });
+      redirect(VENDEDOR_HOME);
+    }
+  }
 
   redirect("/colaborador");
 }

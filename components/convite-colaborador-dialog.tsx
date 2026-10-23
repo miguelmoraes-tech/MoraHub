@@ -3,8 +3,14 @@
 import { useActionState, useRef, useState } from "react";
 import { Plus, X, Copy, Check } from "lucide-react";
 import { convidarColaborador } from "@/app/(dashboard)/juridico/actions";
+import type { ColaboradorPapel } from "@/lib/types";
 
-export function ConviteColaboradorDialog() {
+export function ConviteColaboradorDialog({
+  papelFixo,
+}: {
+  /** Locks the invite to one papel (the Vendedores page only invites 'comercial'). */
+  papelFixo?: ColaboradorPapel;
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [openCount, setOpenCount] = useState(0);
 
@@ -21,7 +27,7 @@ export function ConviteColaboradorDialog() {
         className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
       >
         <Plus className="h-4 w-4" />
-        Adicionar colaborador
+        {papelFixo === "comercial" ? "Convidar vendedor" : "Adicionar colaborador"}
       </button>
 
       {/* See new-cliente-dialog.tsx for why margin/display are handled this way. */}
@@ -31,7 +37,9 @@ export function ConviteColaboradorDialog() {
       >
         <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-950">
           <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-            <h2 className="text-sm font-semibold">Adicionar colaborador</h2>
+            <h2 className="text-sm font-semibold">
+              {papelFixo === "comercial" ? "Convidar vendedor" : "Adicionar colaborador"}
+            </h2>
             <button
               type="button"
               onClick={() => dialogRef.current?.close()}
@@ -43,6 +51,7 @@ export function ConviteColaboradorDialog() {
 
           <ConviteColaboradorForm
             key={openCount}
+            papelFixo={papelFixo}
             onDone={() => dialogRef.current?.close()}
           />
         </div>
@@ -51,15 +60,19 @@ export function ConviteColaboradorDialog() {
   );
 }
 
-function ConviteColaboradorForm({ onDone }: { onDone: () => void }) {
+function ConviteColaboradorForm({
+  onDone,
+  papelFixo,
+}: {
+  onDone: () => void;
+  papelFixo?: ColaboradorPapel;
+}) {
   const [state, formAction, pending] = useActionState(
     convidarColaborador,
     undefined
   );
   const [copied, setCopied] = useState(false);
-  const [papel, setPapel] = useState<
-    "contador" | "advogado" | "financeiro" | "rh" | "comercial" | "marketing"
-  >("contador");
+  const [papel, setPapel] = useState<ColaboradorPapel>(papelFixo ?? "contador");
   const created = state && "ok" in state ? state : null;
 
   async function handleCopy() {
@@ -120,9 +133,11 @@ function ConviteColaboradorForm({ onDone }: { onDone: () => void }) {
 
       <div className="space-y-1.5">
         <label className="text-xs font-medium text-zinc-400">Papel *</label>
+        {papelFixo && <input type="hidden" name="papel" value={papelFixo} />}
         <select
-          name="papel"
+          name={papelFixo ? undefined : "papel"}
           required
+          disabled={!!papelFixo}
           value={papel}
           onChange={(e) => setPapel(e.target.value as typeof papel)}
           className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
@@ -151,9 +166,9 @@ function ConviteColaboradorForm({ onDone }: { onDone: () => void }) {
         )}
         {papel === "comercial" && (
           <p className="text-xs text-zinc-500">
-            Funcionário interno com acesso a vendas, funil de leads e
-            comissões desta empresa. Como o Financeiro e o RH, só pode estar
-            vinculado a uma empresa por vez.
+            Vendedor: vê os leads da empresa (somente leitura), marca
+            reuniões e converte leads em clientes. Você acompanha a atividade
+            dele em Atividade dos vendedores.
           </p>
         )}
         {papel === "marketing" && (

@@ -4,16 +4,25 @@ import { Suspense, useActionState, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Handshake } from "lucide-react";
 import { signup } from "@/lib/actions/auth";
 import { ACCOUNT_TYPES, ACCOUNT_TYPE_STYLES } from "@/lib/account-types";
-import type { AccountType } from "@/lib/hub-mode";
+import { isCollaboratorAccountType, type AccountType } from "@/lib/hub-mode";
 
 function SignupForm() {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [accountType, setAccountType] = useState<AccountType | null>(null);
-  const [state, formAction, pending] = useActionState(signup, undefined);
   const searchParams = useSearchParams();
+  // An invite link (/convite/<token>) passes the invited papel, so the
+  // person signing up skips the account-type step and gets the matching
+  // account type — otherwise a vendedor could pick "Empresarial" and end up
+  // with an empty company of their own instead of the vendedor area.
+  const papelConvite = ACCOUNT_TYPES.find(
+    (o) => o.value === searchParams.get("papel") && isCollaboratorAccountType(o.value)
+  )?.value;
+  const [step, setStep] = useState<1 | 2>(papelConvite ? 2 : 1);
+  const [accountType, setAccountType] = useState<AccountType | null>(
+    papelConvite ?? null
+  );
+  const [state, formAction, pending] = useActionState(signup, undefined);
   const redirectTo = searchParams.get("redirect") ?? "";
   const prefillEmail = searchParams.get("email") ?? "";
   const loginHref = redirectTo
@@ -21,6 +30,13 @@ function SignupForm() {
     : "/login";
 
   const selected = ACCOUNT_TYPES.find((o) => o.value === accountType);
+  // The 'comercial' account type is only offered here as "Sou vendedor": no
+  // company of its own, it asks the gestor for access by code afterwards (or
+  // accepts an invite link). The shared ACCOUNT_TYPES entry stays for the
+  // account switcher.
+  const isVendedor = accountType === "comercial";
+  const selectedLabel = isVendedor ? "Sou vendedor" : selected?.label;
+  const SelectedIcon = isVendedor ? Handshake : selected?.icon;
 
   return (
     <>
@@ -44,7 +60,7 @@ function SignupForm() {
 
         {step === 1 ? (
           <div className="grid grid-cols-2 gap-3">
-            {ACCOUNT_TYPES.map((option) => {
+            {ACCOUNT_TYPES.filter((option) => option.value !== "comercial").map((option) => {
               const Icon = option.icon;
               const styles = ACCOUNT_TYPE_STYLES[option.value];
               return (
@@ -71,6 +87,28 @@ function SignupForm() {
                 </button>
               );
             })}
+            <button
+              type="button"
+              onClick={() => {
+                setAccountType("comercial");
+                setStep(2);
+              }}
+              className={`col-span-2 flex items-center gap-3 rounded-xl border p-4 text-left transition-colors ${ACCOUNT_TYPE_STYLES.comercial.card}`}
+            >
+              <span
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-950 ${ACCOUNT_TYPE_STYLES.comercial.iconBg}`}
+              >
+                <Handshake className="h-5 w-5" />
+              </span>
+              <span className="flex flex-col gap-1">
+                <span className={`text-sm font-semibold ${ACCOUNT_TYPE_STYLES.comercial.text}`}>
+                  Sou vendedor
+                </span>
+                <span className="text-xs leading-relaxed text-zinc-500">
+                  Tenho o código do meu gestor e quero acessar os leads da empresa dele
+                </span>
+              </span>
+            </button>
           </div>
         ) : (
           <form
@@ -80,7 +118,7 @@ function SignupForm() {
             <input type="hidden" name="tipoConta" value={accountType ?? ""} />
             <input type="hidden" name="redirectTo" value={redirectTo} />
 
-            {selected && (
+            {selected && SelectedIcon && (
               <button
                 type="button"
                 onClick={() => setStep(1)}
@@ -89,12 +127,12 @@ function SignupForm() {
                 <span
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-950 ${ACCOUNT_TYPE_STYLES[selected.value].iconBg}`}
                 >
-                  <selected.icon className="h-3.5 w-3.5" />
+                  <SelectedIcon className="h-3.5 w-3.5" />
                 </span>
                 <span
                   className={`flex-1 truncate text-sm font-medium ${ACCOUNT_TYPE_STYLES[selected.value].text}`}
                 >
-                  {selected.label}
+                  {selectedLabel}
                 </span>
                 <span className="flex items-center gap-1 text-xs text-zinc-500">
                   <ArrowLeft className="h-3 w-3" />
