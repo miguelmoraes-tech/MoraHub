@@ -14,7 +14,6 @@ import { todayISO } from "@/lib/vencimentos/dates";
 import { isFollowupPendente } from "@/lib/leads";
 
 const PREVIA_OPTIONS = ["Prévia enviada", "Prévia pendente"];
-const CONTATO_OPTIONS = ["WhatsApp/Ambos", "Só ligação"];
 
 export function LeadsBoard({
   leads,
@@ -43,9 +42,6 @@ export function LeadsBoard({
   const [previaFiltro, setPreviaFiltro] = useState<"" | "enviada" | "pendente">(
     ""
   );
-  const [contatoFiltro, setContatoFiltro] = useState<
-    "" | "whatsapp" | "ligacao"
-  >("");
   const [somenteAtrasados, setSomenteAtrasados] = useState(false);
   const hoje = todayISO();
 
@@ -58,16 +54,9 @@ export function LeadsBoard({
   );
 
   const porNicho = nicho ? leads.filter((l) => l.nicho === nicho) : leads;
-  const porContato = contatoFiltro
-    ? porNicho.filter((l) =>
-        contatoFiltro === "ligacao"
-          ? l.tipo_contato === "ligacao"
-          : l.tipo_contato !== "ligacao"
-      )
-    : porNicho;
-  const aAbordar = porContato.filter((lead) => lead.status === "abordar");
-  const abordados = porContato.filter((lead) => lead.status === "abordado");
-  const convertidos = porContato.filter((lead) => lead.status === "convertido");
+  const aAbordar = porNicho.filter((lead) => lead.status === "abordar");
+  const abordados = porNicho.filter((lead) => lead.status === "abordado");
+  const convertidos = porNicho.filter((lead) => lead.status === "convertido");
   const abordadosFiltrados = previaFiltro
     ? abordados.filter((lead) =>
         previaFiltro === "enviada" ? lead.previa_enviada : !lead.previa_enviada
@@ -82,7 +71,7 @@ export function LeadsBoard({
   const list = somenteAtrasados
     ? listaBase.filter((lead) => isFollowupPendente(lead, hoje))
     : listaBase;
-  const atrasadosCount = porContato.filter((lead) =>
+  const atrasadosCount = porNicho.filter((lead) =>
     isFollowupPendente(lead, hoje)
   ).length;
 
@@ -117,7 +106,7 @@ export function LeadsBoard({
         <div>
           <h1 className="text-lg font-semibold text-zinc-100">Leads</h1>
           <p className="text-sm text-zinc-500">
-            {porContato.length} lead(s) no total
+            {porNicho.length} lead(s) no total
           </p>
         </div>
         {!readOnly && (
@@ -173,27 +162,6 @@ export function LeadsBoard({
             onChange={setNicho}
           />
         )}
-
-        <SegmentFilter
-          value={
-            contatoFiltro === "whatsapp"
-              ? "WhatsApp/Ambos"
-              : contatoFiltro === "ligacao"
-                ? "Só ligação"
-                : ""
-          }
-          options={CONTATO_OPTIONS}
-          allLabel="Todos os contatos"
-          onChange={(value) =>
-            setContatoFiltro(
-              value === "WhatsApp/Ambos"
-                ? "whatsapp"
-                : value === "Só ligação"
-                  ? "ligacao"
-                  : ""
-            )
-          }
-        />
 
         {tab === "abordado" && abordados.length > 0 && (
           <SegmentFilter
