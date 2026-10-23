@@ -62,6 +62,16 @@ export const ACCOUNT_TYPES: {
   },
 ];
 
+/**
+ * Account types offered as cards on /signup's "tipo de conta" step. To bring
+ * another one back, add its value here — nothing else changes. Only affects
+ * the manual choice: the invite flow (/convite/<token> -> /signup?papel=...)
+ * accepts any collaborator papel regardless, and the "Sou vendedor" card
+ * (the 'comercial' type, by access code) is rendered by the signup page
+ * itself, not from this list.
+ */
+export const SIGNUP_ACCOUNT_TYPES: AccountType[] = ["empresarial", "pessoal"];
+
 export const ACCOUNT_TYPE_STYLES: Record<
   AccountType,
   {

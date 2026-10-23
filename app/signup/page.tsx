@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Handshake } from "lucide-react";
 import { signup } from "@/lib/actions/auth";
-import { ACCOUNT_TYPES, ACCOUNT_TYPE_STYLES } from "@/lib/account-types";
+import { ACCOUNT_TYPES, ACCOUNT_TYPE_STYLES, SIGNUP_ACCOUNT_TYPES } from "@/lib/account-types";
 import { isCollaboratorAccountType, type AccountType } from "@/lib/hub-mode";
 
 function SignupForm() {
@@ -60,7 +60,7 @@ function SignupForm() {
 
         {step === 1 ? (
           <div className="grid grid-cols-2 gap-3">
-            {ACCOUNT_TYPES.filter((option) => option.value !== "comercial").map((option) => {
+            {ACCOUNT_TYPES.filter((option) => SIGNUP_ACCOUNT_TYPES.includes(option.value)).map((option) => {
               const Icon = option.icon;
               const styles = ACCOUNT_TYPE_STYLES[option.value];
               return (
