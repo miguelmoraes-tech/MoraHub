@@ -658,5 +658,44 @@ await teste("fundador/cofundador: valores e escrita; sócio: leitura nunca escre
   assert.deepEqual(p({ ehDono: false, nivel: "edicao", extras: ["contato", "investimento"] }), { valores: false, somenteLeitura: true });
 });
 
+console.log("\nFase 3.5 — RH: workspace_id em tudo que a folha grava");
+await teste("gerarFolhaDoMes lê por workspace_id e grava workspace_id em contas_pagar e folha_pagamento", async () => {
+  const inserts: { tabela: string; row: Record<string, unknown> }[] = [];
+  const filtros: { tabela: string; coluna: string; valor: unknown }[] = [];
+  const dados: Record<string, unknown[]> = {
+    funcionarios: [{ id: "f1", nome: "Ana", salario: 3000 }, { id: "f2", nome: "Bia", salario: null }],
+    folha_pagamento: [],
+  };
+  const fake = {
+    from(tabela: string) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const q: any = {};
+      q.select = () => q;
+      q.eq = (coluna: string, valor: unknown) => {
+        filtros.push({ tabela, coluna, valor });
+        return q;
+      };
+      q.insert = (row: Record<string, unknown>) => {
+        inserts.push({ tabela, row });
+        return q;
+      };
+      q.delete = () => q;
+      q.single = async () => ({ data: { id: `conta-${inserts.length}` }, error: null });
+      q.then = (resolve: (v: unknown) => unknown) => resolve({ data: dados[tabela] ?? [], error: null });
+      return q;
+    },
+  };
+  const { gerarFolhaDoMes } = await import("@/lib/rh/folha-sync");
+  const r = await gerarFolhaDoMes(fake as never, { workspaceId: WS_A, donoId: "dono-1" }, "2026-10-01", 5);
+  assert.equal(r.criados, 2);
+  const gravacoes = inserts.filter((i) => i.tabela === "contas_pagar" || i.tabela === "folha_pagamento");
+  assert.equal(gravacoes.length, 4);
+  for (const g of gravacoes) assert.equal(g.row.workspace_id, WS_A, g.tabela);
+  for (const f of filtros.filter((x) => x.tabela === "funcionarios" || x.tabela === "folha_pagamento")) {
+    assert.ok(f.coluna !== "user_id", `${f.tabela} filtrou por user_id`);
+  }
+  assert.ok(filtros.some((f) => f.tabela === "funcionarios" && f.coluna === "workspace_id" && f.valor === WS_A));
+});
+
 console.log(`\n${total} testes`);
 if (process.exitCode) console.log("HÁ FALHAS");

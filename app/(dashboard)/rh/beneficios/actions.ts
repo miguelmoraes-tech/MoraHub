@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDonoIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoSoDono } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { BeneficioSchema } from "@/lib/validations/beneficio";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
@@ -30,12 +32,14 @@ export async function createBeneficio(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getDonoIdAtivo();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  // RH é só do fundador/cofundador.
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
   const { error } = await supabase.from("beneficios").insert({
-    user_id: donoId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     funcionario_id: parsed.data.funcionario_id,
     tipo: parsed.data.tipo,
     valor: parsed.data.valor ?? null,
@@ -58,6 +62,9 @@ export async function updateBeneficio(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("beneficios")
@@ -67,7 +74,8 @@ export async function updateBeneficio(
       valor: parsed.data.valor ?? null,
       observacoes: parsed.data.observacoes ?? null,
     })
-    .eq("id", beneficioId);
+    .eq("id", beneficioId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar o benefício." };
 
   revalidatePath("/rh/beneficios");
@@ -76,8 +84,15 @@ export async function updateBeneficio(
 }
 
 export async function deleteBeneficio(beneficioId: string) {
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return;
+
   const supabase = await createClient();
-  await supabase.from("beneficios").delete().eq("id", beneficioId);
+  await supabase
+    .from("beneficios")
+    .delete()
+    .eq("id", beneficioId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidatePath("/rh/beneficios");
   revalidatePath("/rh");
 }

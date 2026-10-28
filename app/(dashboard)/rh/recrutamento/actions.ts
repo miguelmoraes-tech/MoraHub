@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDonoIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoSoDono } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import {
   uploadCandidatoCurriculo,
@@ -11,6 +11,8 @@ import { VagaSchema } from "@/lib/validations/vaga";
 import { CandidatoSchema } from "@/lib/validations/candidato";
 import type { ActionState } from "@/lib/actions/types";
 import type { CandidatoStatus, Vaga } from "@/lib/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
@@ -47,12 +49,14 @@ export async function createVaga(_prevState: ActionState, formData: FormData): P
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getDonoIdAtivo();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  // RH é só do fundador/cofundador.
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
   const { error } = await supabase.from("vagas").insert({
-    user_id: donoId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     titulo: parsed.data.titulo,
     departamento_id: parsed.data.departamento_id ?? null,
     status: parsed.data.status,
@@ -77,6 +81,9 @@ export async function updateVaga(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("vagas")
@@ -89,7 +96,8 @@ export async function updateVaga(
       salario_previsto: parsed.data.salario_previsto ?? null,
       tipo_contrato: parsed.data.tipo_contrato,
     })
-    .eq("id", vagaId);
+    .eq("id", vagaId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar a vaga." };
 
   revalidateRecrutamento(vagaId);
@@ -97,8 +105,15 @@ export async function updateVaga(
 }
 
 export async function deleteVaga(vagaId: string) {
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return;
+
   const supabase = await createClient();
-  await supabase.from("vagas").delete().eq("id", vagaId);
+  await supabase
+    .from("vagas")
+    .delete()
+    .eq("id", vagaId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidateRecrutamento();
 }
 
@@ -123,27 +138,25 @@ export async function createCandidato(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getDonoIdAtivo();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  // RH é só do fundador/cofundador.
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Sessão expirada. Faça login novamente." };
 
   const curriculo = fileOrNull(formData.get("curriculo"));
   let curriculo_path: string | null = null;
   if (curriculo) {
     try {
-      curriculo_path = await uploadCandidatoCurriculo(user.id, curriculo);
+      curriculo_path = await uploadCandidatoCurriculo(acesso.workspaceId, curriculo);
     } catch {
       return { error: "Não foi possível enviar o currículo." };
     }
   }
 
   const { error } = await supabase.from("candidatos").insert({
-    user_id: donoId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     vaga_id: parsed.data.vaga_id,
     nome: parsed.data.nome,
     email: parsed.data.email ?? null,
@@ -173,6 +186,9 @@ export async function updateCandidato(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("candidatos")
@@ -185,7 +201,8 @@ export async function updateCandidato(
       observacoes: parsed.data.observacoes ?? null,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", candidatoId);
+    .eq("id", candidatoId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar o candidato." };
 
   revalidateRecrutamento(vagaId);
@@ -193,24 +210,36 @@ export async function updateCandidato(
 }
 
 export async function moveCandidato(candidatoId: string, vagaId: string, status: CandidatoStatus) {
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return;
+
   const supabase = await createClient();
   await supabase
     .from("candidatos")
     .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", candidatoId);
+    .eq("id", candidatoId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidateRecrutamento(vagaId);
 }
 
 export async function deleteCandidato(candidatoId: string, vagaId: string) {
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return;
+
   const supabase = await createClient();
 
   const { data: existente } = await supabase
     .from("candidatos")
     .select("curriculo_path")
     .eq("id", candidatoId)
+    .eq("workspace_id", acesso.workspaceId)
     .single();
 
-  await supabase.from("candidatos").delete().eq("id", candidatoId);
+  await supabase
+    .from("candidatos")
+    .delete()
+    .eq("id", candidatoId)
+    .eq("workspace_id", acesso.workspaceId);
 
   const curriculoPath = (existente as { curriculo_path: string | null } | null)?.curriculo_path;
   if (curriculoPath) await removeClienteArquivo(curriculoPath);
@@ -222,14 +251,16 @@ export async function contratarCandidato(
   candidatoId: string,
   vagaId: string
 ): Promise<ActionState> {
-  const donoId = await getDonoIdAtivo();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  // RH é só do fundador/cofundador.
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
   const { data: candidato } = await supabase
     .from("candidatos")
     .select("nome, email, telefone")
     .eq("id", candidatoId)
+    .eq("workspace_id", acesso.workspaceId)
     .single();
   if (!candidato) return { error: "Candidato não encontrado." };
 
@@ -237,13 +268,15 @@ export async function contratarCandidato(
     .from("vagas")
     .select("departamento_id, tipo_contrato, salario_previsto")
     .eq("id", vagaId)
+    .eq("workspace_id", acesso.workspaceId)
     .single();
 
   const c = candidato as { nome: string; email: string | null; telefone: string | null };
   const v = vaga as Pick<Vaga, "departamento_id" | "tipo_contrato" | "salario_previsto"> | null;
 
   const { error } = await supabase.from("funcionarios").insert({
-    user_id: donoId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     nome: c.nome,
     email: c.email,
     telefone: c.telefone,

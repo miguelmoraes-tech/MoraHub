@@ -28,6 +28,10 @@ const MODULOS_NOVOS: Record<string, string[]> = {
     "contas_pagar", "contas_receber", "orcamentos", "gastos", "lancamentos_extrato",
     "assinaturas", "comprovantes",
   ],
+  rh: [
+    "departamentos", "funcionarios", "ferias", "beneficios", "folha_pagamento", "vagas",
+    "candidatos", "avaliacoes_desempenho", "controle_ponto",
+  ],
 };
 const ESTRITAS = Object.values(MODULOS_NOVOS).flat();
 
@@ -116,6 +120,14 @@ const ACTIONS_COM_GUARDA = [
   "app/(dashboard)/gastos/actions.ts",
   "app/(dashboard)/assinantes/actions.ts",
   "lib/actions/conciliacao.ts",
+  "app/(dashboard)/rh/avaliacoes/actions.ts",
+  "app/(dashboard)/rh/beneficios/actions.ts",
+  "app/(dashboard)/rh/departamentos/actions.ts",
+  "app/(dashboard)/rh/ferias/actions.ts",
+  "app/(dashboard)/rh/folha/actions.ts",
+  "app/(dashboard)/rh/funcionarios/actions.ts",
+  "app/(dashboard)/rh/ponto/actions.ts",
+  "app/(dashboard)/rh/recrutamento/actions.ts",
 ];
 const semGuarda: string[] = [];
 let actionsVerificadas = 0;
@@ -147,6 +159,7 @@ const PASTAS_CONCLUIDAS: Record<string, string[]> = {
     "app/(dashboard)/dashboard/financeiro", "app/api/export/dre", "lib/financeiro",
     "components/financeiro", "lib/actions/conciliacao.ts",
   ],
+  rh: ["app/(dashboard)/rh", "lib/rh", "components/rh"],
 };
 const proibidos = [/getDonoIdAtivo/, /getWorkspaceIdAtivo/, /get_colaboradores_do_dono_by_id/];
 const legado: string[] = [];
@@ -162,3 +175,18 @@ for (const [modulo, pastas] of Object.entries(PASTAS_CONCLUIDAS)) {
 console.log(`\nCódigo antigo de dono em módulos concluídos: ${legado.length}`);
 for (const s of legado) console.log("  ! " + s);
 if (legado.length) process.exitCode = 1;
+
+// --- RH: só fundador/cofundador ---------------------------------------------
+// Toda página e action de RH passa por getAcessoSoDono("rh"); nenhuma usa o guard
+// genérico (que, se o catálogo mudar, poderia deixar a equipe entrar).
+const rhSemGuard: string[] = [];
+for (const arq of arquivos(join(raiz, "app/(dashboard)/rh"))) {
+  if (!/(page|actions)\.tsx?$/.test(arq)) continue;
+  const rel = relative(raiz, arq);
+  const texto = readFileSync(arq, "utf8");
+  if (!texto.includes('getAcessoSoDono("rh")')) rhSemGuard.push(rel);
+  if (/getAcessoModulo|getAcessoEdicao/.test(texto)) rhSemGuard.push(`${rel} usa guard genérico`);
+}
+console.log(`\nRH sem getAcessoSoDono: ${rhSemGuard.length}`);
+for (const s of rhSemGuard) console.log("  ! " + s);
+if (rhSemGuard.length) process.exitCode = 1;

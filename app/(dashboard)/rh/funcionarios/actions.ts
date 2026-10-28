@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDonoIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoSoDono } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { FuncionarioSchema } from "@/lib/validations/funcionario";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
@@ -39,12 +41,14 @@ export async function createFuncionario(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getDonoIdAtivo();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  // RH é só do fundador/cofundador.
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
   const { error } = await supabase.from("funcionarios").insert({
-    user_id: donoId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     nome: parsed.data.nome,
     cargo: parsed.data.cargo ?? null,
     cpf: parsed.data.cpf ?? null,
@@ -79,6 +83,9 @@ export async function updateFuncionario(
     return { error: "Um funcionário não pode ser seu próprio gestor." };
   }
 
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("funcionarios")
@@ -97,7 +104,8 @@ export async function updateFuncionario(
       departamento_id: parsed.data.departamento_id ?? null,
       gestor_id: parsed.data.gestor_id ?? null,
     })
-    .eq("id", funcionarioId);
+    .eq("id", funcionarioId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar o funcionário." };
 
   revalidatePath("/rh/funcionarios");
@@ -106,8 +114,15 @@ export async function updateFuncionario(
 }
 
 export async function deleteFuncionario(funcionarioId: string) {
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return;
+
   const supabase = await createClient();
-  await supabase.from("funcionarios").delete().eq("id", funcionarioId);
+  await supabase
+    .from("funcionarios")
+    .delete()
+    .eq("id", funcionarioId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidatePath("/rh/funcionarios");
   revalidatePath("/rh");
 }

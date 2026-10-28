@@ -267,9 +267,12 @@ function Row({ item, funcionarios }: { item: FolhaPagamento; funcionarios: Funci
 export function FolhaPagamentoBoard({
   folhas,
   funcionarios,
+  financeiroAtivo = true,
 }: {
   folhas: FolhaPagamento[];
   funcionarios: Funcionario[];
+  /** A folha vira contas a pagar: sem o módulo Financeiro ligado, não se gera. */
+  financeiroAtivo?: boolean;
 }) {
   const grupos = useMemo(() => {
     const map = new Map<string, FolhaPagamento[]>();
@@ -288,8 +291,15 @@ export function FolhaPagamentoBoard({
           <h1 className="text-lg font-semibold text-zinc-100">Folha de Pagamento</h1>
           <p className="text-sm text-zinc-500">{folhas.length} registro(s)</p>
         </div>
-        <GerarFolhaForm />
+        {financeiroAtivo && <GerarFolhaForm />}
       </div>
+
+      {!financeiroAtivo && (
+        <p className="mb-5 rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-300">
+          Ative o módulo Financeiro para gerar folha. A folha vira contas a pagar, e sem o
+          Financeiro nada é gravado.
+        </p>
+      )}
 
       {grupos.length > 0 ? (
         <div className="space-y-5">

@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDonoIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoSoDono } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { ControlePontoSchema } from "@/lib/validations/controle-ponto";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
@@ -36,6 +38,10 @@ export async function salvarPonto(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  // RH é só do fundador/cofundador.
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
+
   const supabase = await createClient();
   const payload = {
     funcionario_id: parsed.data.funcionario_id,
@@ -53,14 +59,13 @@ export async function salvarPonto(
     const { error } = await supabase
       .from("controle_ponto")
       .update(payload)
-      .eq("id", existingId);
+      .eq("id", existingId)
+      .eq("workspace_id", acesso.workspaceId);
     if (error) return { error: "Não foi possível atualizar o registro." };
   } else {
-    const donoId = await getDonoIdAtivo();
-    if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
-
     const { error } = await supabase.from("controle_ponto").insert({
-      user_id: donoId,
+      user_id: acesso.donoId,
+      workspace_id: acesso.workspaceId,
       ...payload,
     });
     if (error) return { error: "Não foi possível salvar o registro." };
@@ -71,7 +76,14 @@ export async function salvarPonto(
 }
 
 export async function deletePonto(pontoId: string) {
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return;
+
   const supabase = await createClient();
-  await supabase.from("controle_ponto").delete().eq("id", pontoId);
+  await supabase
+    .from("controle_ponto")
+    .delete()
+    .eq("id", pontoId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidatePath("/rh/ponto");
 }

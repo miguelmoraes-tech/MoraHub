@@ -116,9 +116,10 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
     supabase
       .from("ferias")
       .select("id, funcionario_id, periodo_aquisitivo_fim")
+      .eq("workspace_id", workspaceId ?? "")
       .eq("status", "pendente")
       .not("periodo_aquisitivo_fim", "is", null),
-    supabase.from("funcionarios").select("id, nome"),
+    supabase.from("funcionarios").select("id, nome").eq("workspace_id", workspaceId ?? ""),
     supabase
       .from("leads")
       .select("id, nome, status, resultado, proximo_followup")

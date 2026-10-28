@@ -89,9 +89,10 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
     supabase
       .from("ferias")
       .select("id, funcionario_id, periodo_aquisitivo_fim")
+      .eq("workspace_id", workspaceId ?? "")
       .eq("status", "pendente")
       .not("periodo_aquisitivo_fim", "is", null),
-    supabase.from("funcionarios").select("id, nome"),
+    supabase.from("funcionarios").select("id, nome").eq("workspace_id", workspaceId ?? ""),
   ])) as [
     { data: VencimentoRow[] | null },
     { data: ClienteAssinaturaRow[] | null },

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getDonoIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoSoDono } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { getClienteArquivoSignedUrls } from "@/lib/supabase/storage";
 import { CandidatosKanban } from "@/components/rh/candidatos-kanban";
@@ -11,14 +11,15 @@ export default async function VagaCandidatosPage({
   params: Promise<{ vagaId: string }>;
 }) {
   const { vagaId } = await params;
-  const donoId = await getDonoIdAtivo();
-  if (!donoId) notFound();
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) notFound();
 
   const supabase = await createClient();
   const { data: vaga } = (await supabase
     .from("vagas")
     .select("*")
     .eq("id", vagaId)
+    .eq("workspace_id", acesso.workspaceId)
     .single()) as { data: Vaga | null };
   if (!vaga) notFound();
 
@@ -26,6 +27,7 @@ export default async function VagaCandidatosPage({
     .from("candidatos")
     .select("*")
     .eq("vaga_id", vagaId)
+    .eq("workspace_id", acesso.workspaceId)
     .order("created_at", { ascending: true })) as { data: Candidato[] | null };
 
   const curriculoUrls = await getClienteArquivoSignedUrls(
