@@ -23,6 +23,12 @@ import {
   normalizarPermissoes,
 } from "@/lib/modulos/permissoes";
 import { VENDEDOR_HOME } from "@/lib/vendedor-access";
+import { MODULOS, menuDoDono, primeiraRotaHabilitada, rotaPermitida } from "@/lib/modulos/registry";
+import { filtrarPermissoesOferecidas, modulosOferecidos } from "@/lib/socios-shared";
+import { getModulosPermiteMembrosDoCatalogo } from "@/lib/modulos/catalogo";
+import { readFileSync } from "node:fs";
+import { resolverAcessoModulo } from "@/lib/modulos/guard";
+import { computeCampanhaDerived } from "@/lib/marketing/campanha-metrics-shared";
 
 let total = 0;
 function teste(nome: string, fn: () => void | Promise<void>) {
@@ -48,14 +54,18 @@ const ok = (papel: Papel, corrigirCookie = false): ResolucaoEmpresa => ({
   corrigirCookie,
 });
 
+// modulos.permite_membros = true hoje (rh e vendedores = false).
+const CATALOGO = ["leads", "renegados", "clientes", "agenda", "marketing", "financeiro", "juridico"];
+
 function decide(
   path: string,
   resolucao: ResolucaoEmpresa,
   habilitados: string[] = ["leads", "clientes", "vendedores", "agenda"],
   funcionarioSemVinculo = false,
-  permissoes: string[] = []
+  permissoes: string[] = [],
+  permiteMembros: string[] = CATALOGO
 ) {
-  const e: EntradaAcesso = { path, resolucao, habilitados, permissoes, funcionarioSemVinculo };
+  const e: EntradaAcesso = { path, resolucao, habilitados, permissoes, permiteMembros, funcionarioSemVinculo };
   return decidirAcesso(e);
 }
 const vaiPara = (d: ReturnType<typeof decidirAcesso>) =>
@@ -92,6 +102,8 @@ const PATHS = [
   "/vendedor", "/vendedor/leads", "/vendedor/agenda", "/acesso-vendedor", "/acesso-vendedor/aguardando",
   "/nova-empresa", "/login", "/signup", "/convite/abc", "/api/export/leads", "/colaborador", "/metas",
   "/sem-acesso", "/socios", "/clientes/abc", "/api/export/clientes",
+  "/marketing", "/marketing/calendario", "/marketing/campanhas", "/contas-receber", "/dre", "/api/export/dre",
+  "/dashboard/financeiro", "/rh/folha", "/rh/ponto", "/juridico", "/documentos",
 ];
 
 console.log("\nCaso 1 — funcionário que NUNCA criou empresa (só vínculo comercial)");
@@ -232,8 +244,8 @@ await teste("para qualquer resolução x rota, o destino devolve 'seguir' (ponto
     ok("dono", true), ok("comercial", true), ok("socio", true),
     { status: "sem_empresa" }, { status: "erro" }, { status: "legado", workspaceId: WS_A, papel: "rh" },
   ];
-  const modulos = [[], ["leads"], ["leads", "clientes", "vendedores", "agenda"], ["rh"]];
-  const permissoesPossiveis = [[], ["leads"], ["clientes"], ["leads", "renegados", "clientes", "agenda"], ["financeiro"]];
+  const modulos = [[], ["leads"], ["leads", "clientes", "vendedores", "agenda"], ["rh"], ["leads", "marketing", "financeiro", "rh", "juridico", "clientes"]];
+  const permissoesPossiveis = [[], ["leads"], ["clientes"], ["leads", "renegados", "clientes", "agenda"], ["financeiro"], ["marketing", "juridico", "rh"]];
   let casos = 0;
   for (const res of resolucoes)
     for (const hab of modulos)
@@ -325,10 +337,14 @@ await teste("permissão em módulo que a empresa DESLIGOU não vale", () => {
   assert.equal(vaiPara(decide("/leads", ok("socio"), ["clientes"], false, ["leads"])), AGUARDANDO_LIBERACAO);
   assert.equal(vaiPara(decide("/leads", ok("socio"), ["clientes"], false, ["leads", "clientes"])), "/clientes");
 });
-await teste("permissão em módulo fora da lista (financeiro, rh...) nunca libera rota", () => {
-  assert.deepEqual(modulosVisiveis(["financeiro", "rh", "leads"], ["financeiro", "rh"]), []);
-  assert.equal(vaiPara(decide("/contas-pagar", ok("socio"), ["financeiro"], false, ["financeiro"])), AGUARDANDO_LIBERACAO);
+await teste("módulo com permite_membros=false (rh, vendedores) nunca libera rota, mesmo com permissão gravada", () => {
+  assert.deepEqual(modulosVisiveis(["financeiro", "rh", "leads"], ["rh", "vendedores"], CATALOGO), []);
   assert.equal(vaiPara(decide("/rh", ok("funcionario"), ["rh"], false, ["rh"])), AGUARDANDO_LIBERACAO);
+  assert.equal(vaiPara(decide("/vendedores", ok("socio"), ["vendedores"], false, ["vendedores"])), AGUARDANDO_LIBERACAO);
+});
+await teste("sem o catálogo (falha de leitura) o sócio não abre módulo nenhum", () => {
+  assert.deepEqual(modulosVisiveis(["leads"], ["leads"]), []);
+  assert.equal(vaiPara(decide("/leads", ok("socio"), ["leads"], false, ["leads"], [])), AGUARDANDO_LIBERACAO);
 });
 
 console.log("\nFase 3 — sem permissão ou leitura falha: nega");
@@ -365,6 +381,7 @@ await teste("lerPermissoesProprias: normaliza linhas e descarta nível/módulo i
   assert.deepEqual(await lerPermissoesProprias(client as never, WS_A, "eu"), [
     { modulo: "leads", nivel: "edicao", extras: ["contato"] },
     { modulo: "agenda", nivel: "leitura", extras: [] },
+    { modulo: "financeiro", nivel: "edicao", extras: [] }, // módulo conhecido; quem barra é o catálogo
   ]);
   assert.deepEqual(normalizarPermissoes("lixo"), []);
   assert.deepEqual(normalizarPermissoes([null, 3, { modulo: 7 }]), []);
@@ -434,6 +451,182 @@ await teste("permissoes_extras: {nome, chave} usa nome como rótulo e chave como
   assert.deepEqual(extrasDoCatalogo(["contato"]), [{ chave: "contato", rotulo: "Contato" }]);
   assert.deepEqual(extrasDoCatalogo([{ nome: "sem chave" }, 5, null]), []);
   assert.deepEqual(extrasDoCatalogo(null), []);
+});
+
+// ===========================================================================
+// Fase 3.5 — Marketing, Financeiro, RH e Jurídico por empresa
+// ===========================================================================
+
+console.log("\nFase 3.5 — as empresas atuais não mudam (snapshot gerado no commit 615495d)");
+const ATUAIS = ["leads", "renegados", "clientes", "agenda", "vendedores"];
+const dourado = JSON.parse(
+  readFileSync(new URL("./snapshot-empresas-atuais.json", import.meta.url), "utf8")
+);
+await teste("menu do dono com os 5 módulos de hoje é idêntico ao do snapshot", () => {
+  assert.deepEqual(JSON.parse(JSON.stringify(menuDoDono(ATUAIS))), dourado.menu);
+  assert.equal(primeiraRotaHabilitada(ATUAIS), dourado.primeiraRota);
+});
+await teste("rotaPermitida é idêntica ao snapshot em todos os caminhos", () => {
+  for (const [p, esperado] of Object.entries(dourado.rotaPermitida)) {
+    assert.equal(rotaPermitida(p, ATUAIS), esperado, p);
+  }
+});
+await teste("decisão do proxy idêntica ao snapshot para todo papel x permissões x caminho", () => {
+  let n = 0;
+  for (const [chave, esperado] of Object.entries(dourado.decisoes)) {
+    const [papel, perm, path] = chave.split("|");
+    const d = decidirAcesso({
+      path,
+      resolucao: { status: "ok", workspaceId: WS_A, papel: papel as Papel, corrigirCookie: false },
+      habilitados: ATUAIS,
+      permissoes: perm ? perm.split(",") : [],
+      permiteMembros: CATALOGO,
+      funcionarioSemVinculo: false,
+    });
+    assert.equal(d.tipo === "seguir" ? "seguir" : d.para, esperado, chave);
+    n++;
+  }
+  assert.ok(n > 1000, `poucos casos (${n})`);
+});
+
+console.log("\nFase 3.5 — módulos novos: ligados ∩ permissão ∩ permite_membros");
+const NOVOS = ["marketing", "financeiro", "juridico", "rh"];
+const TODOS = [...ATUAIS, ...NOVOS];
+await teste("fundador e cofundador abrem as rotas dos módulos novos quando ligados", () => {
+  for (const papel of ["dono", "cofundador"] as const)
+    for (const p of [
+      "/marketing", "/marketing/calendario", "/marketing/campanhas", "/contas-pagar", "/dre",
+      "/api/export/dre", "/dashboard/financeiro", "/rh", "/rh/folha", "/juridico", "/documentos",
+    ]) {
+      assert.equal(vaiPara(decide(p, ok(papel), TODOS)), "seguir", `${papel} ${p}`);
+    }
+});
+await teste("módulo novo DESLIGADO é negado ao dono (volta à 1ª rota ligada) e ao sócio", () => {
+  for (const p of ["/marketing", "/contas-pagar", "/rh", "/juridico", "/documentos", "/api/export/dre"]) {
+    assert.equal(vaiPara(decide(p, ok("dono"), ATUAIS)), "/leads", p);
+    assert.equal(vaiPara(decide(p, ok("socio"), ATUAIS, false, TODOS)), "/leads", `socio ${p}`);
+  }
+});
+await teste("sócio com permissão em marketing/financeiro/juridico abre; sem permissão é negado", () => {
+  for (const [modulo, rota] of [
+    ["marketing", "/marketing/campanhas"],
+    ["financeiro", "/contas-receber"],
+    ["juridico", "/documentos"],
+  ]) {
+    for (const papel of ["socio", "funcionario"] as const) {
+      assert.equal(vaiPara(decide(rota, ok(papel), TODOS, false, [modulo])), "seguir", `${papel} ${rota}`);
+      assert.equal(vaiPara(decide(rota, ok(papel), TODOS, false, ["leads"])), "/leads", `${papel} sem permissão ${rota}`);
+      assert.equal(vaiPara(decide(rota, ok(papel), TODOS, false, [])), AGUARDANDO_LIBERACAO, `${papel} nenhuma ${rota}`);
+    }
+  }
+});
+await teste("RH é negado a sócio e funcionário (permite_membros=false), mesmo ligado e com permissão", () => {
+  for (const papel of ["socio", "funcionario"] as const)
+    for (const p of ["/rh", "/rh/folha", "/rh/funcionarios", "/rh/ponto"]) {
+      assert.equal(vaiPara(decide(p, ok(papel), TODOS, false, ["rh", "leads"])), "/leads", `${papel} ${p}`);
+    }
+});
+await teste("a matriz (modulosOferecidos) só traz módulos ligados E com permite_membros=true", () => {
+  assert.deepEqual(
+    modulosOferecidos(TODOS, CATALOGO),
+    ["leads", "renegados", "clientes", "agenda", "marketing", "financeiro", "juridico"]
+  );
+  assert.ok(!modulosOferecidos(TODOS, CATALOGO).includes("rh"));
+  assert.ok(!modulosOferecidos(TODOS, CATALOGO).includes("vendedores"));
+  assert.deepEqual(modulosOferecidos(ATUAIS, CATALOGO), ["leads", "renegados", "clientes", "agenda"]);
+  assert.deepEqual(modulosOferecidos(TODOS, []), []);
+  assert.deepEqual(modulosOferecidos(["marketing"], CATALOGO), ["marketing"]);
+});
+await teste("filtrarPermissoesOferecidas remove da matriz o que não foi oferecido", () => {
+  const p = [
+    { modulo: "rh", nivel: "edicao" as const, extras: [] },
+    { modulo: "leads", nivel: "leitura" as const, extras: [] },
+  ];
+  assert.deepEqual(filtrarPermissoesOferecidas(p, ["leads"]).map((x) => x.modulo), ["leads"]);
+});
+await teste("catálogo: lê só permite_membros=true do registro; falha ou exceção = lista vazia", async () => {
+  const mk = (r: unknown) => ({ from: () => ({ select: () => ({ eq: async () => r }) }) });
+  assert.deepEqual(
+    await getModulosPermiteMembrosDoCatalogo(
+      mk({ data: [{ chave: "leads" }, { chave: "marketing" }, { chave: "inventado" }], error: null }) as never
+    ),
+    ["leads", "marketing"]
+  );
+  assert.deepEqual(
+    await getModulosPermiteMembrosDoCatalogo(mk({ data: null, error: { message: "x" } }) as never),
+    []
+  );
+  const comExcecao = {
+    from: () => {
+      throw new Error("rede");
+    },
+  };
+  assert.deepEqual(await getModulosPermiteMembrosDoCatalogo(comExcecao as never), []);
+});
+await teste("rotas dos módulos do registro não colidem entre módulos", () => {
+  const vistas = new Map<string, string>();
+  for (const m of MODULOS)
+    for (const r of m.rotas) {
+      assert.ok(!vistas.has(r), `${r} em ${m.chave} e ${vistas.get(r)}`);
+      vistas.set(r, m.chave);
+    }
+});
+
+console.log("\nFase 3.5 — guard de módulo (resolverAcessoModulo)");
+const perm = (modulo: string, nivel: "leitura" | "edicao", extras: string[] = []) => ({ modulo, nivel, extras });
+const guard = (
+  modulo: string,
+  papel: string | null,
+  nivelMinimo: "leitura" | "edicao",
+  p: { habilitados?: string[]; permiteMembros?: string[]; permissoes?: ReturnType<typeof perm>[] } = {}
+) =>
+  resolverAcessoModulo({
+    modulo,
+    papel,
+    nivelMinimo,
+    habilitados: p.habilitados ?? TODOS,
+    permiteMembros: p.permiteMembros ?? CATALOGO,
+    permissoes: p.permissoes ?? [],
+  });
+await teste("fundador e cofundador: acesso total a todo módulo ligado (inclusive RH)", () => {
+  for (const papel of ["dono", "cofundador"])
+    for (const m of ["marketing", "financeiro", "juridico", "rh", "leads"]) {
+      for (const nivel of ["leitura", "edicao"] as const) {
+        const r = guard(m, papel, nivel);
+        assert.ok(r?.ehDono && r.nivel === "edicao", `${papel} ${m} ${nivel}`);
+      }
+    }
+});
+await teste("módulo desligado é negado a todos, inclusive ao dono", () => {
+  for (const papel of ["dono", "cofundador", "socio", "funcionario"])
+    assert.equal(guard("marketing", papel, "leitura", { habilitados: ATUAIS, permissoes: [perm("marketing", "edicao")] }), null, papel);
+});
+await teste("sócio com leitura lê mas NÃO escreve; com edição faz os dois", () => {
+  for (const papel of ["socio", "funcionario"]) {
+    const leitura = [perm("financeiro", "leitura", ["valores"])];
+    assert.deepEqual(guard("financeiro", papel, "leitura", { permissoes: leitura }), { ehDono: false, nivel: "leitura", extras: ["valores"] });
+    assert.equal(guard("financeiro", papel, "edicao", { permissoes: leitura }), null, `${papel} escrita com leitura`);
+    const edicao = [perm("financeiro", "edicao")];
+    assert.equal(guard("financeiro", papel, "edicao", { permissoes: edicao })?.nivel, "edicao");
+  }
+});
+await teste("sócio sem permissão no módulo (ou com permissão só em outro) é negado", () => {
+  for (const papel of ["socio", "funcionario"]) {
+    assert.equal(guard("marketing", papel, "leitura", { permissoes: [] }), null);
+    assert.equal(guard("marketing", papel, "leitura", { permissoes: [perm("leads", "edicao")] }), null);
+  }
+});
+await teste("RH negado a sócio/funcionário (permite_membros=false) mesmo com permissão gravada", () => {
+  for (const papel of ["socio", "funcionario"]) {
+    assert.equal(guard("rh", papel, "leitura", { permissoes: [perm("rh", "edicao")] }), null, papel);
+    assert.equal(guard("rh", papel, "edicao", { permissoes: [perm("rh", "edicao")] }), null, papel);
+  }
+  assert.equal(guard("marketing", "socio", "leitura", { permiteMembros: [], permissoes: [perm("marketing", "edicao")] }), null);
+});
+await teste("vendedor (comercial), papel legado, nulo e módulo desconhecido: negado", () => {
+  for (const papel of ["comercial", "financeiro", "rh", "", null, "admin"])
+    assert.equal(guard("leads", papel, "leitura", { permissoes: [perm("leads", "edicao")] }), null, String(papel));
+  assert.equal(guard("inventado", "dono", "leitura", { habilitados: ["inventado"] }), null);
 });
 
 console.log(`\n${total} testes`);

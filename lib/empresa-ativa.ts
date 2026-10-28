@@ -5,16 +5,14 @@ import {
   EMPRESA_ATIVA_COOKIE,
   EMPRESA_ATIVA_COOKIE_MAX_AGE,
   escolherEmpresa,
-  ehPapelRestrito,
   listarEmpresas,
   temPainelCompleto,
   type EmpresaVinculo,
 } from "@/lib/empresas";
-import {
-  lerPermissoesProprias,
-  type ModuloComPermissao,
-  type NivelPermissao,
-} from "@/lib/modulos/permissoes";
+import { lerPermissoesProprias, type NivelPermissao } from "@/lib/modulos/permissoes";
+import { getModulosHabilitados, getModulosPermiteMembros } from "@/lib/modulos/habilitados";
+import { getModuloRegistro } from "@/lib/modulos/registry";
+import { resolverAcessoModulo } from "@/lib/modulos/guard";
 
 /**
  * A empresa ativa da requisição e tudo o que depende dela. É o ÚNICO ponto
@@ -108,73 +106,90 @@ export async function limparEmpresaAtiva() {
   cookieStore.delete(EMPRESA_ATIVA_COOKIE);
 }
 
-// --- Sócios e funcionários: acesso por módulo ---
+// --- Acesso por módulo (guard genérico) ---
 
 export interface AcessoModulo {
   workspaceId: string;
   /** dono_id da empresa: é o user_id das linhas criadas. */
   donoId: string;
   userId: string;
-  /** Painel completo (fundador/cofundador): vê e edita tudo do módulo. */
-  completo: boolean;
+  /** Fundador/cofundador: vê e edita tudo do módulo (e nada de equipe passa por aqui). */
+  ehDono: boolean;
   nivel: NivelPermissao;
-  /** Extras de tela liberados (ex.: "contato"). Só interface, não é barreira. */
+  /** Extras de tela liberados (ex.: "contato", "valores"). Só interface, não é barreira. */
   extras: string[];
 }
 
-/** O extra vale para o painel completo e para quem o recebeu na permissão. */
+/** O extra vale para fundador/cofundador e para quem o recebeu na permissão. */
 export function temExtra(acesso: AcessoModulo, extra: string): boolean {
-  return acesso.completo || acesso.extras.includes(extra);
+  return acesso.ehDono || acesso.extras.includes(extra);
 }
 
+/** Permissões do próprio usuário, lidas uma vez por requisição. */
+const getPermissoesProprias = cache(async (workspaceId: string, userId: string) =>
+  lerPermissoesProprias(await createClient(), workspaceId, userId)
+);
+
 /**
- * O que a empresa ativa deixa o usuário ver de um módulo: o painel completo
- * vê tudo; sócio/funcionário, só o que `permissoes_membro` (leitura própria)
- * lista. Qualquer outra coisa, ou falha de leitura, devolve null (nega).
+ * O que a empresa ativa deixa o usuário fazer num módulo. Fundador e
+ * cofundador têm acesso total; sócio/funcionário, só com o módulo ligado na
+ * empresa, `modulos.permite_membros = true` e uma linha em `permissoes_membro`
+ * (leitura própria) do nível pedido. Para `edicao`, o banco confirma de novo
+ * (tem_permissao). Em todos os casos o módulo precisa estar HABILITADO na
+ * empresa. Qualquer outra coisa, ou falha de leitura, devolve null (nega).
+ * O RLS segue sendo a barreira real; isto evita tentar e dá mensagem clara.
  */
-export async function getAcessoModulo(modulo: ModuloComPermissao): Promise<AcessoModulo | null> {
+export async function getAcessoModulo(
+  modulo: string,
+  nivelMinimo: NivelPermissao = "leitura"
+): Promise<AcessoModulo | null> {
+  if (!getModuloRegistro(modulo)) return null;
   const ativa = await getEmpresaAtiva();
   if (!ativa) return null;
   const base = { workspaceId: ativa.workspaceId, donoId: ativa.donoId, userId: ativa.userId };
-
-  if (temPainelCompleto(ativa.papel)) {
-    return { ...base, completo: true, nivel: "edicao", extras: [] };
-  }
-  if (!ehPapelRestrito(ativa.papel)) return null;
-
-  const supabase = await createClient();
-  const permissoes = await lerPermissoesProprias(supabase, ativa.workspaceId, ativa.userId);
-  const p = permissoes.find((x) => x.modulo === modulo);
-  return p ? { ...base, completo: false, nivel: p.nivel, extras: p.extras } : null;
-}
-
-/**
- * Guarda das actions de escrita: fundador/cofundador, OU quem tem
- * tem_permissao(empresa, módulo, 'edicao') no banco. O RLS continua sendo a
- * barreira real; isto evita tentar (e dá mensagem clara). Falha = null.
- */
-export async function getAcessoEdicao(modulo: ModuloComPermissao): Promise<AcessoModulo | null> {
-  const ativa = await getEmpresaAtiva();
-  if (!ativa) return null;
-  const base = { workspaceId: ativa.workspaceId, donoId: ativa.donoId, userId: ativa.userId };
-
-  if (temPainelCompleto(ativa.papel)) {
-    return { ...base, completo: true, nivel: "edicao", extras: [] };
-  }
-  if (!ehPapelRestrito(ativa.papel)) return null;
+  const painel = temPainelCompleto(ativa.papel);
 
   try {
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc("tem_permissao", {
-      p_ws: ativa.workspaceId,
-      p_modulo: modulo,
-      p_nivel: "edicao",
+    const [habilitados, permiteMembros, permissoes] = await Promise.all([
+      getModulosHabilitados(ativa.workspaceId),
+      painel ? Promise.resolve([] as string[]) : getModulosPermiteMembros(),
+      painel ? Promise.resolve([]) : getPermissoesProprias(ativa.workspaceId, ativa.userId),
+    ]);
+    const r = resolverAcessoModulo({
+      modulo,
+      papel: ativa.papel,
+      nivelMinimo,
+      habilitados,
+      permiteMembros,
+      permissoes,
     });
-    if (error || data !== true) return null;
-    const permissoes = await lerPermissoesProprias(supabase, ativa.workspaceId, ativa.userId);
-    const extras = permissoes.find((x) => x.modulo === modulo)?.extras ?? [];
-    return { ...base, completo: false, nivel: "edicao", extras };
+    if (!r) return null;
+
+    // Edição de sócio/funcionário: o banco confirma de novo (tem_permissao).
+    if (!r.ehDono && nivelMinimo === "edicao") {
+      const { data, error } = await (await createClient()).rpc("tem_permissao", {
+        p_ws: ativa.workspaceId,
+        p_modulo: modulo,
+        p_nivel: "edicao",
+      });
+      if (error || data !== true) return null;
+    }
+    return { ...base, ...r };
   } catch {
     return null;
   }
+}
+
+/** Guarda das actions de escrita: o mesmo guard, exigindo edição. */
+export async function getAcessoEdicao(modulo: string): Promise<AcessoModulo | null> {
+  return getAcessoModulo(modulo, "edicao");
+}
+
+/**
+ * Módulos só do fundador/cofundador (RH): além do guard, exige ser dono. Mesmo
+ * que o catálogo mude, a equipe nunca passa por aqui.
+ */
+export async function getAcessoSoDono(modulo: string): Promise<AcessoModulo | null> {
+  const acesso = await getAcessoModulo(modulo, "edicao");
+  return acesso?.ehDono ? acesso : null;
 }

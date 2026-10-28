@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getModuloRegistro } from "@/lib/modulos/registry";
 
 /**
  * Permissões por módulo de sócios e funcionários (tabela `permissoes_membro`,
@@ -9,10 +10,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * rotas mostram. Qualquer falha de leitura devolve lista vazia, que NEGA.
  */
 
-/** Módulos que têm RLS de membro por ora: os únicos que podem receber permissão. */
-export const MODULOS_COM_PERMISSAO = ["leads", "renegados", "clientes", "agenda"] as const;
-export type ModuloComPermissao = (typeof MODULOS_COM_PERMISSAO)[number];
-
 export type NivelPermissao = "leitura" | "edicao";
 
 export interface PermissaoModulo {
@@ -22,10 +19,6 @@ export interface PermissaoModulo {
   extras: string[];
 }
 
-export function ehModuloComPermissao(chave: string): chave is ModuloComPermissao {
-  return (MODULOS_COM_PERMISSAO as readonly string[]).includes(chave);
-}
-
 /** Nível válido ou null: valor desconhecido nunca vira permissão. */
 export function nivelValido(valor: unknown): NivelPermissao | null {
   return valor === "leitura" || valor === "edicao" ? valor : null;
@@ -33,8 +26,10 @@ export function nivelValido(valor: unknown): NivelPermissao | null {
 
 /**
  * Normaliza o jsonb de permissões ([{modulo, nivel, extras}]) vindo do banco
- * ou de um formulário. Descarta tudo o que não é módulo com permissão ou
- * nível válido, e módulos repetidos (vale o primeiro).
+ * ou de um formulário. Descarta tudo o que não é módulo conhecido pelo
+ * registro ou nível válido, e módulos repetidos (vale o primeiro). Quais
+ * módulos aceitam permissão de equipe é decisão do catálogo
+ * (`modulos.permite_membros`), aplicada em `modulosVisiveis` e na matriz.
  */
 export function normalizarPermissoes(bruto: unknown): PermissaoModulo[] {
   if (!Array.isArray(bruto)) return [];
@@ -44,7 +39,7 @@ export function normalizarPermissoes(bruto: unknown): PermissaoModulo[] {
     if (!item || typeof item !== "object") continue;
     const { modulo, nivel, extras } = item as Record<string, unknown>;
     const n = nivelValido(nivel);
-    if (typeof modulo !== "string" || !ehModuloComPermissao(modulo) || !n) continue;
+    if (typeof modulo !== "string" || !getModuloRegistro(modulo) || !n) continue;
     if (vistos.has(modulo)) continue;
     vistos.add(modulo);
     saida.push({
@@ -61,12 +56,17 @@ export function modulosDasPermissoes(permissoes: readonly PermissaoModulo[]): st
   return permissoes.map((p) => p.modulo);
 }
 
-/** Interseção na ordem do array de habilitados: módulos que a pessoa pode abrir. */
+/**
+ * Interseção na ordem do array de habilitados: módulos que a pessoa pode abrir
+ * = habilitados na empresa ∩ com permissão ∩ que aceitam equipe no catálogo
+ * (`permiteMembros`, vindo de `modulos.permite_membros`). Sem o catálogo, nega.
+ */
 export function modulosVisiveis(
   habilitados: readonly string[],
-  permitidos: readonly string[]
+  permitidos: readonly string[],
+  permiteMembros: readonly string[] = []
 ): string[] {
-  return habilitados.filter((m) => permitidos.includes(m) && ehModuloComPermissao(m));
+  return habilitados.filter((m) => permitidos.includes(m) && permiteMembros.includes(m));
 }
 
 /**

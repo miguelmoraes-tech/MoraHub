@@ -8,7 +8,7 @@ import { getVencimentoAlertas } from "@/lib/vencimentos/get-alerts";
 import { getUnreadTotal } from "@/lib/chat";
 import type { AccountType } from "@/lib/hub-mode";
 import { CHAT_HABILITADO, VENCIMENTOS_HABILITADO } from "@/lib/modulos/registry";
-import { getModulosHabilitados } from "@/lib/modulos/habilitados";
+import { getModulosHabilitados, getModulosPermiteMembros } from "@/lib/modulos/habilitados";
 import { ehPapelRestrito, temPainelCompleto } from "@/lib/empresas";
 import {
   lerPermissoesProprias,
@@ -47,11 +47,16 @@ export default async function DashboardLayout({
   if (painel) {
     modulosHabilitados = await getModulosHabilitados(painel.workspaceId);
   } else if (restrito && ativa) {
-    const [habilitados, permissoes] = await Promise.all([
+    const [habilitados, permissoes, permiteMembros] = await Promise.all([
       getModulosHabilitados(ativa.workspaceId),
       lerPermissoesProprias(supabase, ativa.workspaceId, user.id),
+      getModulosPermiteMembros(),
     ]);
-    modulosHabilitados = modulosVisiveis(habilitados, modulosDasPermissoes(permissoes));
+    modulosHabilitados = modulosVisiveis(
+      habilitados,
+      modulosDasPermissoes(permissoes),
+      permiteMembros
+    );
   }
 
   // Vencimentos e Chat não são módulos do catálogo (lib/modulos/registry.ts):

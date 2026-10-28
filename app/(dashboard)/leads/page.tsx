@@ -10,6 +10,9 @@ export default async function LeadsPage() {
   const acesso = await getAcessoModulo("leads");
   const workspaceId = acesso?.workspaceId ?? null;
   const ocultarContato = !acesso || !temExtra(acesso, "contato");
+  // O seletor de campanha dos leads só existe para quem tem o módulo Marketing
+  // (ligado na empresa e liberado para a pessoa); sem ele, a lista vem vazia.
+  const acessoMarketing = await getAcessoModulo("marketing");
   const noventaDiasAtras = subtractDaysISO(todayISO(), 90);
 
   const [{ data: leads }, { data: propostas }, { data: followups }, { data: campanhas }] =
@@ -29,15 +32,15 @@ export default async function LeadsPage() {
         .select("*")
         .eq("workspace_id", workspaceId ?? "")
         .order("data_contato", { ascending: false }),
-      // Campanhas ativas/recentes — só resolve para dono ou colaborador de
-      // marketing vinculado (RLS "dono ou marketing vinculado"); um
-      // colaborador comercial vê a lista vazia, o que é esperado.
-      supabase
-        .from("campanhas")
-        .select("id, nome, status, canal")
-        .eq("workspace_id", workspaceId ?? "")
-        .or(`status.eq.ativa,created_at.gte.${noventaDiasAtras}`)
-        .order("created_at", { ascending: false }),
+      // Campanhas ativas/recentes: só com acesso ao módulo Marketing.
+      acessoMarketing
+        ? supabase
+            .from("campanhas")
+            .select("id, nome, status, canal")
+            .eq("workspace_id", acessoMarketing.workspaceId)
+            .or(`status.eq.ativa,created_at.gte.${noventaDiasAtras}`)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [] }),
     ])) as [
       { data: Lead[] | null },
       { data: Proposta[] | null },
@@ -53,7 +56,7 @@ export default async function LeadsPage() {
       followups={followups ?? []}
       campanhas={campanhas ?? []}
       somenteLeitura={acesso?.nivel !== "edicao"}
-      semExportar={!acesso?.completo}
+      semExportar={!acesso?.ehDono}
       ocultarContato={ocultarContato}
     />
   );

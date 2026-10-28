@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDonoIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoEdicao } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { CalendarioConteudoSchema } from "@/lib/validations/calendario-conteudo";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
@@ -35,12 +37,13 @@ export async function createConteudo(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getDonoIdAtivo();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  const acesso = await getAcessoEdicao("marketing");
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
   const { error } = await supabase.from("calendario_conteudo").insert({
-    user_id: donoId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     titulo: parsed.data.titulo,
     tipo: parsed.data.tipo,
     canal: parsed.data.canal,
@@ -68,6 +71,9 @@ export async function updateConteudo(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  const acesso = await getAcessoEdicao("marketing");
+  if (!acesso) return { error: SEM_PERMISSAO };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("calendario_conteudo")
@@ -82,7 +88,8 @@ export async function updateConteudo(
       responsavel_id: parsed.data.responsavel_id ?? null,
       observacoes: parsed.data.observacoes ?? null,
     })
-    .eq("id", conteudoId);
+    .eq("id", conteudoId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar o conteúdo." };
 
   revalidatePath("/marketing/calendario");
@@ -91,8 +98,15 @@ export async function updateConteudo(
 }
 
 export async function deleteConteudo(conteudoId: string) {
+  const acesso = await getAcessoEdicao("marketing");
+  if (!acesso) return;
+
   const supabase = await createClient();
-  await supabase.from("calendario_conteudo").delete().eq("id", conteudoId);
+  await supabase
+    .from("calendario_conteudo")
+    .delete()
+    .eq("id", conteudoId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidatePath("/marketing/calendario");
   revalidatePath("/marketing");
 }

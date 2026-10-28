@@ -1,6 +1,6 @@
 import {
-  MODULOS_COM_PERMISSAO,
   normalizarPermissoes,
+  modulosVisiveis,
   type NivelPermissao,
   type PermissaoModulo,
 } from "@/lib/modulos/permissoes";
@@ -38,6 +38,9 @@ export const MODULO_ROTULO: Record<string, string> = {
   renegados: "Renegados",
   clientes: "Clientes",
   agenda: "Agenda",
+  marketing: "Marketing",
+  financeiro: "Financeiro",
+  juridico: "Jurídico",
 };
 
 export const NIVEL_ROTULO: Record<NivelPermissao, string> = {
@@ -167,9 +170,23 @@ export function sanearPermissoes(bruto: unknown): PermissaoModulo[] {
   }));
 }
 
-/** Módulos que um formulário pode oferecer: o recorte da lista branca ∩ habilitados da empresa. */
-export function modulosOferecidos(habilitados: readonly string[]): string[] {
-  return MODULOS_COM_PERMISSAO.filter((m) => habilitados.includes(m));
+/**
+ * Módulos que um formulário pode oferecer: habilitados na empresa E com
+ * `permite_membros = true` no catálogo (RH e Vendedores nunca aparecem).
+ */
+export function modulosOferecidos(
+  habilitados: readonly string[],
+  permiteMembros: readonly string[]
+): string[] {
+  return modulosVisiveis(habilitados, habilitados, permiteMembros);
+}
+
+/** Descarta da matriz o que não é oferecido (módulo desligado ou sem permite_membros). */
+export function filtrarPermissoesOferecidas(
+  permissoes: readonly PermissaoModulo[],
+  oferecidos: readonly string[]
+): PermissaoModulo[] {
+  return permissoes.filter((p) => oferecidos.includes(p.modulo));
 }
 
 const SOCIOS_MENSAGENS: [trecho: string, texto: string][] = [

@@ -1,5 +1,5 @@
 import type { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoModulo, temExtra } from "@/lib/empresa-ativa";
 import type { CampanhaMetrics } from "@/lib/marketing/campanha-metrics-shared";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -7,6 +7,27 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 type LeadRow = { id: string; campanha_id: string | null; status: string };
 type ClienteRow = { id: string; lead_origem_id: string | null };
 type ComprovanteRow = { cliente_id: string; valor: number | null };
+
+/** De quais módulos a pessoa pode ler os números de uma campanha. */
+export interface FontesMetricas {
+  leads: boolean;
+  clientes: boolean;
+  /** Comprovantes (Financeiro) com o extra "valores": a receita são valores. */
+  financeiro: boolean;
+}
+
+export async function getFontesMetricas(): Promise<FontesMetricas> {
+  const [leads, clientes, financeiro] = await Promise.all([
+    getAcessoModulo("leads"),
+    getAcessoModulo("clientes"),
+    getAcessoModulo("financeiro"),
+  ]);
+  return {
+    leads: !!leads,
+    clientes: !!clientes,
+    financeiro: !!financeiro && temExtra(financeiro, "valores"),
+  };
+}
 
 /**
  * Leads gerados / clientes convertidos / receita gerada para cada campanha,
@@ -16,25 +37,32 @@ type ComprovanteRow = { cliente_id: string; valor: number | null };
  */
 export async function getCampanhaMetricsMap(
   supabase: SupabaseServerClient,
-  donoId: string,
-  campanhaIds: string[]
+  workspaceId: string,
+  campanhaIds: string[],
+  fontes: FontesMetricas
 ): Promise<Map<string, CampanhaMetrics>> {
   const result = new Map<string, CampanhaMetrics>();
   if (campanhaIds.length === 0) return result;
 
-  const workspaceId = await getWorkspaceIdAtivo();
+  // Receita = comprovantes (financeiro) dos clientes (clientes) vindos dos
+  // leads (leads) da campanha: precisa dos três módulos.
+  const lerReceita = fontes.leads && fontes.clientes && fontes.financeiro;
 
   const [{ data: leads }, { data: clientes }] = (await Promise.all([
-    supabase
-      .from("leads")
-      .select("id, campanha_id, status")
-      .eq("workspace_id", workspaceId ?? "")
-      .in("campanha_id", campanhaIds),
-    supabase
-      .from("clientes")
-      .select("id, lead_origem_id")
-      .eq("workspace_id", workspaceId ?? "")
-      .not("lead_origem_id", "is", null),
+    fontes.leads
+      ? supabase
+          .from("leads")
+          .select("id, campanha_id, status")
+          .eq("workspace_id", workspaceId)
+          .in("campanha_id", campanhaIds)
+      : Promise.resolve({ data: [] }),
+    lerReceita
+      ? supabase
+          .from("clientes")
+          .select("id, lead_origem_id")
+          .eq("workspace_id", workspaceId)
+          .not("lead_origem_id", "is", null)
+      : Promise.resolve({ data: [] }),
   ])) as [{ data: LeadRow[] | null }, { data: ClienteRow[] | null }];
 
   const leadsList = leads ?? [];
@@ -58,7 +86,7 @@ export async function getCampanhaMetricsMap(
       ? ((await supabase
           .from("comprovantes")
           .select("cliente_id, valor")
-          .eq("workspace_id", workspaceId ?? "")
+          .eq("workspace_id", workspaceId)
           .in("cliente_id", todosClienteIds)) as { data: ComprovanteRow[] | null })
       : { data: [] as ComprovanteRow[] };
 
@@ -87,9 +115,9 @@ export async function getCampanhaMetricsMap(
       0
     );
     result.set(campanhaId, {
-      leadsGerados: leadsInfo?.total ?? 0,
-      clientesConvertidos: leadsInfo?.convertidos ?? 0,
-      receitaGerada,
+      leadsGerados: fontes.leads ? (leadsInfo?.total ?? 0) : null,
+      clientesConvertidos: fontes.leads ? (leadsInfo?.convertidos ?? 0) : null,
+      receitaGerada: lerReceita ? receitaGerada : null,
     });
   }
 

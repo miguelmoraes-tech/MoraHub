@@ -1,26 +1,30 @@
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { temExtra, type AcessoModulo } from "@/lib/empresa-ativa";
 import { todayISO } from "@/lib/vencimentos/dates";
-import { getCampanhaMetricsMap } from "@/lib/marketing/campanha-metrics";
+import { getCampanhaMetricsMap, getFontesMetricas } from "@/lib/marketing/campanha-metrics";
 import { computeCampanhaDerived } from "@/lib/marketing/campanha-metrics-shared";
 import type { Campanha } from "@/lib/types";
 
 type ConteudoRow = { id: string; data_publicacao: string | null; status: string };
 
+/** `null` = sem o extra "investimento" (ou sem a fonte do número): a tela mostra "—". */
 export interface MarketingOverview {
   conteudoPublicadoSemana: number;
   conteudoPublicadoMes: number;
   campanhasAtivasCount: number;
-  totalInvestidoMes: number;
+  totalInvestidoMes: number | null;
   roiMedioAtivas: number | null;
+  /** True quando a pessoa não vê investimento/ROI (extra "investimento" ausente). */
+  semInvestimento: boolean;
 }
 
 const VAZIO: MarketingOverview = {
   conteudoPublicadoSemana: 0,
   conteudoPublicadoMes: 0,
   campanhasAtivasCount: 0,
-  totalInvestidoMes: 0,
+  totalInvestidoMes: null,
   roiMedioAtivas: null,
+  semInvestimento: true,
 };
 
 function ultimoDiaDoMes(mesAtual: string) {
@@ -28,9 +32,12 @@ function ultimoDiaDoMes(mesAtual: string) {
   return new Date(Date.UTC(ano, mes, 0)).toISOString().slice(0, 10);
 }
 
-export async function getMarketingOverview(donoId: string | null): Promise<MarketingOverview> {
-  const workspaceId = await getWorkspaceIdAtivo();
-  if (!donoId || !workspaceId) return VAZIO;
+export async function getMarketingOverview(
+  acesso: AcessoModulo | null
+): Promise<MarketingOverview> {
+  if (!acesso) return VAZIO;
+  const workspaceId = acesso.workspaceId;
+  const veInvestimento = temExtra(acesso, "investimento");
 
   const supabase = await createClient();
   const hoje = todayISO();
@@ -45,7 +52,7 @@ export async function getMarketingOverview(donoId: string | null): Promise<Marke
     supabase
       .from("calendario_conteudo")
       .select("id, data_publicacao, status")
-      .eq("user_id", donoId)
+      .eq("workspace_id", workspaceId)
       .eq("status", "publicado"),
     supabase.from("campanhas").select("*").eq("workspace_id", workspaceId),
   ])) as [{ data: ConteudoRow[] | null }, { data: Campanha[] | null }];
@@ -61,6 +68,17 @@ export async function getMarketingOverview(donoId: string | null): Promise<Marke
   const campanhasList = campanhas ?? [];
   const campanhasAtivas = campanhasList.filter((c) => c.status === "ativa");
 
+  if (!veInvestimento) {
+    return {
+      conteudoPublicadoSemana,
+      conteudoPublicadoMes,
+      campanhasAtivasCount: campanhasAtivas.length,
+      totalInvestidoMes: null,
+      roiMedioAtivas: null,
+      semInvestimento: true,
+    };
+  }
+
   const totalInvestidoMes = campanhasList
     .filter(
       (c) => (c.data_inicio ?? "") <= ultimoDiaMes && (!c.data_fim || c.data_fim >= primeiroDiaMes)
@@ -69,8 +87,9 @@ export async function getMarketingOverview(donoId: string | null): Promise<Marke
 
   const metricsMap = await getCampanhaMetricsMap(
     supabase,
-    donoId,
-    campanhasAtivas.map((c) => c.id)
+    workspaceId,
+    campanhasAtivas.map((c) => c.id),
+    await getFontesMetricas()
   );
   const roisAtivas = campanhasAtivas
     .map((c) => computeCampanhaDerived(c, metricsMap.get(c.id)).roi)
@@ -84,5 +103,6 @@ export async function getMarketingOverview(donoId: string | null): Promise<Marke
     campanhasAtivasCount: campanhasAtivas.length,
     totalInvestidoMes,
     roiMedioAtivas,
+    semInvestimento: false,
   };
 }

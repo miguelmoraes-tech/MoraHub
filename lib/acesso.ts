@@ -66,6 +66,12 @@ export interface EntradaAcesso {
    */
   permissoes?: readonly string[];
   /**
+   * Módulos do catálogo com `permite_membros = true`. Só vale para
+   * sócio/funcionário; ausente ou vazio nega (módulo fora da lista nunca abre
+   * para a equipe, mesmo que haja permissão gravada).
+   */
+  permiteMembros?: readonly string[];
+  /**
    * Funcionário sem nenhum vínculo e sem empresa própria (cadastrou-se como
    * 'comercial' e ainda não entrou numa empresa). Só é consultado quando
    * `resolucao.status === "sem_empresa"`.
@@ -76,6 +82,7 @@ export interface EntradaAcesso {
 export function decidirAcesso(entrada: EntradaAcesso): Decisao {
   const { path, resolucao, habilitados, funcionarioSemVinculo } = entrada;
   const permissoes = entrada.permissoes ?? [];
+  const permiteMembros = entrada.permiteMembros ?? [];
   if (isRotaIsenta(path)) return seguir;
 
   const naEntrada = ROTAS_DE_ENTRADA.includes(path);
@@ -108,7 +115,7 @@ export function decidirAcesso(entrada: EntradaAcesso): Decisao {
       }
 
       if (resolucao.papel === "socio" || resolucao.papel === "funcionario") {
-        return decidirRestrito(path, naEntrada, habilitados, permissoes);
+        return decidirRestrito(path, naEntrada, habilitados, permissoes, permiteMembros);
       }
 
       // Fundador e cofundador (painel por módulos): fora de /vendedor/*.
@@ -129,9 +136,10 @@ function decidirRestrito(
   path: string,
   naEntrada: boolean,
   habilitados: readonly string[],
-  permissoes: readonly string[]
+  permissoes: readonly string[],
+  permiteMembros: readonly string[]
 ): Decisao {
-  const liberados = modulosVisiveis(habilitados, permissoes);
+  const liberados = modulosVisiveis(habilitados, permissoes, permiteMembros);
   const home = primeiraRotaHabilitada(liberados) ?? AGUARDANDO_LIBERACAO;
 
   if (naEntrada || path === "/" || path === HOME_DONO) return para(home);

@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import type { ColaboradorParaAtribuicao } from "@/lib/types";
 
 export interface Responsavel {
   id: string;
@@ -7,27 +6,18 @@ export interface Responsavel {
 }
 
 /**
- * Quem pode ser responsável por um item do calendário de conteúdo: o dono
- * da conta e qualquer colaborador com papel 'marketing' ativo nela.
+ * Quem pode ser responsável por um item do calendário de conteúdo: o fundador
+ * e os membros ativos da empresa (RPC pessoas_da_empresa, sem vendedores).
+ * Falha na consulta = lista vazia (o campo fica sem opções, nada é aberto).
  */
-export async function getResponsaveisMarketing(donoId: string): Promise<Responsavel[]> {
+export async function getResponsaveisMarketing(workspaceId: string): Promise<Responsavel[]> {
   const supabase = await createClient();
-
-  const [{ data: perfilDono }, { data: colaboradores }] = (await Promise.all([
-    supabase.from("perfis").select("id, nome").eq("id", donoId).maybeSingle(),
-    supabase.rpc("get_colaboradores_do_dono_by_id", { p_dono_id: donoId }),
-  ])) as [
-    { data: { id: string; nome: string | null } | null },
-    { data: ColaboradorParaAtribuicao[] | null },
-  ];
-
-  const responsaveis: Responsavel[] = [];
-  if (perfilDono) {
-    responsaveis.push({ id: perfilDono.id, nome: perfilDono.nome || "Você (dono)" });
-  }
-  for (const c of colaboradores ?? []) {
-    if (c.papel !== "marketing" || c.status !== "ativo") continue;
-    responsaveis.push({ id: c.membro_id, nome: c.nome || c.email || "Colaborador" });
-  }
-  return responsaveis;
+  const { data, error } = await supabase.rpc("pessoas_da_empresa", {
+    p_workspace_id: workspaceId,
+  });
+  if (error) return [];
+  return ((data ?? []) as { pessoa_id: string; nome: string | null; papel: string }[]).map((p) => ({
+    id: p.pessoa_id,
+    nome: p.nome || "Sem nome",
+  }));
 }

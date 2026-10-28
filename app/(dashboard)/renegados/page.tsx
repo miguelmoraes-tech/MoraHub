@@ -23,7 +23,7 @@ export default async function RenegadosPage() {
     <RenegadosBoard
       renegados={renegados ?? []}
       somenteLeitura={acesso?.nivel !== "edicao"}
-      semExportar={!acesso?.completo}
+      semExportar={!acesso?.ehDono}
     />
   );
 }

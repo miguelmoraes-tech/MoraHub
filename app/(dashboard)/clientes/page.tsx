@@ -17,7 +17,7 @@ export default async function ClientesPage() {
     <ClientesBoard
       clientes={clientes ?? []}
       somenteLeitura={acesso?.nivel !== "edicao"}
-      listaApenas={!acesso?.completo}
+      listaApenas={!acesso?.ehDono}
     />
   );
 }

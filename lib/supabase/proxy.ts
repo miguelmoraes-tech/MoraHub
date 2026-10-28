@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getVendedorAcesso, isComercialSemVinculo } from "@/lib/vendedor-access";
 import { getModulosDaEmpresa } from "@/lib/modulos/habilitados";
+import { getModulosPermiteMembrosDoCatalogo } from "@/lib/modulos/catalogo";
 import { lerPermissoesProprias, modulosDasPermissoes } from "@/lib/modulos/permissoes";
 import {
   EMPRESA_ATIVA_COOKIE,
@@ -100,6 +101,7 @@ export async function updateSession(request: NextRequest) {
 
   let habilitados: string[] = [];
   let permissoes: string[] = [];
+  let permiteMembros: string[] = [];
   if (resolucao.status === "ok") {
     if (resolucao.corrigirCookie) {
       response.cookies.set(EMPRESA_ATIVA_COOKIE, resolucao.workspaceId, {
@@ -113,18 +115,21 @@ export async function updateSession(request: NextRequest) {
     const painel = resolucao.papel === "dono" || resolucao.papel === "cofundador";
     const restrito = resolucao.papel === "socio" || resolucao.papel === "funcionario";
     if ((painel || restrito) && lerModulos) {
-      // Sócio/funcionário: módulos da empresa ∩ as próprias permissões, lidos
-      // em paralelo. Falha em qualquer um = lista vazia = nega.
-      const [modulos, permitidos] = await Promise.all([
+      // Sócio/funcionário: módulos da empresa ∩ as próprias permissões ∩ o que o
+      // catálogo deixa para a equipe, lidos em paralelo. Falha em qualquer um =
+      // lista vazia = nega.
+      const [modulos, permitidos, catalogo] = await Promise.all([
         modulosDoCookie && resolucao.workspaceId === cookieValido
           ? modulosDoCookie
           : getModulosDaEmpresa(supabase, resolucao.workspaceId).catch(() => [] as string[]),
         restrito
           ? lerPermissoesProprias(supabase, resolucao.workspaceId, user.id)
           : Promise.resolve([]),
+        restrito ? getModulosPermiteMembrosDoCatalogo(supabase) : Promise.resolve([] as string[]),
       ]);
       habilitados = modulos;
       permissoes = modulosDasPermissoes(permitidos);
+      permiteMembros = catalogo;
     }
   }
 
@@ -149,6 +154,7 @@ export async function updateSession(request: NextRequest) {
     resolucao,
     habilitados,
     permissoes,
+    permiteMembros,
     funcionarioSemVinculo,
   });
   if (decisao.tipo === "redirecionar") {

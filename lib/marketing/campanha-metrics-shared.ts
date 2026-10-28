@@ -7,10 +7,14 @@ import type { Campanha } from "@/lib/types";
  * and can't be reached from any client component's import graph.
  */
 
+/**
+ * `null` = a pessoa não tem permissão no módulo de onde o número vem (leads,
+ * clientes ou financeiro): a tela mostra "—", nunca zero.
+ */
 export interface CampanhaMetrics {
-  leadsGerados: number;
-  clientesConvertidos: number;
-  receitaGerada: number;
+  leadsGerados: number | null;
+  clientesConvertidos: number | null;
+  receitaGerada: number | null;
 }
 
 export interface CampanhaDerived {
@@ -30,7 +34,13 @@ export function computeCampanhaDerived(
   metrics: CampanhaMetrics = METRICS_VAZIO
 ): CampanhaDerived {
   const valorGasto = campanha.valor_gasto ?? 0;
-  const custoPorLead = metrics.leadsGerados > 0 ? valorGasto / metrics.leadsGerados : null;
-  const roi = valorGasto > 0 ? ((metrics.receitaGerada - valorGasto) / valorGasto) * 100 : null;
+  const custoPorLead =
+    metrics.leadsGerados !== null && metrics.leadsGerados > 0
+      ? valorGasto / metrics.leadsGerados
+      : null;
+  const roi =
+    valorGasto > 0 && metrics.receitaGerada !== null
+      ? ((metrics.receitaGerada - valorGasto) / valorGasto) * 100
+      : null;
   return { custoPorLead, roi };
 }

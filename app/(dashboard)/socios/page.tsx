@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getEmpresaPainel } from "@/lib/empresa-ativa";
-import { getModulosHabilitados } from "@/lib/modulos/habilitados";
+import { getModulosHabilitados, getModulosPermiteMembros } from "@/lib/modulos/habilitados";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import {
   MODULO_ROTULO,
@@ -19,7 +19,7 @@ import { SociosBoard } from "@/components/socios/socios-board";
  * Equipe da empresa: sócios, funcionários e cofundadores (com permissões por
  * módulo) e setores com código de entrada. Só fundador e cofundador abrem; o
  * RLS e as RPCs são a barreira de verdade. O formulário oferece apenas módulos
- * que o registro conhece, que têm RLS de membro e que a empresa tem ligados.
+ * que a empresa tem ligados e que o catálogo marca como permite_membros.
  */
 export default async function SociosPage() {
   const empresa = await getEmpresaPainel();
@@ -28,8 +28,11 @@ export default async function SociosPage() {
   const supabase = await createClient();
   const ws = empresa.workspaceId;
 
-  const habilitados = await getModulosHabilitados(ws);
-  const chaves = modulosOferecidos(habilitados);
+  const [habilitados, permiteMembros] = await Promise.all([
+    getModulosHabilitados(ws),
+    getModulosPermiteMembros(),
+  ]);
+  const chaves = modulosOferecidos(habilitados, permiteMembros);
 
   const [
     { data: catalogo },

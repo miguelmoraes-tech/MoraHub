@@ -4,6 +4,7 @@ import * as z from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getEmpresaPainel } from "@/lib/empresa-ativa";
+import { getModulosPermiteMembros } from "@/lib/modulos/habilitados";
 import {
   sanearPermissoes,
   sociosErrorMessage,
@@ -27,10 +28,16 @@ const PermissaoSchema = z.array(
   })
 );
 
-/** Passa a entrada pelo schema e depois pela lista branca (módulo/nível válidos). */
-function lerPermissoes(bruto: unknown): PermissaoModulo[] | null {
+/**
+ * Passa a entrada pelo schema, pela lista branca (módulo/nível válidos) e pelo
+ * catálogo: módulo com `permite_membros = false` (RH, Vendedores) nunca é
+ * gravado numa matriz, mesmo que o cliente o envie.
+ */
+async function lerPermissoes(bruto: unknown): Promise<PermissaoModulo[] | null> {
   const parsed = PermissaoSchema.safeParse(bruto);
-  return parsed.success ? sanearPermissoes(parsed.data) : null;
+  if (!parsed.success) return null;
+  const permiteMembros = await getModulosPermiteMembros();
+  return sanearPermissoes(parsed.data).filter((p) => permiteMembros.includes(p.modulo));
 }
 
 const ConviteSchema = z.object({
@@ -60,7 +67,7 @@ export async function convidarMembro(entrada: {
   }
 
   // Cofundador tem o mesmo nível do fundador: não leva matriz.
-  const permissoes = papel === "cofundador" ? [] : lerPermissoes(entrada.permissoes);
+  const permissoes = papel === "cofundador" ? [] : await lerPermissoes(entrada.permissoes);
   if (!permissoes) return { error: "Permissões inválidas." };
 
   const supabase = await createClient();
@@ -96,7 +103,7 @@ export async function atualizarPermissoesMembro(
 ): Promise<ResultadoSocios> {
   const empresa = await getEmpresaPainel();
   if (!empresa) return { error: SEM_PAINEL };
-  const limpas = lerPermissoes(permissoes);
+  const limpas = await lerPermissoes(permissoes);
   if (!limpas) return { error: "Permissões inválidas." };
 
   const supabase = await createClient();
@@ -151,7 +158,7 @@ export async function criarSetor(entrada: {
   }
   const empresa = await getEmpresaPainel();
   if (!empresa) return { error: SEM_PAINEL };
-  const permissoes = lerPermissoes(entrada.permissoes);
+  const permissoes = await lerPermissoes(entrada.permissoes);
   if (!permissoes) return { error: "Permissões inválidas." };
 
   const supabase = await createClient();
@@ -198,7 +205,7 @@ export async function atualizarSetor(
   }
   let permissoes: PermissaoModulo[] | null = null;
   if (mudancas.permissoes !== undefined) {
-    permissoes = lerPermissoes(mudancas.permissoes);
+    permissoes = await lerPermissoes(mudancas.permissoes);
     if (!permissoes) return { error: "Permissões inválidas." };
   }
 

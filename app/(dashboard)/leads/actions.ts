@@ -302,5 +302,5 @@ export async function convertLeadToCliente(
   revalidatePath("/leads");
   revalidatePath("/clientes");
   // O detalhe do cliente é só do painel completo; os demais caem na lista.
-  redirect(acesso.completo ? `/clientes/${(cliente as { id: string }).id}` : "/clientes");
+  redirect(acesso.ehDono ? `/clientes/${(cliente as { id: string }).id}` : "/clientes");
 }

@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { getModuloRegistro } from "@/lib/modulos/registry";
+import { getModulosPermiteMembrosDoCatalogo } from "@/lib/modulos/catalogo";
 
 /**
  * Módulos ligados de uma empresa, no servidor. A fonte é `workspace_modulos`
@@ -31,3 +32,8 @@ export async function getModulosDaEmpresa(
     .map((r) => r.modulo_chave)
     .filter((c) => !!getModuloRegistro(c));
 }
+
+/** Catálogo `permite_membros`, lido uma vez por requisição. */
+export const getModulosPermiteMembros = cache(
+  async (): Promise<string[]> => getModulosPermiteMembrosDoCatalogo(await createClient())
+);

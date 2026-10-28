@@ -1,5 +1,5 @@
 import { Wallet, TrendingUp, Receipt, Scale, Handshake, ArrowLeftRight, ArrowUpRight, ArrowDownRight, Users2, Megaphone } from "lucide-react";
-import { getDonoIdAtivo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoModulo, getDonoIdAtivo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getRHOverview } from "@/lib/rh/get-overview";
@@ -70,7 +70,7 @@ export default async function DashboardFinanceiroPage() {
       ]
     >,
     getRHOverview(donoId),
-    getMarketingOverview(donoId),
+    getMarketingOverview(await getAcessoModulo("marketing")),
   ]);
 
   const comprovantesList = comprovantes ?? [];

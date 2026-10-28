@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoModulo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { todayISO, diffInDays, recurringMonthKeysInWindow, subtractDaysISO } from "@/lib/vencimentos/dates";
 import { getRHOverview, type RHOverview } from "@/lib/rh/get-overview";
 import { getMarketingOverview, type MarketingOverview } from "@/lib/marketing/get-overview";
@@ -158,7 +158,7 @@ export async function getDashboardExecutivoOverview(
       ]
     >,
     getRHOverview(donoId),
-    getMarketingOverview(donoId),
+    getMarketingOverview(await getAcessoModulo("marketing")),
     getMetasOverview(donoId),
     getMetaResumoPorSetor(donoId, "comercial"),
     getSuporteData([donoId]),
