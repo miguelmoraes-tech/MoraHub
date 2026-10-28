@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getDonoIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoFinanceiro } from "@/lib/financeiro/acesso";
 import {
   OrcamentosBoard,
   type OrcamentoComRealizado,
@@ -7,17 +7,20 @@ import {
 import type { Gasto, Orcamento } from "@/lib/types";
 
 export default async function OrcamentosPage() {
-  const donoId = await getDonoIdAtivo();
+  const fin = await getAcessoFinanceiro();
   const supabase = await createClient();
 
-  const [{ data: orcamentos }, { data: gastos }] = donoId
+  const [{ data: orcamentos }, { data: gastos }] = fin
     ? await Promise.all([
         supabase
           .from("orcamentos")
           .select("*")
-          .eq("user_id", donoId)
+          .eq("workspace_id", fin.workspaceId)
           .order("mes_referencia", { ascending: false }),
-        supabase.from("gastos").select("*").eq("user_id", donoId),
+        // O "realizado" só é calculado para quem vê valores.
+        fin.valores
+          ? supabase.from("gastos").select("*").eq("workspace_id", fin.workspaceId)
+          : Promise.resolve({ data: [] }),
       ])
     : [{ data: [] }, { data: [] }];
 
@@ -32,11 +35,18 @@ export default async function OrcamentosPage() {
     (orcamentos ?? []) as Orcamento[]
   ).map((item) => ({
     ...item,
+    valor_planejado: fin?.valores ? item.valor_planejado : 0,
     realizado:
       realizadoPorChave.get(
         `${item.categoria}|${item.mes_referencia.slice(0, 7)}`
       ) ?? 0,
   }));
 
-  return <OrcamentosBoard orcamentos={orcamentosComRealizado} />;
+  return (
+    <OrcamentosBoard
+      orcamentos={orcamentosComRealizado}
+      somenteLeitura={!fin || fin.somenteLeitura}
+      semValores={!fin?.valores}
+    />
+  );
 }

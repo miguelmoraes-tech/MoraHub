@@ -117,12 +117,18 @@ export async function getDashboardExecutivoOverview(
   ] = await Promise.all([
     Promise.all([
       supabase.from("comprovantes").select("valor").eq("workspace_id", workspaceId ?? ""),
-      supabase.from("gastos").select("valor, recorrencia, data, tipo").eq("user_id", donoId),
-      supabase.from("contas_pagar").select("valor, data_vencimento, status").eq("user_id", donoId),
+      supabase
+        .from("gastos")
+        .select("valor, recorrencia, data, tipo")
+        .eq("workspace_id", workspaceId ?? ""),
+      supabase
+        .from("contas_pagar")
+        .select("valor, data_vencimento, status")
+        .eq("workspace_id", workspaceId ?? ""),
       supabase
         .from("contas_receber")
         .select("valor, data_vencimento, status")
-        .eq("user_id", donoId),
+        .eq("workspace_id", workspaceId ?? ""),
       supabase
         .from("assinaturas")
         .select("valor, recorrencia, proxima_cobranca, status")
@@ -157,7 +163,7 @@ export async function getDashboardExecutivoOverview(
         { count: number | null },
       ]
     >,
-    getRHOverview(donoId),
+    getRHOverview(workspaceId),
     getMarketingOverview(await getAcessoModulo("marketing")),
     getMetasOverview(donoId),
     getMetaResumoPorSetor(donoId, "comercial"),

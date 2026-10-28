@@ -203,11 +203,17 @@ function Row({
   clientes,
   propostas,
   hoje,
+  somenteLeitura,
+  semValores,
+  auxiliarIndisponivel,
 }: {
   item: ContaReceber;
   clientes: Cliente[];
   propostas: Proposta[];
   hoje: string;
+  somenteLeitura: boolean;
+  semValores: boolean;
+  auxiliarIndisponivel: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const action = updateContaReceber.bind(null, item.id);
@@ -270,30 +276,33 @@ function Row({
           </StatusChip>
         </p>
         <p className="text-xs text-zinc-500">
-          {formatCurrency(item.valor)} · vencimento {formatDate(item.data_vencimento)}
+          {semValores ? "—" : formatCurrency(item.valor)} · vencimento {formatDate(item.data_vencimento)}
           {atrasado && " (atrasado)"}
           {proximo && " (em breve)"}
           {cliente && ` · ${cliente.nome}`}
           {proposta && ` · ${proposta.titulo}`}
+          {auxiliarIndisponivel && (item.cliente_id || item.proposta_id) && " · cliente/proposta: —"}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteContaReceber.bind(null, item.id)}>
+      {!somenteLeitura && (
+        <div className="flex shrink-0 items-center gap-1">
           <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+            type="button"
+            onClick={() => setEditing(true)}
+            className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Pencil className="h-3.5 w-3.5" />
           </button>
-        </form>
-      </div>
+          <form action={deleteContaReceber.bind(null, item.id)}>
+            <button
+              type="submit"
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
@@ -302,10 +311,17 @@ export function ContasReceberBoard({
   contas,
   clientes,
   propostas,
+  somenteLeitura = false,
+  semValores = false,
+  auxiliarIndisponivel = false,
 }: {
   contas: ContaReceber[];
   clientes: Cliente[];
   propostas: Proposta[];
+  somenteLeitura?: boolean;
+  semValores?: boolean;
+  /** Sem permissão em Clientes ou Leads/propostas: nomes aparecem como "—". */
+  auxiliarIndisponivel?: boolean;
 }) {
   const hoje = todayISO();
   const ordenadas = [...contas].sort((a, b) =>
@@ -321,10 +337,11 @@ export function ContasReceberBoard({
         <div>
           <h1 className="text-lg font-semibold text-zinc-100">Contas a Receber</h1>
           <p className="text-sm text-zinc-500">
-            {ordenadas.length} conta(s) · {formatCurrency(total)} em aberto
+            {ordenadas.length} conta(s)
+            {semValores ? "" : ` · ${formatCurrency(total)} em aberto`}
           </p>
         </div>
-        <NewForm clientes={clientes} propostas={propostas} />
+        {!somenteLeitura && <NewForm clientes={clientes} propostas={propostas} />}
       </div>
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
@@ -342,6 +359,9 @@ export function ContasReceberBoard({
                 clientes={clientes}
                 propostas={propostas}
                 hoje={hoje}
+                somenteLeitura={somenteLeitura}
+                semValores={semValores}
+                auxiliarIndisponivel={auxiliarIndisponivel}
               />
             ))}
           </div>

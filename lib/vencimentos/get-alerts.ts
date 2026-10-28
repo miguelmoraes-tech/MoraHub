@@ -94,6 +94,7 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
     supabase
       .from("gastos")
       .select("id, nome, data, recorrencia")
+      .eq("workspace_id", workspaceId ?? "")
       .eq("tipo", "fixo")
       .in("recorrencia", ["Mensal", "Anual"]),
     supabase.from("vencimentos").select("id, titulo, data"),

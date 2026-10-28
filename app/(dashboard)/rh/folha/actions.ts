@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDonoIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoSoDono } from "@/lib/empresa-ativa";
+import { getModulosHabilitados } from "@/lib/modulos/habilitados";
 import { createClient } from "@/lib/supabase/server";
 import {
   gerarFolhaDoMes,
@@ -16,6 +17,9 @@ function textOrNull(value: FormDataEntryValue | null) {
   const str = value.toString().trim();
   return str === "" ? null : str;
 }
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
+const AVISO_ATIVE_FINANCEIRO = "Ative o módulo Financeiro para gerar folha.";
 
 function revalidateFolha() {
   revalidatePath("/rh/folha");
@@ -37,12 +41,22 @@ export async function gerarFolhaMes(
     return { error: "Informe um dia de vencimento válido (1 a 28)." };
   }
 
-  const donoId = await getDonoIdAtivo();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  // RH é só do fundador/cofundador.
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
+  // A folha vira contas a pagar: sem o Financeiro ligado não se grava nada às cegas.
+  if (!(await getModulosHabilitados(acesso.workspaceId)).includes("financeiro")) {
+    return { error: AVISO_ATIVE_FINANCEIRO };
+  }
 
   const supabase = await createClient();
   const mesReferenciaISO = `${mesReferencia}-01`;
-  const { criados } = await gerarFolhaDoMes(supabase, donoId, mesReferenciaISO, diaVencimento);
+  const { criados } = await gerarFolhaDoMes(
+    supabase,
+    { workspaceId: acesso.workspaceId, donoId: acesso.donoId },
+    mesReferenciaISO,
+    diaVencimento
+  );
 
   revalidateFolha();
   if (criados === 0) {
@@ -73,6 +87,9 @@ export async function updateFolhaPagamento(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return { error: SEM_PERMISSAO };
+
   const supabase = await createClient();
   const status: FolhaPagamentoStatus = parsed.data.status;
   const dataPagamento = status === "pago" ? (parsed.data.data_pagamento ?? null) : null;
@@ -87,20 +104,32 @@ export async function updateFolhaPagamento(
       data_pagamento: dataPagamento,
       observacoes: parsed.data.observacoes ?? null,
     })
-    .eq("id", folhaId);
+    .eq("id", folhaId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar a folha." };
 
-  await syncContaPagarFromFolha(supabase, contaPagarId, status, dataPagamento);
+  await syncContaPagarFromFolha(supabase, acesso.workspaceId, contaPagarId, status, dataPagamento);
 
   revalidateFolha();
   return { ok: true };
 }
 
 export async function deleteFolhaPagamento(folhaId: string, contaPagarId: string | null) {
+  const acesso = await getAcessoSoDono("rh");
+  if (!acesso) return;
+
   const supabase = await createClient();
-  await supabase.from("folha_pagamento").delete().eq("id", folhaId);
+  await supabase
+    .from("folha_pagamento")
+    .delete()
+    .eq("id", folhaId)
+    .eq("workspace_id", acesso.workspaceId);
   if (contaPagarId) {
-    await supabase.from("contas_pagar").delete().eq("id", contaPagarId);
+    await supabase
+      .from("contas_pagar")
+      .delete()
+      .eq("id", contaPagarId)
+      .eq("workspace_id", acesso.workspaceId);
   }
   revalidateFolha();
 }

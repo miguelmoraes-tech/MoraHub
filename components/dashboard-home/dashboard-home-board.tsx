@@ -1,12 +1,46 @@
 import Link from "next/link";
-import { Target, UserX, Users, CalendarClock, UserCheck, Activity, Blocks } from "lucide-react";
+import {
+  Target,
+  UserX,
+  Users,
+  CalendarClock,
+  UserCheck,
+  Activity,
+  Blocks,
+  Megaphone,
+  Wallet,
+  Users2,
+  Scale,
+} from "lucide-react";
 import { SetorResumoCard } from "@/components/dashboard-executivo/setor-resumo-card";
 import type { DashboardHomeOverview } from "@/lib/dashboard-home/get-overview";
 
 export function DashboardHomeBoard({ overview }: { overview: DashboardHomeOverview }) {
-  const { leads, renegados, clientes, agenda, vendedores, atividade, habilitados } = overview;
+  const {
+    leads,
+    renegados,
+    clientes,
+    agenda,
+    vendedores,
+    atividade,
+    marketing,
+    financeiro,
+    rh,
+    juridico,
+    habilitados,
+  } = overview;
   const com = (chave: string) => habilitados.includes(chave);
-  const temResumo = ["leads", "renegados", "clientes", "agenda", "vendedores"].some(com);
+  const temResumo = [
+    "leads",
+    "renegados",
+    "clientes",
+    "agenda",
+    "vendedores",
+    "marketing",
+    "financeiro",
+    "rh",
+    "juridico",
+  ].some(com);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
@@ -126,6 +160,65 @@ export function DashboardHomeBoard({ overview }: { overview: DashboardHomeOvervi
               ]}
             />
           </>
+        )}
+
+        {com("marketing") && (
+          <SetorResumoCard
+            icon={Megaphone}
+            titulo="Marketing"
+            href="/marketing"
+            stats={[
+              { label: "campanhas ativas", value: String(marketing.campanhasAtivas) },
+              { label: "conteúdos a publicar", value: String(marketing.conteudoPlanejado) },
+            ]}
+          />
+        )}
+
+        {com("financeiro") && (
+          <SetorResumoCard
+            icon={Wallet}
+            titulo="Financeiro"
+            href="/contas-pagar"
+            stats={[
+              {
+                label: "contas a pagar abertas",
+                value: String(financeiro.contasPagarAbertas),
+                tone: financeiro.contasPagarAbertas > 0 ? "amber" : "zinc",
+              },
+              {
+                label: "contas a receber abertas",
+                value: String(financeiro.contasReceberAbertas),
+              },
+            ]}
+          />
+        )}
+
+        {com("rh") && (
+          <SetorResumoCard
+            icon={Users2}
+            titulo="RH"
+            href="/rh"
+            stats={[
+              { label: "funcionários ativos", value: String(rh.funcionariosAtivos) },
+              { label: "vagas abertas", value: String(rh.vagasAbertas) },
+            ]}
+          />
+        )}
+
+        {com("juridico") && (
+          <SetorResumoCard
+            icon={Scale}
+            titulo="Jurídico & Contábil"
+            href="/juridico"
+            stats={[
+              { label: "processos abertos", value: String(juridico.processosAbertos) },
+              {
+                label: "compliance pendente",
+                value: String(juridico.compliancePendente),
+                tone: juridico.compliancePendente > 0 ? "amber" : "emerald",
+              },
+            ]}
+          />
         )}
       </div>
     </div>

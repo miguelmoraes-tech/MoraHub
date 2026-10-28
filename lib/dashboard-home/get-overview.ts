@@ -32,6 +32,11 @@ export interface DashboardHomeOverview {
   agenda: { proximos7Dias: number; hoje: number };
   vendedores: { ativos: number; solicitacoesPendentes: number };
   atividade: { vendedoresAtivos: number; leadsAbertos: number; aberturas: number };
+  // Módulos novos: só contagens (sem valores), só quando o módulo está ligado.
+  marketing: { campanhasAtivas: number; conteudoPlanejado: number };
+  financeiro: { contasPagarAbertas: number; contasReceberAbertas: number };
+  rh: { funcionariosAtivos: number; vagasAbertas: number };
+  juridico: { processosAbertos: number; compliancePendente: number };
 }
 
 const DIAS_ATIVIDADE = 7;
@@ -45,6 +50,10 @@ const VAZIO: DashboardHomeOverview = {
   agenda: { proximos7Dias: 0, hoje: 0 },
   vendedores: { ativos: 0, solicitacoesPendentes: 0 },
   atividade: { vendedoresAtivos: 0, leadsAbertos: 0, aberturas: 0 },
+  marketing: { campanhasAtivas: 0, conteudoPlanejado: 0 },
+  financeiro: { contasPagarAbertas: 0, contasReceberAbertas: 0 },
+  rh: { funcionariosAtivos: 0, vagasAbertas: 0 },
+  juridico: { processosAbertos: 0, compliancePendente: 0 },
 };
 
 export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview> {
@@ -75,6 +84,14 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
     colaboradoresRes,
     solicitacoesRes,
     atividadeRes,
+    campanhasRes,
+    conteudoRes,
+    contasPagarRes,
+    contasReceberRes,
+    funcionariosRes,
+    vagasRes,
+    processosRes,
+    complianceRes,
   ] = await Promise.all([
     com("leads")
       ? supabase
@@ -116,6 +133,62 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
           p_dias: DIAS_ATIVIDADE,
         })
       : nada,
+    com("marketing")
+      ? supabase
+          .from("campanhas")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .eq("status", "ativa")
+      : nada,
+    com("marketing")
+      ? supabase
+          .from("calendario_conteudo")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .in("status", ["planejado", "em_producao", "agendado"])
+      : nada,
+    com("financeiro")
+      ? supabase
+          .from("contas_pagar")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .neq("status", "pago")
+      : nada,
+    com("financeiro")
+      ? supabase
+          .from("contas_receber")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .neq("status", "recebido")
+      : nada,
+    com("rh")
+      ? supabase
+          .from("funcionarios")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .eq("status", "ativo")
+      : nada,
+    com("rh")
+      ? supabase
+          .from("vagas")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .eq("status", "aberta")
+      : nada,
+    com("juridico")
+      ? supabase
+          .from("processos")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .neq("fase", "encerrado")
+      : nada,
+    com("juridico")
+      ? supabase
+          .from("compliance_juridico")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .neq("status", "conforme")
+      : nada,
   ]);
 
   const leads = (leadsRes.data ?? []) as Pick<
@@ -154,6 +227,19 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
       vendedoresAtivos: new Set(atividade.map((a) => a.vendedor_id)).size,
       leadsAbertos: new Set(atividade.map((a) => a.lead_id)).size,
       aberturas: atividade.reduce((soma, a) => soma + a.aberturas, 0),
+    },
+    marketing: {
+      campanhasAtivas: campanhasRes.count ?? 0,
+      conteudoPlanejado: conteudoRes.count ?? 0,
+    },
+    financeiro: {
+      contasPagarAbertas: contasPagarRes.count ?? 0,
+      contasReceberAbertas: contasReceberRes.count ?? 0,
+    },
+    rh: { funcionariosAtivos: funcionariosRes.count ?? 0, vagasAbertas: vagasRes.count ?? 0 },
+    juridico: {
+      processosAbertos: processosRes.count ?? 0,
+      compliancePendente: complianceRes.count ?? 0,
     },
   };
 }

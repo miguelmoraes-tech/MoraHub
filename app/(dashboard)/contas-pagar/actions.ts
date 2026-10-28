@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDonoIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoFinanceiroEdicao } from "@/lib/financeiro/acesso";
 import { createClient } from "@/lib/supabase/server";
 import { syncFolhaFromContaPagar } from "@/lib/rh/folha-sync";
 import { ContaPagarSchema } from "@/lib/validations/conta-pagar";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
@@ -35,12 +37,13 @@ export async function createContaPagar(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getDonoIdAtivo();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
   const { error } = await supabase.from("contas_pagar").insert({
-    user_id: donoId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     descricao: parsed.data.descricao,
     valor: parsed.data.valor,
     fornecedor: parsed.data.fornecedor ?? null,
@@ -66,6 +69,9 @@ export async function updateContaPagar(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("contas_pagar")
@@ -79,12 +85,14 @@ export async function updateContaPagar(
       status: parsed.data.status,
       observacoes: parsed.data.observacoes ?? null,
     })
-    .eq("id", contaId);
+    .eq("id", contaId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar a conta." };
 
   // Folha de pagamento gerada a partir desta conta (se houver) reflete o mesmo status.
   await syncFolhaFromContaPagar(
     supabase,
+    acesso.workspaceId,
     contaId,
     parsed.data.status,
     parsed.data.data_pagamento ?? null
@@ -97,7 +105,14 @@ export async function updateContaPagar(
 }
 
 export async function deleteContaPagar(contaId: string) {
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return;
+
   const supabase = await createClient();
-  await supabase.from("contas_pagar").delete().eq("id", contaId);
+  await supabase
+    .from("contas_pagar")
+    .delete()
+    .eq("id", contaId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidatePath("/contas-pagar");
 }

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getDonoIdAtivo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoFinanceiro } from "@/lib/financeiro/acesso";
+import { SemAcessoAviso, SemValoresAviso } from "@/components/financeiro/sem-valores";
 import { todayISO, recurringMonthKeysInWindow } from "@/lib/vencimentos/dates";
 import { FluxoCaixaView, type FluxoCaixaMes } from "@/components/fluxo-caixa-view";
 import type { Assinatura, ContaPagar, ContaReceber, Gasto } from "@/lib/types";
@@ -26,8 +27,11 @@ function pad(n: number) {
 }
 
 export default async function FluxoCaixaPage() {
-  const donoId = await getDonoIdAtivo();
-  const workspaceId = await getWorkspaceIdAtivo();
+  const fin = await getAcessoFinanceiro();
+  if (!fin) return <SemAcessoAviso titulo="Fluxo de Caixa" />;
+  // A tela é só valores e saldos.
+  if (!fin.valores) return <SemValoresAviso titulo="Fluxo de Caixa" />;
+  const workspaceId = fin.workspaceId;
   const supabase = await createClient();
 
   const [
@@ -35,29 +39,27 @@ export default async function FluxoCaixaPage() {
     { data: contasReceber },
     { data: assinaturas },
     { data: gastosFixos },
-  ] = donoId && workspaceId
-    ? await Promise.all([
-        supabase
-          .from("contas_pagar")
-          .select("valor, data_vencimento")
-          .eq("user_id", donoId),
-        supabase
-          .from("contas_receber")
-          .select("valor, data_vencimento")
-          .eq("user_id", donoId)
-          .in("status", ["pendente", "recebido"]),
-        supabase
-          .from("assinaturas")
-          .select("valor, recorrencia, proxima_cobranca")
-          .eq("workspace_id", workspaceId)
-          .eq("status", "ativa"),
-        supabase
-          .from("gastos")
-          .select("valor, recorrencia, data")
-          .eq("user_id", donoId)
-          .eq("tipo", "fixo"),
-      ])
-    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
+  ] = await Promise.all([
+    supabase
+      .from("contas_pagar")
+      .select("valor, data_vencimento")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("contas_receber")
+      .select("valor, data_vencimento")
+      .eq("workspace_id", workspaceId)
+      .in("status", ["pendente", "recebido"]),
+    supabase
+      .from("assinaturas")
+      .select("valor, recorrencia, proxima_cobranca")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "ativa"),
+    supabase
+      .from("gastos")
+      .select("valor, recorrencia, data")
+      .eq("workspace_id", workspaceId)
+      .eq("tipo", "fixo"),
+  ]);
 
   const hoje = todayISO();
   const [anoAtual, mesAtual] = hoje.slice(0, 7).split("-").map(Number);

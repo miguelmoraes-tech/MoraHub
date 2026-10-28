@@ -28,6 +28,7 @@ import { filtrarPermissoesOferecidas, modulosOferecidos } from "@/lib/socios-sha
 import { getModulosPermiteMembrosDoCatalogo } from "@/lib/modulos/catalogo";
 import { readFileSync } from "node:fs";
 import { resolverAcessoModulo } from "@/lib/modulos/guard";
+import { permissoesFinanceiro } from "@/lib/financeiro/permissoes";
 import { computeCampanhaDerived } from "@/lib/marketing/campanha-metrics-shared";
 
 let total = 0;
@@ -627,6 +628,34 @@ await teste("vendedor (comercial), papel legado, nulo e módulo desconhecido: ne
   for (const papel of ["comercial", "financeiro", "rh", "", null, "admin"])
     assert.equal(guard("leads", papel, "leitura", { permissoes: [perm("leads", "edicao")] }), null, String(papel));
   assert.equal(guard("inventado", "dono", "leitura", { habilitados: ["inventado"] }), null);
+});
+
+console.log('\nFase 3.5 — Marketing: métrica sem permissão é "—" (null), nunca zero');
+await teste("computeCampanhaDerived: sem leads/receita (null) não calcula custo/lead nem ROI", () => {
+  const camp = { valor_gasto: 100 };
+  assert.deepEqual(
+    computeCampanhaDerived(camp, { leadsGerados: null, clientesConvertidos: null, receitaGerada: null }),
+    { custoPorLead: null, roi: null }
+  );
+  assert.deepEqual(
+    computeCampanhaDerived(camp, { leadsGerados: 4, clientesConvertidos: 1, receitaGerada: null }),
+    { custoPorLead: 25, roi: null }
+  );
+  assert.deepEqual(
+    computeCampanhaDerived(camp, { leadsGerados: 0, clientesConvertidos: 0, receitaGerada: 200 }),
+    { custoPorLead: null, roi: 100 }
+  );
+});
+
+console.log('\nFase 3.5 — Financeiro: nível e extra "valores"');
+await teste("fundador/cofundador: valores e escrita; sócio: leitura nunca escreve, sem valores nunca escreve", () => {
+  const p = permissoesFinanceiro;
+  assert.deepEqual(p({ ehDono: true, nivel: "edicao", extras: [] }), { valores: true, somenteLeitura: false });
+  assert.deepEqual(p({ ehDono: false, nivel: "leitura", extras: ["valores"] }), { valores: true, somenteLeitura: true });
+  assert.deepEqual(p({ ehDono: false, nivel: "edicao", extras: [] }), { valores: false, somenteLeitura: true });
+  assert.deepEqual(p({ ehDono: false, nivel: "leitura", extras: [] }), { valores: false, somenteLeitura: true });
+  assert.deepEqual(p({ ehDono: false, nivel: "edicao", extras: ["valores"] }), { valores: true, somenteLeitura: false });
+  assert.deepEqual(p({ ehDono: false, nivel: "edicao", extras: ["contato", "investimento"] }), { valores: false, somenteLeitura: true });
 });
 
 console.log(`\n${total} testes`);

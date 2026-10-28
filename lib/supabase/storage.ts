@@ -8,13 +8,18 @@ function sanitizeFileName(name: string) {
   return name.replace(/[^\w.\-]+/g, "_");
 }
 
+/**
+ * Arquivos NOVOS ficam na pasta da empresa (`<workspace_id>/...`): a policy do
+ * bucket libera fundador/cofundador e a equipe com Jurídico/Financeiro. O
+ * caminho antigo `<user_id>/...` continua valendo para leitura e remoção.
+ */
 export async function uploadClienteArquivo(
-  userId: string,
+  workspaceId: string,
   clienteId: string,
   file: File
 ) {
   const supabase = await createClient();
-  const path = `${userId}/${clienteId}/${Date.now()}-${sanitizeFileName(file.name)}`;
+  const path = `${workspaceId}/${clienteId}/${Date.now()}-${sanitizeFileName(file.name)}`;
 
   const { error } = await supabase.storage.from(BUCKET).upload(path, file);
   if (error) throw error;
@@ -22,9 +27,9 @@ export async function uploadClienteArquivo(
   return path;
 }
 
-export async function uploadDocumentoArquivo(userId: string, file: File) {
+export async function uploadDocumentoArquivo(workspaceId: string, file: File) {
   const supabase = await createClient();
-  const path = `${userId}/documentos/${Date.now()}-${sanitizeFileName(file.name)}`;
+  const path = `${workspaceId}/documentos/${Date.now()}-${sanitizeFileName(file.name)}`;
 
   const { error } = await supabase.storage.from(BUCKET).upload(path, file);
   if (error) throw error;
@@ -32,15 +37,10 @@ export async function uploadDocumentoArquivo(userId: string, file: File) {
   return path;
 }
 
-/**
- * Path is keyed by the *uploader's* auth.uid() (storage RLS requires
- * folder[1] = auth.uid()), not the modelo's dono_id — an advogado filing a
- * modelo on behalf of a linked conta uploads under their own folder, same as
- * they're the only one who ever opens it back from the Biblioteca screen.
- */
-export async function uploadModeloContratoArquivo(userId: string, file: File) {
+/** Modelos de contrato novos ficam na pasta da empresa (`<workspace_id>/modelos/...`). */
+export async function uploadModeloContratoArquivo(workspaceId: string, file: File) {
   const supabase = await createClient();
-  const path = `${userId}/modelos/${Date.now()}-${sanitizeFileName(file.name)}`;
+  const path = `${workspaceId}/modelos/${Date.now()}-${sanitizeFileName(file.name)}`;
 
   const { error } = await supabase.storage.from(BUCKET).upload(path, file);
   if (error) throw error;
@@ -69,15 +69,10 @@ export async function getClienteArquivoSignedUrls(paths: (string | null)[]) {
   return new Map(entries);
 }
 
-/**
- * Path is keyed by the *uploader's* auth.uid() (storage RLS requires
- * folder[1] = auth.uid()), same constraint as uploadModeloContratoArquivo —
- * a financeiro colaborador uploading a currículo can only read it back
- * themselves; the dono re-uploading would need to do so under their own id.
- */
-export async function uploadCandidatoCurriculo(userId: string, file: File) {
+/** Currículos novos ficam na pasta da empresa (`<workspace_id>/rh/candidatos/...`). */
+export async function uploadCandidatoCurriculo(workspaceId: string, file: File) {
   const supabase = await createClient();
-  const path = `${userId}/rh/candidatos/${Date.now()}-${sanitizeFileName(file.name)}`;
+  const path = `${workspaceId}/rh/candidatos/${Date.now()}-${sanitizeFileName(file.name)}`;
 
   const { error } = await supabase.storage.from(BUCKET).upload(path, file);
   if (error) throw error;

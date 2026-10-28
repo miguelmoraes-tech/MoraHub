@@ -1,21 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
-import { getDonoIdAtivo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoFinanceiro } from "@/lib/financeiro/acesso";
 import { ConciliacaoView } from "@/components/conciliacao-view";
+import { SemAcessoAviso, SemValoresAviso } from "@/components/financeiro/sem-valores";
 import { sugerirMatches } from "@/lib/conciliacao/match";
 import type { Comprovante, Gasto, LancamentoExtrato } from "@/lib/types";
 
 export default async function ConciliacaoPage() {
-  const donoId = await getDonoIdAtivo();
-  const workspaceId = await getWorkspaceIdAtivo();
+  const fin = await getAcessoFinanceiro();
+  if (!fin) return <SemAcessoAviso titulo="Conciliação Bancária" />;
+  // A tela é só extrato e valores.
+  if (!fin.valores) return <SemValoresAviso titulo="Conciliação Bancária" />;
   const supabase = await createClient();
 
-  const [{ data: lancamentos }, { data: gastos }, { data: comprovantes }] = donoId && workspaceId
-    ? await Promise.all([
-        supabase.from("lancamentos_extrato").select("*").eq("user_id", donoId),
-        supabase.from("gastos").select("*").eq("user_id", donoId),
-        supabase.from("comprovantes").select("*").eq("workspace_id", workspaceId),
-      ])
-    : [{ data: [] }, { data: [] }, { data: [] }];
+  const [{ data: lancamentos }, { data: gastos }, { data: comprovantes }] = await Promise.all([
+    supabase.from("lancamentos_extrato").select("*").eq("workspace_id", fin.workspaceId),
+    supabase.from("gastos").select("*").eq("workspace_id", fin.workspaceId),
+    supabase.from("comprovantes").select("*").eq("workspace_id", fin.workspaceId),
+  ]);
 
   const lancamentosTyped = (lancamentos ?? []) as LancamentoExtrato[];
   const gastosTyped = (gastos ?? []) as Gasto[];
@@ -31,7 +32,7 @@ export default async function ConciliacaoPage() {
       gastos={gastosTyped}
       comprovantes={comprovantesTyped}
       sugestoes={sugestoes}
-      contas={donoId ? [{ donoId, nome: "Minha conta" }] : []}
+      somenteLeitura={fin.somenteLeitura}
     />
   );
 }

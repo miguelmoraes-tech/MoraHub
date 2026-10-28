@@ -22,18 +22,21 @@ const ISOLADAS = [
 
 // Módulos novos (Fase 3.5): update/delete também precisam de workspace_id.
 // Cada módulo entra aqui quando é concluído.
-const ESTRITAS = [
-  "campanhas", "calendario_conteudo",
-];
 const MODULOS_NOVOS: Record<string, string[]> = {
   marketing: ["campanhas", "calendario_conteudo"],
+  financeiro: [
+    "contas_pagar", "contas_receber", "orcamentos", "gastos", "lancamentos_extrato",
+    "assinaturas", "comprovantes",
+  ],
 };
+const ESTRITAS = Object.values(MODULOS_NOVOS).flat();
 
 // Legado do contador (papel sem interface): fora do escopo da empresa ativa.
 const IGNORAR = [/^app[\\/]colaborador[\\/]/];
 
 const raiz = process.cwd();
 function arquivos(dir: string): string[] {
+  if (statSync(dir).isFile()) return [dir];
   return readdirSync(dir).flatMap((nome) => {
     const caminho = join(dir, nome);
     if (statSync(caminho).isDirectory()) return arquivos(caminho);
@@ -98,7 +101,7 @@ if (insertsSemWorkspace.length) process.exitCode = 1;
 // Toda action exportada dos módulos que sócio/funcionário podem editar precisa
 // passar por uma guarda de edição (fundador/cofundador OU tem_permissao). A
 // barreira real é o RLS; isto pega uma action nova esquecida sem guarda.
-const GUARDAS = ["getAcessoEdicao", "getAcessoSoDono", "podeEditarProposta", "getEmpresaPainel"];
+const GUARDAS = ["getAcessoEdicao", "getAcessoFinanceiroEdicao", "getAcessoSoDono", "podeEditarProposta", "getEmpresaPainel"];
 const ACTIONS_COM_GUARDA = [
   "app/(dashboard)/leads/actions.ts",
   "app/(dashboard)/renegados/actions.ts",
@@ -107,6 +110,12 @@ const ACTIONS_COM_GUARDA = [
   "app/(dashboard)/socios/actions.ts",
   "app/(dashboard)/marketing/calendario/actions.ts",
   "app/(dashboard)/marketing/campanhas/actions.ts",
+  "app/(dashboard)/contas-pagar/actions.ts",
+  "app/(dashboard)/contas-receber/actions.ts",
+  "app/(dashboard)/orcamentos/actions.ts",
+  "app/(dashboard)/gastos/actions.ts",
+  "app/(dashboard)/assinantes/actions.ts",
+  "lib/actions/conciliacao.ts",
 ];
 const semGuarda: string[] = [];
 let actionsVerificadas = 0;
@@ -131,6 +140,13 @@ if (semGuarda.length) process.exitCode = 1;
 // (a empresa vem do guard, validada no servidor) nem filtrar só por user_id.
 const PASTAS_CONCLUIDAS: Record<string, string[]> = {
   marketing: ["app/(dashboard)/marketing", "lib/marketing", "components/marketing"],
+  financeiro: [
+    "app/(dashboard)/contas-pagar", "app/(dashboard)/contas-receber", "app/(dashboard)/orcamentos",
+    "app/(dashboard)/fluxo-caixa", "app/(dashboard)/rentabilidade", "app/(dashboard)/conciliacao",
+    "app/(dashboard)/dre", "app/(dashboard)/gastos", "app/(dashboard)/assinantes",
+    "app/(dashboard)/dashboard/financeiro", "app/api/export/dre", "lib/financeiro",
+    "components/financeiro", "lib/actions/conciliacao.ts",
+  ],
 };
 const proibidos = [/getDonoIdAtivo/, /getWorkspaceIdAtivo/, /get_colaboradores_do_dono_by_id/];
 const legado: string[] = [];

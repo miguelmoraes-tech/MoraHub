@@ -1,13 +1,12 @@
 "use client";
 
-import { useActionState, useMemo, useRef, useState } from "react";
+import { useActionState, useMemo, useRef } from "react";
 import {
   Landmark,
   Upload,
   CheckCircle2,
   XCircle,
   RotateCcw,
-  Filter,
 } from "lucide-react";
 import type { Comprovante, Gasto, LancamentoExtrato } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -20,11 +19,6 @@ import {
 } from "@/lib/actions/conciliacao";
 import type { SugestaoMatch } from "@/lib/conciliacao/match";
 
-export interface ContaOption {
-  donoId: string;
-  nome: string;
-}
-
 export type LancamentoComConta = LancamentoExtrato & { donoNome?: string };
 export type GastoComConta = Gasto & { donoNome?: string };
 export type ComprovanteComConta = Comprovante & { donoNome?: string };
@@ -32,7 +26,7 @@ export type ComprovanteComConta = Comprovante & { donoNome?: string };
 const inputClass =
   "w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500";
 
-function UploadForm({ contas }: { contas: ContaOption[] }) {
+function UploadForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(importarOfx, undefined);
   useActionSuccess(state, () => formRef.current?.reset());
@@ -48,21 +42,6 @@ function UploadForm({ contas }: { contas: ContaOption[] }) {
         Importar extrato (OFX)
       </div>
       <div className="flex flex-wrap items-end gap-3">
-        {contas.length > 1 && (
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-zinc-400">Conta</label>
-            <select name="dono_id" defaultValue={contas[0]?.donoId} className={inputClass}>
-              {contas.map((conta) => (
-                <option key={conta.donoId} value={conta.donoId}>
-                  {conta.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {contas.length <= 1 && (
-          <input type="hidden" name="dono_id" value={contas[0]?.donoId ?? ""} />
-        )}
         <div className="min-w-[220px] flex-1 space-y-1">
           <label className="text-xs font-medium text-zinc-400">Arquivo .ofx</label>
           <input
@@ -75,7 +54,7 @@ function UploadForm({ contas }: { contas: ContaOption[] }) {
         </div>
         <button
           type="submit"
-          disabled={pending || contas.length === 0}
+          disabled={pending}
           className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500 disabled:opacity-60"
         >
           <Upload className="h-4 w-4" />
@@ -151,7 +130,6 @@ function VincularForm({
 
   return (
     <form action={formAction} className="flex flex-wrap items-center gap-2">
-      <input type="hidden" name="dono_id" value={lancamento.user_id} />
       {sugestao && (
         <span className="rounded-full bg-sky-900/40 px-2 py-0.5 text-[11px] font-medium text-sky-300">
           Sugestão
@@ -184,7 +162,6 @@ function IgnorarForm({ lancamento }: { lancamento: LancamentoComConta }) {
   const [, formAction, pending] = useActionState(bound, undefined);
   return (
     <form action={formAction}>
-      <input type="hidden" name="dono_id" value={lancamento.user_id} />
       <button
         type="submit"
         disabled={pending}
@@ -202,7 +179,6 @@ function DesfazerForm({ lancamento }: { lancamento: LancamentoComConta }) {
   const [, formAction, pending] = useActionState(bound, undefined);
   return (
     <form action={formAction}>
-      <input type="hidden" name="dono_id" value={lancamento.user_id} />
       <button
         type="submit"
         disabled={pending}
@@ -226,26 +202,21 @@ export function ConciliacaoView({
   gastos,
   comprovantes,
   sugestoes,
-  contas,
+  somenteLeitura = false,
 }: {
   lancamentos: LancamentoComConta[];
   gastos: GastoComConta[];
   comprovantes: ComprovanteComConta[];
   sugestoes: Record<string, SugestaoMatch>;
-  contas: ContaOption[];
+  somenteLeitura?: boolean;
 }) {
-  const [contaFiltro, setContaFiltro] = useState("");
-
   const lancamentosFiltrados = useMemo(() => {
-    const base = contaFiltro
-      ? lancamentos.filter((l) => l.user_id === contaFiltro)
-      : lancamentos;
-    return [...base].sort((a, b) => {
+    return [...lancamentos].sort((a, b) => {
       const statusDiff = STATUS_ORDER[a.status_conciliacao] - STATUS_ORDER[b.status_conciliacao];
       if (statusDiff !== 0) return statusDiff;
       return b.data.localeCompare(a.data);
     });
-  }, [lancamentos, contaFiltro]);
+  }, [lancamentos]);
 
   const gastoLabelPorId = useMemo(() => new Map(gastos.map((g) => [g.id, g.nome])), [gastos]);
   const comprovanteLabelPorId = useMemo(
@@ -285,28 +256,9 @@ export function ConciliacaoView({
             cadastrado.
           </p>
         </div>
-        {contas.length > 1 && (
-          <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2">
-            <Filter className="h-3.5 w-3.5 text-zinc-500" />
-            <select
-              value={contaFiltro}
-              onChange={(e) => setContaFiltro(e.target.value)}
-              className="bg-transparent text-sm text-zinc-300 outline-none"
-            >
-              <option value="" className="bg-zinc-900">
-                Todas as contas
-              </option>
-              {contas.map((conta) => (
-                <option key={conta.donoId} value={conta.donoId} className="bg-zinc-900">
-                  {conta.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
-      <UploadForm contas={contas} />
+      {!somenteLeitura && <UploadForm />}
       <Resumo lancamentos={lancamentosFiltrados} />
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
@@ -354,7 +306,7 @@ export function ConciliacaoView({
                 </div>
 
                 <div className="mt-2">
-                  {lancamento.status_conciliacao === "pendente" && (
+                  {lancamento.status_conciliacao === "pendente" && !somenteLeitura && (
                     <div className="flex flex-wrap items-center gap-2">
                       <VincularForm
                         lancamento={lancamento}
@@ -375,13 +327,13 @@ export function ConciliacaoView({
                               "Comprovante removido")
                             : "—"}
                       </p>
-                      <DesfazerForm lancamento={lancamento} />
+                      {!somenteLeitura && <DesfazerForm lancamento={lancamento} />}
                     </div>
                   )}
                   {lancamento.status_conciliacao === "ignorado" && (
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-xs text-zinc-600">Ignorado (ex: transferência interna).</p>
-                      <DesfazerForm lancamento={lancamento} />
+                      {!somenteLeitura && <DesfazerForm lancamento={lancamento} />}
                     </div>
                   )}
                 </div>

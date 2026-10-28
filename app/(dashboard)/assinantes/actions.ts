@@ -1,23 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoFinanceiroEdicao } from "@/lib/financeiro/acesso";
 import { createClient } from "@/lib/supabase/server";
 import { AssinanteSchema } from "@/lib/validations/assinante";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
   const str = value.toString().trim();
   return str === "" ? null : str;
-}
-
-async function requireUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return { supabase, user };
 }
 
 function parseAssinanteForm(formData: FormData) {
@@ -41,14 +35,13 @@ export async function createAssinante(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
-  if (!user) return { error: "Sessão expirada. Faça login novamente." };
-  const workspaceId = await getWorkspaceIdAtivo();
-  if (!workspaceId) return { error: "Selecione uma empresa em que você é o dono." };
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
 
+  const supabase = await createClient();
   const { error } = await supabase.from("assinaturas").insert({
-    user_id: user.id,
-    workspace_id: workspaceId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     cliente_id: parsed.data.cliente_id,
     plano: parsed.data.plano,
     valor: parsed.data.valor ?? null,
@@ -73,7 +66,10 @@ export async function updateAssinante(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase } = await requireUser();
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  const supabase = await createClient();
   const { error } = await supabase
     .from("assinaturas")
     .update({
@@ -85,7 +81,8 @@ export async function updateAssinante(
       proxima_cobranca: parsed.data.proxima_cobranca ?? null,
       status: parsed.data.status,
     })
-    .eq("id", assinaturaId);
+    .eq("id", assinaturaId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar a assinatura." };
 
   revalidatePath("/assinantes");
@@ -93,7 +90,14 @@ export async function updateAssinante(
 }
 
 export async function deleteAssinante(assinaturaId: string) {
-  const { supabase } = await requireUser();
-  await supabase.from("assinaturas").delete().eq("id", assinaturaId);
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("assinaturas")
+    .delete()
+    .eq("id", assinaturaId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidatePath("/assinantes");
 }

@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDonoIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoFinanceiroEdicao } from "@/lib/financeiro/acesso";
 import { createClient } from "@/lib/supabase/server";
 import { OrcamentoSchema } from "@/lib/validations/orcamento";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
@@ -35,12 +37,13 @@ export async function createOrcamento(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getDonoIdAtivo();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
   const { error } = await supabase.from("orcamentos").insert({
-    user_id: donoId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     categoria: parsed.data.categoria,
     mes_referencia: parsed.data.mes_referencia,
     valor_planejado: parsed.data.valor_planejado,
@@ -62,6 +65,9 @@ export async function updateOrcamento(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("orcamentos")
@@ -71,7 +77,8 @@ export async function updateOrcamento(
       valor_planejado: parsed.data.valor_planejado,
       observacoes: parsed.data.observacoes ?? null,
     })
-    .eq("id", orcamentoId);
+    .eq("id", orcamentoId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar o orçamento." };
 
   revalidatePath("/orcamentos");
@@ -79,7 +86,14 @@ export async function updateOrcamento(
 }
 
 export async function deleteOrcamento(orcamentoId: string) {
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return;
+
   const supabase = await createClient();
-  await supabase.from("orcamentos").delete().eq("id", orcamentoId);
+  await supabase
+    .from("orcamentos")
+    .delete()
+    .eq("id", orcamentoId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidatePath("/orcamentos");
 }

@@ -124,6 +124,7 @@ export default async function ClienteDetailPage({
       .from("gastos")
       .select("*")
       .eq("cliente_id", id)
+      .eq("workspace_id", workspaceId)
       .order("data", { ascending: false }),
   ])) as [
     { data: Cliente | null },

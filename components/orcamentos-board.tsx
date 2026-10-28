@@ -141,7 +141,15 @@ function NewForm() {
   );
 }
 
-function Row({ item }: { item: OrcamentoComRealizado }) {
+function Row({
+  item,
+  somenteLeitura,
+  semValores,
+}: {
+  item: OrcamentoComRealizado;
+  somenteLeitura: boolean;
+  semValores: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const action = updateOrcamento.bind(null, item.id);
   const [state, formAction, pending] = useActionState(action, undefined);
@@ -199,28 +207,31 @@ function Row({ item }: { item: OrcamentoComRealizado }) {
             <StatusChip tone={tone}>{pct}% do planejado</StatusChip>
           </p>
           <p className="text-xs text-zinc-500">
-            {formatCurrency(item.realizado)} realizado de{" "}
-            {formatCurrency(item.valor_planejado)} planejado
+            {semValores
+              ? "Valores ocultos"
+              : `${formatCurrency(item.realizado)} realizado de ${formatCurrency(item.valor_planejado)} planejado`}
             {item.observacoes && ` · ${item.observacoes}`}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <form action={deleteOrcamento.bind(null, item.id)}>
+        {!somenteLeitura && (
+          <div className="flex shrink-0 items-center gap-1">
             <button
-              type="submit"
-              className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Pencil className="h-3.5 w-3.5" />
             </button>
-          </form>
-        </div>
+            <form action={deleteOrcamento.bind(null, item.id)}>
+              <button
+                type="submit"
+                className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </div>
+        )}
       </div>
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
         <div
@@ -234,8 +245,12 @@ function Row({ item }: { item: OrcamentoComRealizado }) {
 
 export function OrcamentosBoard({
   orcamentos,
+  somenteLeitura = false,
+  semValores = false,
 }: {
   orcamentos: OrcamentoComRealizado[];
+  somenteLeitura?: boolean;
+  semValores?: boolean;
 }) {
   const porMes = new Map<string, OrcamentoComRealizado[]>();
   for (const item of orcamentos) {
@@ -257,7 +272,7 @@ export function OrcamentosBoard({
             {orcamentos.length} orçamento(s) · planejado vs. realizado
           </p>
         </div>
-        <NewForm />
+        {!somenteLeitura && <NewForm />}
       </div>
 
       {mesesOrdenados.length > 0 ? (
@@ -273,7 +288,12 @@ export function OrcamentosBoard({
               </div>
               <div className="space-y-2">
                 {itens.map((item) => (
-                  <Row key={item.id} item={item} />
+                  <Row
+                    key={item.id}
+                    item={item}
+                    somenteLeitura={somenteLeitura}
+                    semValores={semValores}
+                  />
                 ))}
               </div>
             </div>

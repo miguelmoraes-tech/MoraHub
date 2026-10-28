@@ -86,7 +86,7 @@ export async function createContrato(
   let arquivo_path: string | null = null;
   if (arquivo) {
     try {
-      arquivo_path = await uploadClienteArquivo(user.id, clienteId, arquivo);
+      arquivo_path = await uploadClienteArquivo(workspaceId, clienteId, arquivo);
     } catch {
       return { error: "Não foi possível enviar o arquivo." };
     }
@@ -155,7 +155,7 @@ export async function updateContrato(
       ?.arquivo_path ?? null;
 
     try {
-      novoArquivoPath = await uploadClienteArquivo(user.id, clienteId, arquivo);
+      novoArquivoPath = await uploadClienteArquivo(workspaceId, clienteId, arquivo);
     } catch {
       return { error: "Não foi possível enviar o arquivo." };
     }
@@ -224,7 +224,7 @@ export async function createComprovante(
   let arquivo_path: string | null = null;
   if (arquivo) {
     try {
-      arquivo_path = await uploadClienteArquivo(user.id, clienteId, arquivo);
+      arquivo_path = await uploadClienteArquivo(workspaceId, clienteId, arquivo);
     } catch {
       return { error: "Não foi possível enviar o arquivo." };
     }
@@ -290,7 +290,7 @@ export async function updateComprovante(
       ?.arquivo_path ?? null;
 
     try {
-      novoArquivoPath = await uploadClienteArquivo(user.id, clienteId, arquivo);
+      novoArquivoPath = await uploadClienteArquivo(workspaceId, clienteId, arquivo);
     } catch {
       return { error: "Não foi possível enviar o arquivo." };
     }
@@ -300,7 +300,8 @@ export async function updateComprovante(
   const { error } = await supabase
     .from("comprovantes")
     .update(update)
-    .eq("id", comprovanteId);
+    .eq("id", comprovanteId)
+    .eq("workspace_id", workspaceId);
   if (error) {
     if (novoArquivoPath) await removeClienteArquivo(novoArquivoPath);
     return { error: "Não foi possível atualizar o comprovante." };
@@ -325,7 +326,11 @@ export async function deleteComprovante(
     .eq("workspace_id", workspaceId ?? "")
     .single();
 
-  await supabase.from("comprovantes").delete().eq("id", comprovanteId);
+  await supabase
+    .from("comprovantes")
+    .delete()
+    .eq("id", comprovanteId)
+    .eq("workspace_id", workspaceId ?? "");
 
   const arquivoPath = (existente as { arquivo_path: string | null } | null)
     ?.arquivo_path;
@@ -458,7 +463,8 @@ export async function updateAssinatura(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase } = await requireUser();
+  const { supabase, workspaceId } = await requireUser();
+  if (!workspaceId) return SEM_EMPRESA;
   const { error } = await supabase
     .from("assinaturas")
     .update({
@@ -469,7 +475,8 @@ export async function updateAssinatura(
       proxima_cobranca: parsed.data.proxima_cobranca ?? null,
       status: parsed.data.status,
     })
-    .eq("id", assinaturaId);
+    .eq("id", assinaturaId)
+    .eq("workspace_id", workspaceId);
   if (error) return { error: "Não foi possível atualizar a assinatura." };
 
   revalidatePath(`/clientes/${clienteId}`);
@@ -480,8 +487,12 @@ export async function deleteAssinatura(
   clienteId: string,
   assinaturaId: string
 ) {
-  const { supabase } = await requireUser();
-  await supabase.from("assinaturas").delete().eq("id", assinaturaId);
+  const { supabase, workspaceId } = await requireUser();
+  await supabase
+    .from("assinaturas")
+    .delete()
+    .eq("id", assinaturaId)
+    .eq("workspace_id", workspaceId ?? "");
   revalidatePath(`/clientes/${clienteId}`);
 }
 
