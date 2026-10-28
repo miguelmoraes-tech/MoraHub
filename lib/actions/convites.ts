@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { VENDEDOR_HOME, getVendedorAcesso } from "@/lib/vendedor-access";
 import { COMERCIAL_DONO_COOKIE, COMERCIAL_DONO_COOKIE_MAX_AGE } from "@/lib/comercial";
+import { HOME_DONO } from "@/lib/modulos/registry";
 
 export type ConviteResponseState = { error: string } | undefined;
 
@@ -52,7 +53,8 @@ export async function aceitarConvite(
     }
   }
 
-  redirect("/colaborador");
+  // O seletor /colaborador está fora do ar: vai direto para o destino.
+  redirect(HOME_DONO);
 }
 
 export async function recusarConvite(

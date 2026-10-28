@@ -1,5 +1,15 @@
 import type { ComponentType } from "react";
-import { Building2, Home, Calculator, Scale, Briefcase, Users2, LineChart, Megaphone } from "lucide-react";
+import {
+  Building2,
+  Home,
+  Calculator,
+  Scale,
+  Briefcase,
+  Users2,
+  LineChart,
+  Megaphone,
+  Handshake,
+} from "lucide-react";
 import type { AccountType } from "@/lib/hub-mode";
 
 export const ACCOUNT_TYPES: {
@@ -63,14 +73,34 @@ export const ACCOUNT_TYPES: {
 ];
 
 /**
- * Account types offered as cards on /signup's "tipo de conta" step. To bring
- * another one back, add its value here — nothing else changes. Only affects
- * the manual choice: the invite flow (/convite/<token> -> /signup?papel=...)
- * accepts any collaborator papel regardless, and the "Sou vendedor" card
- * (the 'comercial' type, by access code) is rendered by the signup page
- * itself, not from this list.
+ * Opções da tela de tipo de conta de /signup — a lista habilitada vive só
+ * aqui. Cada opção grava o tipo de conta (`tipo`) que o resto do app já
+ * entende: empreendedor = 'empresarial' (cria a primeira empresa no primeiro
+ * acesso), funcionário = 'comercial' (entra por código/convite; a regra de
+ * vendedor sem vínculo depende desse valor). Os demais tipos continuam em
+ * ACCOUNT_TYPES, só não são oferecidos. Convites por link
+ * (/convite/<token> -> /signup?papel=...) aceitam qualquer papel de
+ * colaborador, independentemente desta lista.
  */
-export const SIGNUP_ACCOUNT_TYPES: AccountType[] = ["empresarial", "pessoal"];
+export const SIGNUP_OPCOES: {
+  tipo: AccountType;
+  label: string;
+  description: string;
+  icon: ComponentType<{ className?: string }>;
+}[] = [
+  {
+    tipo: "empresarial",
+    label: "Sou empreendedor",
+    description: "Tenho uma empresa e quero gerenciá-la: clientes, leads, vendedores e mais",
+    icon: Building2,
+  },
+  {
+    tipo: "comercial",
+    label: "Sou funcionário",
+    description: "Trabalho em uma empresa e vou entrar nela com o código do meu gestor ou um convite",
+    icon: Handshake,
+  },
+];
 
 /**
  * Tipos listados no seletor de contas ("Tipos de conta", na sidebar e no topo

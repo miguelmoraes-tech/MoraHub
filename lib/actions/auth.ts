@@ -16,6 +16,14 @@ import {
   getVendedorAcesso,
   isComercialSemVinculo,
 } from "@/lib/vendedor-access";
+import { HOME_DONO } from "@/lib/modulos/registry";
+import { NOVA_EMPRESA } from "@/lib/empresa";
+import {
+  garantirPerfil,
+  garantirTipoAtivo,
+  temEmpresaPropria,
+  tipoContaDaMetadata,
+} from "@/lib/perfil";
 import { COMERCIAL_DONO_COOKIE, COMERCIAL_DONO_COOKIE_MAX_AGE } from "@/lib/comercial";
 
 const HUB_MODE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
@@ -56,6 +64,10 @@ export async function login(
     return { error: "E-mail ou senha incorretos." };
   }
 
+  // Contas antigas (e as de teste) podem não ter linha em `perfis`: cria no
+  // primeiro login, de forma idempotente. Falhar aqui não impede o login.
+  await garantirPerfil(supabase, data.user);
+
   const redirectTo = safeRedirect(formData.get("redirectTo"));
   if (redirectTo) {
     redirect(redirectTo);
@@ -88,18 +100,27 @@ export async function login(
     .eq("id", data.user.id)
     .maybeSingle();
 
-  // Accountants/lawyers don't own a Business/Pessoal hub by default — they
-  // always land on the linked-accounts picker, based on the type chosen at
-  // signup. This doesn't stop the account from becoming an owner later too;
-  // it only decides which screen it sees first on login.
-  if (isCollaboratorAccountType(perfil?.tipo_conta_padrao)) {
-    redirect("/colaborador");
+  const tipoPadrao = perfil?.tipo_conta_padrao ?? tipoContaDaMetadata(data.user);
+
+  // Empreendedor que ainda não tem empresa (o cadastro não pede o nome): o
+  // primeiro login cai na tela "Dê um nome à sua empresa".
+  const cookieStore = await cookies();
+  const lastMode = cookieStore.get(HUB_MODE_COOKIE)?.value;
+  if (
+    tipoPadrao === "empresarial" &&
+    lastMode !== "pessoal" &&
+    !(await temEmpresaPropria(supabase, data.user.id))
+  ) {
+    redirect(NOVA_EMPRESA);
   }
 
-  // Collaborators (external accountants/lawyers acting on someone else's
-  // account) pick which linked account to work on before landing in any hub
-  // — same idea as the business/pessoal mode choice below, but for whose
-  // data they're viewing.
+  // Contador/advogado/etc. e quem tem vínculo de colaborador: o seletor
+  // /colaborador está fora do ar (o proxy o desviaria), então vão direto para
+  // o destino em vez de depender do redirecionamento.
+  if (isCollaboratorAccountType(tipoPadrao)) {
+    redirect(HOME_DONO);
+  }
+
   const { data: colaboracao } = await supabase
     .from("membros")
     .select("id")
@@ -109,11 +130,8 @@ export async function login(
     .maybeSingle();
 
   if (colaboracao) {
-    redirect("/colaborador");
+    redirect(HOME_DONO);
   }
-
-  const cookieStore = await cookies();
-  const lastMode = cookieStore.get(HUB_MODE_COOKIE)?.value;
 
   if (lastMode === "pessoal" || lastMode === "business") {
     redirect(MODE_HOME_ROUTE[lastMode]);
@@ -122,7 +140,7 @@ export async function login(
   // No cookie yet (e.g. first login on a new device) — fall back to the
   // account's default mode chosen at signup. Missing/unknown rows default
   // to "empresarial" via accountTypeToHubMode, so old accounts still work.
-  const mode = accountTypeToHubMode(perfil?.tipo_conta_padrao);
+  const mode = accountTypeToHubMode(tipoPadrao);
   cookieStore.set(HUB_MODE_COOKIE, mode, {
     path: "/",
     maxAge: HUB_MODE_COOKIE_MAX_AGE,
@@ -199,36 +217,44 @@ export async function signup(
     };
   }
 
-  const { error: perfilError } = await supabase
-    .from("perfis")
-    .upsert({ id: data.user.id, nome: nome || null, tipo_conta_padrao: tipoConta });
+  const { ok: perfilOk } = await garantirPerfil(supabase, {
+    id: data.user.id,
+    user_metadata: { nome: nome || undefined, tipo_conta_padrao: tipoConta },
+  });
 
-  if (perfilError) {
+  if (!perfilOk) {
     return { error: "Conta criada, mas houve um problema ao salvar seu perfil. Tente entrar normalmente." };
   }
 
-  // The type chosen at signup is also the first active type in the switcher.
-  await supabase
-    .from("perfis_tipos_ativos")
-    .upsert(
-      { user_id: data.user.id, tipo: tipoConta },
-      { onConflict: "user_id,tipo", ignoreDuplicates: true }
-    );
+  // Empreendedor: a empresa nasce na tela "Dê um nome à sua empresa" (precisa
+  // de nome). Os demais tipos viram o primeiro tipo ativo do switcher.
+  if (tipoConta !== "empresarial") {
+    await garantirTipoAtivo(supabase, data.user.id, tipoConta);
+  }
 
   const redirectTo = safeRedirect(formData.get("redirectTo"));
   if (redirectTo) {
     redirect(redirectTo);
   }
 
-  // A new vendedor has no company yet: straight to typing the gestor's code.
+  // Funcionário: sem empresa ainda, vai para "Entrar numa empresa".
   if (tipoConta === "comercial") {
     redirect(ACESSO_VENDEDOR_CODIGO);
   }
 
-  // Accountants/lawyers don't own a Business/Pessoal hub by default — send
-  // them straight to the linked-accounts picker instead of a mode home.
+  if (tipoConta === "empresarial") {
+    const cookieStore = await cookies();
+    cookieStore.set(HUB_MODE_COOKIE, "business", {
+      path: "/",
+      maxAge: HUB_MODE_COOKIE_MAX_AGE,
+      sameSite: "lax",
+    });
+    redirect(NOVA_EMPRESA);
+  }
+
+  // Contador/advogado/etc.: o seletor /colaborador está fora do ar.
   if (isCollaboratorAccountType(tipoConta)) {
-    redirect("/colaborador");
+    redirect(HOME_DONO);
   }
 
   const mode = accountTypeToHubMode(tipoConta);

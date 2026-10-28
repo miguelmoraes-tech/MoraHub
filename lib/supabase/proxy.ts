@@ -8,7 +8,14 @@ import {
   isRotaDeAcessoVendedor,
   isRotaDoVendedor,
 } from "@/lib/vendedor-access";
-import { ROTA_PADRAO_DONO, isRotaHabilitada } from "@/lib/modulos-habilitados";
+import {
+  HOME_DONO,
+  isRotaLivre,
+  primeiraRotaHabilitada,
+  rotaPermitida,
+} from "@/lib/modulos/registry";
+import { getEmpresaDoUsuario } from "@/lib/modulos/habilitados";
+import { NOVA_EMPRESA } from "@/lib/empresa";
 
 // Exact-path routes usable without a session. Also the set a logged-in user
 // gets bounced away from (see the `user && PUBLIC_ROUTES.includes(path)`
@@ -95,7 +102,9 @@ export async function updateSession(request: NextRequest) {
         return redirectTo(url);
       }
     } else if (await isComercialSemVinculo(supabase, user, acesso)) {
-      if (!isRotaDeAcessoVendedor(path)) {
+      // Sem vínculo ainda: só digitar o código, esperar a aprovação ou criar
+      // a própria empresa.
+      if (!isRotaDeAcessoVendedor(path) && path !== NOVA_EMPRESA) {
         const url = request.nextUrl.clone();
         url.pathname = ACESSO_VENDEDOR_CODIGO;
         url.search = "";
@@ -104,19 +113,24 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Módulos desligados (lib/modulos-habilitados.ts) ficam inalcançáveis: o
-  // código continua no repo, mas a rota volta para o início. Quem só é
-  // vendedor já foi mandado para /vendedor/leads acima.
-  if (!onPublicRoute && !isRotaHabilitada(path)) {
-    const url = request.nextUrl.clone();
-    url.pathname = ROTA_PADRAO_DONO;
-    url.search = "";
-    return redirectTo(url);
+  // Módulo desligado na empresa do usuário (workspace_modulos) fica
+  // inalcançável: o código continua no repo, mas a rota volta para o início.
+  // Rotas livres (acesso, home, vendedor, módulos...) nem chegam ao banco; as
+  // demais custam uma única consulta (empresa + módulos ligados). Quem só é
+  // vendedor, ou ainda não tem vínculo, já foi tratado acima.
+  if (!onPublicRoute && !isRotaLivre(path)) {
+    const { habilitados } = await getEmpresaDoUsuario(supabase, user.id);
+    if (!rotaPermitida(path, habilitados)) {
+      const url = request.nextUrl.clone();
+      url.pathname = primeiraRotaHabilitada(habilitados) ?? HOME_DONO;
+      url.search = "";
+      return redirectTo(url);
+    }
   }
 
   if (onPublicRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/clientes";
+    url.pathname = HOME_DONO;
     return redirectTo(url);
   }
 

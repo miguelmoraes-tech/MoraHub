@@ -1,0 +1,71 @@
+import {
+  Activity,
+  BadgeCheck,
+  Banknote,
+  Blocks,
+  Briefcase,
+  Building2,
+  CalendarClock,
+  CalendarDays,
+  ClipboardCheck,
+  Clock,
+  CreditCard,
+  FileBarChart,
+  FileText,
+  Gift,
+  HandCoins,
+  Landmark,
+  LayoutGrid,
+  LineChart,
+  Megaphone,
+  Palmtree,
+  PieChart,
+  Receipt,
+  Scale,
+  Target,
+  TrendingUp,
+  UserCheck,
+  UserX,
+  Users,
+  Wallet,
+} from "lucide-react";
+import type { IconeNome } from "@/lib/modulos/registry";
+
+export type Icone = React.ComponentType<{ className?: string }>;
+
+const ICONES: Record<IconeNome, Icone> = {
+  target: Target,
+  "user-x": UserX,
+  users: Users,
+  "calendar-clock": CalendarClock,
+  "user-check": UserCheck,
+  activity: Activity,
+  "credit-card": CreditCard,
+  "hand-coins": HandCoins,
+  "pie-chart": PieChart,
+  "line-chart": LineChart,
+  "trending-up": TrendingUp,
+  landmark: Landmark,
+  "file-bar-chart": FileBarChart,
+  receipt: Receipt,
+  "badge-check": BadgeCheck,
+  wallet: Wallet,
+  "building-2": Building2,
+  palmtree: Palmtree,
+  gift: Gift,
+  banknote: Banknote,
+  briefcase: Briefcase,
+  "clipboard-check": ClipboardCheck,
+  clock: Clock,
+  "layout-grid": LayoutGrid,
+  "calendar-days": CalendarDays,
+  megaphone: Megaphone,
+  scale: Scale,
+  "file-text": FileText,
+  blocks: Blocks,
+};
+
+/** Ícone pelo nome; nome desconhecido (ex.: vindo do catálogo) cai num padrão. */
+export function iconeDe(nome: IconeNome | string | null | undefined): Icone {
+  return (nome ? (ICONES as Record<string, Icone>)[nome] : undefined) ?? Blocks;
+}

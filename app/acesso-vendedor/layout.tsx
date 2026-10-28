@@ -30,7 +30,7 @@ export default function AcessoVendedorLayout({
               Mora <span className="text-copper-400">HUB</span>
             </span>
             <span className="rounded-full border border-teal-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-teal-400">
-              Vendedor
+              Funcionário
             </span>
           </div>
           <form action={logout}>

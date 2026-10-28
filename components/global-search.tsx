@@ -1,6 +1,5 @@
 "use client";
 
-import { isRotaHabilitada } from "@/lib/modulos-habilitados";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -33,7 +32,7 @@ const GRUPOS: {
   { key: "servicos", label: "Serviços", icon: Wrench },
 ];
 
-export function GlobalSearch() {
+export function GlobalSearch({ incluirDocumentos }: { incluirDocumentos: boolean }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -152,7 +151,7 @@ export function GlobalSearch() {
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={
-                isRotaHabilitada("/documentos")
+                incluirDocumentos
                   ? "Buscar clientes, leads, documentos..."
                   : "Buscar clientes, leads..."
               }

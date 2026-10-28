@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
-import { isRotaHabilitada } from "@/lib/modulos-habilitados";
+import { getModulosHabilitados } from "@/lib/modulos/habilitados";
+import { rotaPermitida } from "@/lib/modulos/registry";
 
 export type BuscaResultado = {
   id: string;
@@ -50,6 +51,12 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
 
   const supabase = await createClient();
   const workspaceId = await getEffectiveWorkspaceIdGeral();
+  // Só busca nas tabelas de módulos ligados na empresa.
+  const habilitados = workspaceId ? await getModulosHabilitados(workspaceId) : [];
+  const comClientes = rotaPermitida("/clientes", habilitados);
+  const comLeads = rotaPermitida("/leads", habilitados);
+  const comDocumentos = rotaPermitida("/documentos", habilitados);
+  const nada = Promise.resolve({ data: null });
   const pattern = `%${sanitizeTermo(termo)}%`;
   const ate = LIMITE_POR_GRUPO + 1;
 
@@ -62,7 +69,8 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
     { data: leads },
     { data: documentos },
   ] = await Promise.all([
-    supabase
+    comClientes
+      ? supabase
       .from("clientes")
       .select("id, nome, contato, email, responsavel, segmento")
       .eq("workspace_id", workspaceId ?? "")
@@ -70,42 +78,53 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
         `nome.ilike.${pattern},contato.ilike.${pattern},email.ilike.${pattern},responsavel.ilike.${pattern},segmento.ilike.${pattern}`
       )
       .order("nome")
-      .limit(ate),
-    supabase
+      .limit(ate)
+      : nada,
+    comClientes
+      ? supabase
       .from("acessos")
       .select("id, cliente_id, nome_servico, categoria, usuario, url_login")
       .or(
         `nome_servico.ilike.${pattern},categoria.ilike.${pattern},usuario.ilike.${pattern},url_login.ilike.${pattern}`
       )
-      .limit(ate),
-    supabase
+      .limit(ate)
+      : nada,
+    comClientes
+      ? supabase
       .from("infraestrutura")
       .select("id, cliente_id, dominio, hospedagem, tecnologias")
       .or(
         `dominio.ilike.${pattern},hospedagem.ilike.${pattern},tecnologias.ilike.${pattern}`
       )
-      .limit(ate),
-    supabase
+      .limit(ate)
+      : nada,
+    comClientes
+      ? supabase
       .from("projetos")
       .select("id, cliente_id, nome, tecnologias, repositorio_git")
       .or(
         `nome.ilike.${pattern},tecnologias.ilike.${pattern},repositorio_git.ilike.${pattern}`
       )
-      .limit(ate),
-    supabase
+      .limit(ate)
+      : nada,
+    comClientes
+      ? supabase
       .from("servicos")
       .select("id, cliente_id, nome, categoria")
       .or(`nome.ilike.${pattern},categoria.ilike.${pattern}`)
-      .limit(ate),
-    supabase
+      .limit(ate)
+      : nada,
+    comLeads
+      ? supabase
       .from("leads")
       .select("id, nome, nicho, contato")
       .eq("workspace_id", workspaceId ?? "")
       .or(`nome.ilike.${pattern},nicho.ilike.${pattern},contato.ilike.${pattern}`)
       .order("nome")
-      .limit(ate),
-    // Documentos é um módulo desligado: sem consulta, grupo sempre vazio.
-    isRotaHabilitada("/documentos")
+      .limit(ate)
+      : nada,
+    // Documentos pertence ao módulo Jurídico: desligado, o grupo vem vazio.
+    comDocumentos
       ? supabase
           .from("documentos")
           .select("id, cliente_id, titulo")

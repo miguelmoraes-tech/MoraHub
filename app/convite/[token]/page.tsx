@@ -96,7 +96,7 @@ export default async function ConvitePage({
               </p>
 
               {user ? (
-                user.email === convite.email_convidado ? (
+                user.email?.toLowerCase() === convite.email_convidado.toLowerCase() ? (
                   <div className="flex gap-2 pt-2">
                     <AceitarConviteForm token={token} />
                     <RecusarConviteForm

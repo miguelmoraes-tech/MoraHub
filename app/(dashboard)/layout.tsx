@@ -11,7 +11,8 @@ import { getComercialDonoId } from "@/lib/comercial";
 import { getMarketingDonoId } from "@/lib/marketing";
 import { getUnreadTotal } from "@/lib/chat";
 import type { AccountType } from "@/lib/hub-mode";
-import { isRotaHabilitada } from "@/lib/modulos-habilitados";
+import { CHAT_HABILITADO, VENCIMENTOS_HABILITADO } from "@/lib/modulos/registry";
+import { getModulosHabilitados } from "@/lib/modulos/habilitados";
 import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { ToastProvider } from "@/components/toast";
 import {
@@ -33,9 +34,9 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  // Vencimentos e Chat são módulos desligados (lib/modulos-habilitados.ts):
+  // Vencimentos e Chat não são módulos do catálogo (lib/modulos/registry.ts):
   // sem banner, sem contador de não lidas e sem as consultas deles.
-  const vencimentosAtivo = isRotaHabilitada("/calendario");
+  const vencimentosAtivo = VENCIMENTOS_HABILITADO;
   const alertas = vencimentosAtivo ? await getVencimentoAlertas() : [];
   const financeiroDonoId = await getFinanceiroDonoId();
   const restritoFinanceiro = !!financeiroDonoId;
@@ -103,7 +104,7 @@ export default async function DashboardLayout({
       .maybeSingle();
     if (conversaMarketing) chatHref = `/chat/${conversaMarketing.id}`;
   }
-  const unreadTotal = isRotaHabilitada("/chat") ? await getUnreadTotal() : 0;
+  const unreadTotal = CHAT_HABILITADO ? await getUnreadTotal() : 0;
 
   // Pedidos de acesso de vendedor: só o dono do workspace empresarial os vê
   // (RLS) — quem está numa visão restrita de colaborador não tem sino.
@@ -113,11 +114,14 @@ export default async function DashboardLayout({
     !restritoRH &&
     !restritoComercial &&
     !restritoMarketing;
-  const workspaceEmpresarialId = donoEmpresarial
-    ? await getWorkspaceIdPadrao(user.id, "empresarial")
-    : null;
+  const workspacePropriaId = await getWorkspaceIdPadrao(user.id, "empresarial");
+  const workspaceEmpresarialId = donoEmpresarial ? workspacePropriaId : null;
+  // Módulos ligados da empresa (menu = registro ∩ workspace_modulos).
+  const modulosHabilitados = workspacePropriaId
+    ? await getModulosHabilitados(workspacePropriaId)
+    : [];
   let solicitacoesPendentes: SolicitacaoPendente[] = [];
-  if (workspaceEmpresarialId) {
+  if (workspaceEmpresarialId && modulosHabilitados.includes("vendedores")) {
     const { data } = await supabase
       .from("solicitacoes_vendedor")
       .select("id, email, created_at")
@@ -146,6 +150,8 @@ export default async function DashboardLayout({
         restritoMarketing={restritoMarketing}
         chatHref={chatHref}
         unreadTotal={unreadTotal}
+        modulosHabilitados={modulosHabilitados}
+        ehDono={!!workspaceEmpresarialId}
       />
       <main className="flex flex-1 flex-col overflow-y-auto">
         {vencimentosAtivo && <VencimentosBanner alertas={alertas} />}
@@ -157,7 +163,7 @@ export default async function DashboardLayout({
 
   return (
     <ToastProvider>
-      {workspaceEmpresarialId ? (
+      {workspaceEmpresarialId && modulosHabilitados.includes("vendedores") ? (
         <SolicitacoesVendedorProvider
           workspaceId={workspaceEmpresarialId}
           initialPendentes={solicitacoesPendentes}
