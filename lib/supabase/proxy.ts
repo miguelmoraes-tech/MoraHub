@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getVendedorAcesso, isComercialSemVinculo } from "@/lib/vendedor-access";
 import { getModulosDaEmpresa } from "@/lib/modulos/habilitados";
+import { lerPermissoesProprias, modulosDasPermissoes } from "@/lib/modulos/permissoes";
 import {
   EMPRESA_ATIVA_COOKIE,
   EMPRESA_ATIVA_COOKIE_MAX_AGE,
@@ -98,6 +99,7 @@ export async function updateSession(request: NextRequest) {
   const resolucao = await resolverEmpresaAtiva(supabase, cookieValido);
 
   let habilitados: string[] = [];
+  let permissoes: string[] = [];
   if (resolucao.status === "ok") {
     if (resolucao.corrigirCookie) {
       response.cookies.set(EMPRESA_ATIVA_COOKIE, resolucao.workspaceId, {
@@ -108,11 +110,21 @@ export async function updateSession(request: NextRequest) {
         maxAge: EMPRESA_ATIVA_COOKIE_MAX_AGE,
       });
     }
-    if (resolucao.papel === "dono" && lerModulos) {
-      habilitados =
+    const painel = resolucao.papel === "dono" || resolucao.papel === "cofundador";
+    const restrito = resolucao.papel === "socio" || resolucao.papel === "funcionario";
+    if ((painel || restrito) && lerModulos) {
+      // Sócio/funcionário: módulos da empresa ∩ as próprias permissões, lidos
+      // em paralelo. Falha em qualquer um = lista vazia = nega.
+      const [modulos, permitidos] = await Promise.all([
         modulosDoCookie && resolucao.workspaceId === cookieValido
-          ? await modulosDoCookie
-          : await getModulosDaEmpresa(supabase, resolucao.workspaceId).catch(() => []);
+          ? modulosDoCookie
+          : getModulosDaEmpresa(supabase, resolucao.workspaceId).catch(() => [] as string[]),
+        restrito
+          ? lerPermissoesProprias(supabase, resolucao.workspaceId, user.id)
+          : Promise.resolve([]),
+      ]);
+      habilitados = modulos;
+      permissoes = modulosDasPermissoes(permitidos);
     }
   }
 
@@ -132,7 +144,13 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  const decisao = decidirAcesso({ path, resolucao, habilitados, funcionarioSemVinculo });
+  const decisao = decidirAcesso({
+    path,
+    resolucao,
+    habilitados,
+    permissoes,
+    funcionarioSemVinculo,
+  });
   if (decisao.tipo === "redirecionar") {
     const url = request.nextUrl.clone();
     const [pathname, search] = decisao.para.split("?");

@@ -78,6 +78,8 @@ export interface SolicitacaoVendedor {
   status: SolicitacaoVendedorStatus;
   created_at: string;
   respondido_em: string | null;
+  /** null = pedido de vendedor; senão, o setor (perfis_acesso) cujo código foi usado. */
+  perfil_acesso_id?: string | null;
 }
 
 /** How often the "aguardando aprovação" screen asks whether the gestor answered. */
@@ -98,11 +100,32 @@ export function formatarCodigoVendedor(raw: string): string {
   return limpo.length > 5 ? `${limpo.slice(0, 5)}-${limpo.slice(5)}` : limpo;
 }
 
-/** Raised by solicitar_acesso_vendedor already worded for the user. */
+/**
+ * Código de acesso digitado na tela "Entrar numa empresa": vale o de vendedor
+ * (10 caracteres) e o de setor. Só limpa e põe em maiúsculas; o banco confere.
+ */
+export const CODIGO_ACESSO_MIN = 6;
+export const CODIGO_ACESSO_MAX = 16;
+
+export function limparCodigoAcesso(raw: string): string {
+  return raw
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, CODIGO_ACESSO_MAX);
+}
+
+/** Mesmo visual de XXXXX-XXXXX: hífen depois do 5º caractere. */
+export function formatarCodigoAcesso(raw: string): string {
+  const limpo = limparCodigoAcesso(raw);
+  return limpo.length > 5 ? `${limpo.slice(0, 5)}-${limpo.slice(5)}` : limpo;
+}
+
+/** Raised by solicitar_acesso / solicitar_acesso_vendedor already worded for the user. */
 const CODIGO_USER_MESSAGES = [
   "Código inválido",
   "Este é o seu próprio código",
   "Você já tem acesso a este workspace",
+  "Você já tem acesso a esta empresa",
 ];
 
 export function solicitarAcessoErrorMessage(message: string | undefined | null): string {

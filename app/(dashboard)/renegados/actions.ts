@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoEdicao } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { RenegadoSchema } from "@/lib/validations/renegado";
 import type { ActionState } from "@/lib/actions/types";
@@ -11,6 +11,8 @@ function textOrNull(value: FormDataEntryValue | null) {
   const str = value.toString().trim();
   return str === "" ? null : str;
 }
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -47,12 +49,12 @@ export async function createRenegado(
 
   const { supabase, user } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
-  const workspaceId = await getWorkspaceIdAtivo();
-  if (!workspaceId) return { error: "Selecione uma empresa em que você é o dono." };
+  const acesso = await getAcessoEdicao("renegados");
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const { error } = await supabase.from("renegados").insert({
     user_id: user.id,
-    workspace_id: workspaceId,
+    workspace_id: acesso.workspaceId,
     nome: parsed.data.nome,
     contato: parsed.data.contato ?? null,
     tem_site: parsed.data.tem_site,
@@ -82,6 +84,7 @@ export async function updateRenegado(
   }
 
   const { supabase } = await requireUser();
+  if (!(await getAcessoEdicao("renegados"))) return { error: SEM_PERMISSAO };
   const { error } = await supabase
     .from("renegados")
     .update({
@@ -106,6 +109,7 @@ export async function updateRenegado(
 
 export async function deleteRenegado(renegadoId: string) {
   const { supabase } = await requireUser();
+  if (!(await getAcessoEdicao("renegados"))) return;
   await supabase.from("renegados").delete().eq("id", renegadoId);
   revalidatePath("/renegados");
 }

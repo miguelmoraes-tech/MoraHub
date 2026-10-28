@@ -18,6 +18,7 @@ import {
   Inbox,
   FileText,
   Scale,
+  UsersRound,
   LogOut,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
@@ -49,6 +50,7 @@ const VISAO_GERAL: NavItem = { label: "Visão Geral", href: "/dashboard", icon: 
 
 const EMPRESA_ITEMS: NavItem[] = [
   { label: "Módulos", href: "/modulos", icon: Blocks },
+  { label: "Sócios", href: "/socios", icon: UsersRound },
   { label: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
@@ -150,7 +152,8 @@ export function Sidebar({
   chatHref,
   unreadTotal,
   modulosHabilitados,
-  ehDono,
+  painelCompleto,
+  restrito,
   empresas,
   empresaAtivaId,
 }: {
@@ -161,8 +164,10 @@ export function Sidebar({
   unreadTotal: number;
   /** Módulos ligados da empresa ativa (workspace_modulos). */
   modulosHabilitados: string[];
-  /** Dono da empresa ativa vendo o próprio painel (vê Módulos e Configurações). */
-  ehDono: boolean;
+  /** Fundador/cofundador da empresa ativa (vê Módulos, Sócios e Configurações). */
+  painelCompleto: boolean;
+  /** Sócio/funcionário: menu só com os módulos que as permissões liberam (já em modulosHabilitados). */
+  restrito: boolean;
   /** Empresas com vínculo ativo da conta, para o seletor. */
   empresas: EmpresaVinculo[];
   empresaAtivaId: string | null;
@@ -194,7 +199,9 @@ export function Sidebar({
       </div>
 
       <div className="space-y-3 border-b border-zinc-900 px-3 pb-4">
-        <GlobalSearch incluirDocumentos={rotaPermitida("/documentos", modulosHabilitados)} />
+        {!restrito && (
+          <GlobalSearch incluirDocumentos={rotaPermitida("/documentos", modulosHabilitados)} />
+        )}
         {!isPessoal && <EmpresaSwitcher empresas={empresas} ativaId={empresaAtivaId} />}
         <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} tiposAtivos={tiposAtivos} />
       </div>
@@ -214,12 +221,14 @@ export function Sidebar({
             </>
           ) : (
             <>
-              <NavGroup
-                title="Dashboards"
-                items={[VISAO_GERAL]}
-                accent={accent}
-                habilitados={modulosHabilitados}
-              />
+              {!restrito && (
+                <NavGroup
+                  title="Dashboards"
+                  items={[VISAO_GERAL]}
+                  accent={accent}
+                  habilitados={modulosHabilitados}
+                />
+              )}
               {menuDoDono(modulosHabilitados).map((grupo) => (
                 <NavGroup
                   key={grupo.titulo}
@@ -229,7 +238,7 @@ export function Sidebar({
                   habilitados={modulosHabilitados}
                 />
               ))}
-              {ehDono && (
+              {painelCompleto && (
                 <NavGroup
                   title="Empresa"
                   items={EMPRESA_ITEMS}

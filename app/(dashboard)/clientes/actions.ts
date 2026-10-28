@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDonoIdAtivo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoEdicao } from "@/lib/empresa-ativa";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ClienteSchema } from "@/lib/validations/cliente";
@@ -12,6 +12,8 @@ function textOrNull(value: FormDataEntryValue | null) {
   const str = value.toString().trim();
   return str === "" ? null : str;
 }
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -45,11 +47,8 @@ export async function createCliente(
   }
 
   const { supabase } = await requireUser();
-  const [donoId, workspaceId] = await Promise.all([
-    getDonoIdAtivo(),
-    getWorkspaceIdAtivo(),
-  ]);
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  const acesso = await getAcessoEdicao("clientes");
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const { error } = await supabase.from("clientes").insert({
     nome: parsed.data.nome,
@@ -61,8 +60,8 @@ export async function createCliente(
     segmento: parsed.data.segmento ?? null,
     abordado_por: parsed.data.abordado_por ?? null,
     responsavel: parsed.data.responsavel ?? null,
-    user_id: donoId,
-    workspace_id: workspaceId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
   });
 
   if (error) return { error: "Não foi possível criar o cliente." };
@@ -83,6 +82,7 @@ export async function updateCliente(
 
   const { supabase, user } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!(await getAcessoEdicao("clientes"))) return { error: SEM_PERMISSAO };
 
   const { error } = await supabase
     .from("clientes")
@@ -109,6 +109,7 @@ export async function updateCliente(
 export async function deleteCliente(clienteId: string) {
   const { supabase, user } = await requireUser();
   if (!user) return;
+  if (!(await getAcessoEdicao("clientes"))) return;
 
   await supabase.from("clientes").delete().eq("id", clienteId);
 

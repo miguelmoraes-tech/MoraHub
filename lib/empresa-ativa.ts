@@ -5,9 +5,16 @@ import {
   EMPRESA_ATIVA_COOKIE,
   EMPRESA_ATIVA_COOKIE_MAX_AGE,
   escolherEmpresa,
+  ehPapelRestrito,
   listarEmpresas,
+  temPainelCompleto,
   type EmpresaVinculo,
 } from "@/lib/empresas";
+import {
+  lerPermissoesProprias,
+  type ModuloComPermissao,
+  type NivelPermissao,
+} from "@/lib/modulos/permissoes";
 
 /**
  * A empresa ativa da requisição e tudo o que depende dela. É o ÚNICO ponto
@@ -61,13 +68,14 @@ export async function getEmpresasDoUsuario(): Promise<EmpresaVinculo[]> {
 }
 
 /**
- * Empresa ativa quando o usuário tem o painel completo nela (dono). Vendedor
- * não entra aqui: a interface dele é só /vendedor/*. Sócio entra na Fase 3,
- * por módulo e permissão.
+ * Empresa ativa quando o usuário tem o painel completo nela (fundador ou
+ * cofundador). Vendedor não entra aqui (a interface dele é só /vendedor/*) e
+ * sócio/funcionário só enxergam o que as permissões deles liberam
+ * (getAcessoModulo / getAcessoEdicao).
  */
 export async function getEmpresaPainel(): Promise<EmpresaAtiva | null> {
   const ativa = await getEmpresaAtiva();
-  return ativa?.papel === "dono" ? ativa : null;
+  return ativa && temPainelCompleto(ativa.papel) ? ativa : null;
 }
 
 /** workspace_id da empresa ativa, só se o usuário tem o painel nela. */
@@ -98,4 +106,75 @@ export async function gravarEmpresaAtiva(workspaceId: string) {
 export async function limparEmpresaAtiva() {
   const cookieStore = await cookies();
   cookieStore.delete(EMPRESA_ATIVA_COOKIE);
+}
+
+// --- Sócios e funcionários: acesso por módulo ---
+
+export interface AcessoModulo {
+  workspaceId: string;
+  /** dono_id da empresa: é o user_id das linhas criadas. */
+  donoId: string;
+  userId: string;
+  /** Painel completo (fundador/cofundador): vê e edita tudo do módulo. */
+  completo: boolean;
+  nivel: NivelPermissao;
+  /** Extras de tela liberados (ex.: "contato"). Só interface, não é barreira. */
+  extras: string[];
+}
+
+/** O extra vale para o painel completo e para quem o recebeu na permissão. */
+export function temExtra(acesso: AcessoModulo, extra: string): boolean {
+  return acesso.completo || acesso.extras.includes(extra);
+}
+
+/**
+ * O que a empresa ativa deixa o usuário ver de um módulo: o painel completo
+ * vê tudo; sócio/funcionário, só o que `permissoes_membro` (leitura própria)
+ * lista. Qualquer outra coisa, ou falha de leitura, devolve null (nega).
+ */
+export async function getAcessoModulo(modulo: ModuloComPermissao): Promise<AcessoModulo | null> {
+  const ativa = await getEmpresaAtiva();
+  if (!ativa) return null;
+  const base = { workspaceId: ativa.workspaceId, donoId: ativa.donoId, userId: ativa.userId };
+
+  if (temPainelCompleto(ativa.papel)) {
+    return { ...base, completo: true, nivel: "edicao", extras: [] };
+  }
+  if (!ehPapelRestrito(ativa.papel)) return null;
+
+  const supabase = await createClient();
+  const permissoes = await lerPermissoesProprias(supabase, ativa.workspaceId, ativa.userId);
+  const p = permissoes.find((x) => x.modulo === modulo);
+  return p ? { ...base, completo: false, nivel: p.nivel, extras: p.extras } : null;
+}
+
+/**
+ * Guarda das actions de escrita: fundador/cofundador, OU quem tem
+ * tem_permissao(empresa, módulo, 'edicao') no banco. O RLS continua sendo a
+ * barreira real; isto evita tentar (e dá mensagem clara). Falha = null.
+ */
+export async function getAcessoEdicao(modulo: ModuloComPermissao): Promise<AcessoModulo | null> {
+  const ativa = await getEmpresaAtiva();
+  if (!ativa) return null;
+  const base = { workspaceId: ativa.workspaceId, donoId: ativa.donoId, userId: ativa.userId };
+
+  if (temPainelCompleto(ativa.papel)) {
+    return { ...base, completo: true, nivel: "edicao", extras: [] };
+  }
+  if (!ehPapelRestrito(ativa.papel)) return null;
+
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("tem_permissao", {
+      p_ws: ativa.workspaceId,
+      p_modulo: modulo,
+      p_nivel: "edicao",
+    });
+    if (error || data !== true) return null;
+    const permissoes = await lerPermissoesProprias(supabase, ativa.workspaceId, ativa.userId);
+    const extras = permissoes.find((x) => x.modulo === modulo)?.extras ?? [];
+    return { ...base, completo: false, nivel: "edicao", extras };
+  } catch {
+    return null;
+  }
 }

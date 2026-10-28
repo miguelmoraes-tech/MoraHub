@@ -1,13 +1,15 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Building2, KeyRound } from "lucide-react";
-import { requireComercialSemVinculo } from "@/lib/vendedor";
+import { requireUsuarioComSolicitacao } from "@/lib/vendedor";
 import { ACESSO_VENDEDOR_AGUARDANDO } from "@/lib/vendedor-access";
 import { CodigoVendedorForm } from "@/components/vendedor/codigo-vendedor-form";
 import { NOVA_EMPRESA } from "@/lib/empresa";
+import { getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 
 export default async function CodigoDoGestorPage() {
-  const { email, ultima } = await requireComercialSemVinculo();
+  const { email, ultima } = await requireUsuarioComSolicitacao();
+  const temEmpresa = (await getEmpresasDoUsuario()).length > 0;
   if (ultima?.status === "pendente") redirect(ACESSO_VENDEDOR_AGUARDANDO);
 
   return (
@@ -20,8 +22,8 @@ export default async function CodigoDoGestorPage() {
           Entrar numa empresa
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Digite o código do seu gestor. Peça-o ao dono da empresa: ele aprova o
-          seu acesso em seguida.
+          Digite o código que a empresa te passou (de vendedor ou de setor). O
+          responsável aprova o seu acesso em seguida.
         </p>
       </div>
 
@@ -46,6 +48,15 @@ export default async function CodigoDoGestorPage() {
         <Building2 className="h-4 w-4" />
         Criar minha empresa
       </Link>
+
+      {temEmpresa && (
+        <Link
+          href="/"
+          className="block text-center text-xs font-medium text-zinc-400 hover:text-zinc-200"
+        >
+          Voltar para a minha empresa
+        </Link>
+      )}
 
       <p className="text-center text-xs text-zinc-600">
         Conectado como <span className="text-zinc-400">{email}</span>

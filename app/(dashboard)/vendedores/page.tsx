@@ -33,6 +33,8 @@ export default async function VendedoresPage() {
           .select("id, workspace_id, user_id, email, status, created_at, respondido_em")
           .eq("workspace_id", workspaceId)
           .eq("status", "pendente")
+          // Pedidos de setor têm o próprio fluxo (sino e /socios); aqui só os de vendedor.
+          .is("perfil_acesso_id", null)
           .order("created_at", { ascending: true }),
       ])
     : [{ data: null }, { data: null }];

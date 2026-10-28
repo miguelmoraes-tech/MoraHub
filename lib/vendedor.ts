@@ -2,11 +2,6 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getEmpresaAtiva } from "@/lib/empresa-ativa";
-import {
-  VENDEDOR_HOME,
-  getVendedorAcesso,
-  isComercialSemVinculo,
-} from "@/lib/vendedor-access";
 import type { SolicitacaoVendedor } from "@/lib/vendedor-shared";
 
 export {
@@ -59,28 +54,24 @@ export async function requireVendedor(): Promise<VendedorContext> {
   redirect(user ? "/sem-acesso?erro=1" : "/login");
 }
 
-export interface SemVinculoContext {
+export interface SolicitacaoContext {
+  userId: string;
   email: string;
   /** The caller's most recent request for access (any status), if any. */
   ultima: SolicitacaoVendedor | null;
 }
 
 /**
- * Guard for the code / "aguardando aprovação" screens. The proxy already keeps
- * a comercial account without a link on these two screens; this is the other
- * half: whoever is not in that state is sent where they belong (a linked
- * vendedor to their area, anyone else to the app).
+ * Guard for the code / "aguardando aprovação" screens. Any logged-in account
+ * may open them, with or without a company — the proxy already sends the
+ * anonymous to /login; this repeats it and loads the latest request.
  */
-export async function requireComercialSemVinculo(): Promise<SemVinculoContext> {
+export async function requireUsuarioComSolicitacao(): Promise<SolicitacaoContext> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-
-  const acesso = await getVendedorAcesso(supabase, user.id);
-  if ((await getEmpresaAtiva())?.papel === "comercial") redirect(VENDEDOR_HOME);
-  if (!(await isComercialSemVinculo(supabase, user, acesso))) redirect("/");
 
   const { data } = await supabase
     .from("solicitacoes_vendedor")
@@ -91,6 +82,7 @@ export async function requireComercialSemVinculo(): Promise<SemVinculoContext> {
     .maybeSingle();
 
   return {
+    userId: user.id,
     email: user.email ?? "",
     ultima: (data as SolicitacaoVendedor | null) ?? null,
   };

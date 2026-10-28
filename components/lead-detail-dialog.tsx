@@ -58,6 +58,8 @@ export function LeadDetailDialog({
   followups = [],
   autoOpen = false,
   readOnly = false,
+  somenteLeitura = false,
+  ocultarContato = false,
   variant = "icone",
 }: {
   lead: Lead;
@@ -70,6 +72,10 @@ export function LeadDetailDialog({
    * (lead_view_start / lead_view_ping) while it stays open and visible.
    */
   readOnly?: boolean;
+  /** Sócio/funcionário com leitura: dados e histórico de contatos, sem nenhuma ação de escrita. */
+  somenteLeitura?: boolean;
+  /** Sem o extra "contato": esconde o contato e o campo nos formulários. */
+  ocultarContato?: boolean;
   variant?: "icone" | "botao";
 }) {
   const router = useRouter();
@@ -157,9 +163,9 @@ export function LeadDetailDialog({
           </div>
 
           <div className="px-5 py-4">
-            {mode === "edit" && !readOnly ? (
+            {mode === "edit" && !readOnly && !somenteLeitura ? (
               <form action={updateFormAction} className="space-y-4">
-                <LeadFields lead={lead} />
+                <LeadFields lead={lead} ocultarContato={ocultarContato} />
                 {lead.status === "abordado" && (
                   <>
                     <ResultadoFields lead={lead} />
@@ -213,7 +219,11 @@ export function LeadDetailDialog({
                 </div>
 
                 <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <LeadContato contato={lead.contato} variant="detalhe" />
+                  <LeadContato
+                    contato={lead.contato}
+                    variant="detalhe"
+                    ocultoNoDetalhe={ocultarContato}
+                  />
                   <div>
                     <dt className="text-xs font-medium text-zinc-500">
                       Tipo de contato
@@ -296,7 +306,15 @@ export function LeadDetailDialog({
                   )}
                 </div>
 
-                {readOnly ? (
+                {somenteLeitura ? (
+                  <LeadFollowupSection
+                    leadId={lead.id}
+                    intervaloFollowupDias={lead.intervalo_followup_dias}
+                    followups={followups}
+                    proximoFollowup={lead.status === "convertido" ? null : lead.proximo_followup}
+                    readOnly
+                  />
+                ) : readOnly ? (
                   <>
                   <LeadFollowupSection
                     leadId={lead.id}

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { getColaboradoresDaEmpresa } from "@/lib/colaboradores";
 import { AgendaView } from "@/components/agenda/agenda-view";
@@ -13,7 +13,7 @@ export default async function AgendaPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const workspaceId = await getWorkspaceIdAtivo();
+  const workspaceId = (await getAcessoModulo("agenda"))?.workspaceId ?? null;
 
   const [{ data: reunioes }, { data: colaboradores }] = (await Promise.all([
     supabase

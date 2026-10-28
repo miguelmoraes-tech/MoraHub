@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Bell, Volume2, VolumeX } from "lucide-react";
-import { responderSolicitacaoVendedor } from "@/lib/actions/vendedor-codigo";
+import { responderSolicitacaoAcesso } from "@/lib/actions/vendedor-codigo";
 import { formatDate } from "@/lib/format";
 import { useToast } from "@/components/toast";
 import { useSolicitacoes } from "@/components/vendedor/solicitacoes-provider";
@@ -37,20 +37,20 @@ export function SolicitacoesBell() {
   }, [aberto]);
 
   if (!solicitacoes) return null;
-  const { pendentes, remover, somAtivo, setSomAtivo } = solicitacoes;
+  const { pendentes, setores, remover, somAtivo, setSomAtivo } = solicitacoes;
   const total = pendentes.length;
 
   function responder(id: string, aprovar: boolean) {
     setRespondendoId(id);
     startResponder(async () => {
-      const resultado = await responderSolicitacaoVendedor(id, aprovar);
+      const resultado = await responderSolicitacaoAcesso(id, aprovar);
       setRespondendoId(null);
       if ("error" in resultado) {
         toast.error(resultado.error);
         return;
       }
       remover(id);
-      toast.success(aprovar ? "Vendedor aprovado." : "Solicitação recusada.");
+      toast.success(aprovar ? "Acesso aprovado." : "Solicitação recusada.");
     });
   }
 
@@ -78,7 +78,7 @@ export function SolicitacoesBell() {
       {aberto && (
         <div
           role="dialog"
-          aria-label="Pedidos de acesso de vendedores"
+          aria-label="Pedidos de acesso"
           className="absolute left-3 top-full z-50 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-zinc-800 bg-zinc-950 shadow-xl shadow-black/40"
         >
           <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
@@ -116,7 +116,8 @@ export function SolicitacoesBell() {
                     {s.email ?? "Sem e-mail"}
                   </p>
                   <p className="text-xs text-zinc-500">
-                    Pediu acesso em {formatDate(s.created_at.slice(0, 10))}
+                    {s.perfil_acesso_id ? (setores[s.perfil_acesso_id] ?? "Setor") : "Vendedor"}
+                    {" · "}pediu acesso em {formatDate(s.created_at.slice(0, 10))}
                   </p>
                   <div className="mt-2 flex items-center gap-2">
                     <button

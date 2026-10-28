@@ -9,6 +9,12 @@ import { getUnreadTotal } from "@/lib/chat";
 import type { AccountType } from "@/lib/hub-mode";
 import { CHAT_HABILITADO, VENCIMENTOS_HABILITADO } from "@/lib/modulos/registry";
 import { getModulosHabilitados } from "@/lib/modulos/habilitados";
+import { ehPapelRestrito, temPainelCompleto } from "@/lib/empresas";
+import {
+  lerPermissoesProprias,
+  modulosDasPermissoes,
+  modulosVisiveis,
+} from "@/lib/modulos/permissoes";
 import { getEmpresaAtiva, getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 import { ToastProvider } from "@/components/toast";
 import {
@@ -30,11 +36,23 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  // Empresa ativa (cookie revalidado no banco) e o papel nela: dono = painel
-  // completo. Vendedor tem interface própria em /vendedor/*.
+  // Empresa ativa (cookie revalidado no banco) e o papel nela: fundador e
+  // cofundador = painel completo; sócio e funcionário = só os módulos da
+  // empresa que as permissões deles liberam. Vendedor tem interface própria
+  // em /vendedor/*.
   const [ativa, empresas] = await Promise.all([getEmpresaAtiva(), getEmpresasDoUsuario()]);
-  const painel = ativa?.papel === "dono" ? ativa : null;
-  const modulosHabilitados = painel ? await getModulosHabilitados(painel.workspaceId) : [];
+  const painel = ativa && temPainelCompleto(ativa.papel) ? ativa : null;
+  const restrito = !!ativa && ehPapelRestrito(ativa.papel);
+  let modulosHabilitados: string[] = [];
+  if (painel) {
+    modulosHabilitados = await getModulosHabilitados(painel.workspaceId);
+  } else if (restrito && ativa) {
+    const [habilitados, permissoes] = await Promise.all([
+      getModulosHabilitados(ativa.workspaceId),
+      lerPermissoesProprias(supabase, ativa.workspaceId, user.id),
+    ]);
+    modulosHabilitados = modulosVisiveis(habilitados, modulosDasPermissoes(permissoes));
+  }
 
   // Vencimentos e Chat não são módulos do catálogo (lib/modulos/registry.ts):
   // sem banner, sem contador de não lidas e sem as consultas deles.
@@ -47,19 +65,26 @@ export default async function DashboardLayout({
     .eq("user_id", user.id);
   const tiposAtivos = (tiposAtivosRows ?? []).map((r) => r.tipo as AccountType);
 
-  // Pedidos de acesso de vendedor: só o dono da empresa ativa os vê (RLS), e
-  // só com o módulo Vendedores ligado.
-  const workspaceVendedoresId =
-    painel && modulosHabilitados.includes("vendedores") ? painel.workspaceId : null;
+  // Pedidos de acesso (vendedor ou setor): só o painel completo da empresa
+  // ativa os vê (RLS). Os de setor chegam com o id do setor, cujo nome vem de
+  // perfis_acesso (select do dono/cofundador).
+  const workspacePedidosId = painel ? painel.workspaceId : null;
   let solicitacoesPendentes: SolicitacaoPendente[] = [];
-  if (workspaceVendedoresId) {
-    const { data } = await supabase
-      .from("solicitacoes_vendedor")
-      .select("id, email, created_at")
-      .eq("workspace_id", workspaceVendedoresId)
-      .eq("status", "pendente")
-      .order("created_at", { ascending: true });
+  let setoresNomes: Record<string, string> = {};
+  if (workspacePedidosId) {
+    const [{ data }, { data: setores }] = await Promise.all([
+      supabase
+        .from("solicitacoes_vendedor")
+        .select("id, email, created_at, perfil_acesso_id")
+        .eq("workspace_id", workspacePedidosId)
+        .eq("status", "pendente")
+        .order("created_at", { ascending: true }),
+      supabase.from("perfis_acesso").select("id, nome").eq("workspace_id", workspacePedidosId),
+    ]);
     solicitacoesPendentes = (data ?? []) as SolicitacaoPendente[];
+    setoresNomes = Object.fromEntries(
+      ((setores ?? []) as { id: string; nome: string }[]).map((s) => [s.id, s.nome])
+    );
   }
 
   const conteudo = (
@@ -71,7 +96,8 @@ export default async function DashboardLayout({
         chatHref="/juridico"
         unreadTotal={unreadTotal}
         modulosHabilitados={modulosHabilitados}
-        ehDono={!!painel}
+        painelCompleto={!!painel}
+        restrito={restrito}
         empresas={empresas}
         empresaAtivaId={ativa?.workspaceId ?? null}
       />
@@ -85,10 +111,11 @@ export default async function DashboardLayout({
 
   return (
     <ToastProvider>
-      {workspaceVendedoresId ? (
+      {workspacePedidosId ? (
         <SolicitacoesVendedorProvider
-          workspaceId={workspaceVendedoresId}
+          workspaceId={workspacePedidosId}
           initialPendentes={solicitacoesPendentes}
+          initialSetores={setoresNomes}
         >
           {conteudo}
         </SolicitacoesVendedorProvider>

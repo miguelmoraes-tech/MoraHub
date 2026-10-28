@@ -4,8 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Empresas de uma conta e escolha da empresa ativa — sem dependência de
  * next/headers, para servir ao proxy (que monta o próprio client) e às telas.
  *
- * Uma conta = uma pessoa. O papel é POR EMPRESA: dono, vendedor (comercial) ou
- * sócio. O cookie guarda só o workspace_id escolhido; o banco é quem diz se
+ * Uma conta = uma pessoa. O papel é POR EMPRESA: dono (fundador), cofundador,
+ * sócio, funcionário ou vendedor (comercial). O cookie guarda só o workspace_id escolhido; o banco é quem diz se
  * a conta ainda tem vínculo e qual é o papel (RPCs minhas_empresas /
  * meu_papel_na_empresa, ambas revalidadas a cada requisição).
  */
@@ -13,9 +13,31 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export const EMPRESA_ATIVA_COOKIE = "empresa-ativa";
 export const EMPRESA_ATIVA_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
-/** Papéis que têm interface hoje. Vínculos legados (financeiro, rh...) estão fora do ar. */
-export const PAPEIS_COM_INTERFACE = ["dono", "socio", "comercial"] as const;
+/**
+ * Papéis que têm interface hoje, na ordem em que o fallback escolhe a empresa
+ * ativa. Vínculos legados (financeiro, rh...) estão fora do ar.
+ */
+export const PAPEIS_COM_INTERFACE = [
+  "dono",
+  "cofundador",
+  "socio",
+  "funcionario",
+  "comercial",
+] as const;
 export type PapelEmpresa = (typeof PAPEIS_COM_INTERFACE)[number];
+
+/** Painel completo, conforme os módulos ligados da empresa: o fundador ('dono') e o cofundador. */
+export const PAPEIS_PAINEL = ["dono", "cofundador"] as const;
+/** Painel restrito: só os módulos habilitados ∩ permissões do membro. */
+export const PAPEIS_RESTRITOS = ["socio", "funcionario"] as const;
+
+export function temPainelCompleto(papel: string | null | undefined): boolean {
+  return papel === "dono" || papel === "cofundador";
+}
+
+export function ehPapelRestrito(papel: string | null | undefined): boolean {
+  return papel === "socio" || papel === "funcionario";
+}
 
 export interface EmpresaVinculo {
   workspaceId: string;
@@ -25,8 +47,10 @@ export interface EmpresaVinculo {
 }
 
 export const PAPEL_ROTULO: Record<PapelEmpresa, string> = {
-  dono: "Dono",
+  dono: "Fundador",
+  cofundador: "Cofundador",
   socio: "Sócio",
+  funcionario: "Funcionário",
   comercial: "Vendedor",
 };
 
@@ -67,7 +91,7 @@ export async function listarEmpresas(supabase: SupabaseClient): Promise<EmpresaV
 
 /**
  * A empresa do cookie, se a conta ainda tem vínculo com ela; senão cai numa
- * válida: dono primeiro (painel completo), depois sócio, depois vendedor.
+ * válida: fundador primeiro, depois cofundador, sócio, funcionário e vendedor.
  */
 export function escolherEmpresa(
   empresas: EmpresaVinculo[],

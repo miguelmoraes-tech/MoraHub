@@ -6,6 +6,7 @@ import {
   rotaPermitida,
 } from "@/lib/modulos/registry";
 import { NOVA_EMPRESA } from "@/lib/empresa";
+import { modulosVisiveis } from "@/lib/modulos/permissoes";
 import {
   ACESSO_VENDEDOR_CODIGO,
   VENDEDOR_HOME,
@@ -24,6 +25,16 @@ import {
  *    resolução deixa passar (ponto fixo em um salto) — /dashboard e
  *    /vendedor/leads nunca se redirecionam mutuamente.
  */
+
+/** Sócio/funcionário sem nenhuma permissão: a tela "Aguardando liberação de acesso". */
+export const AGUARDANDO_LIBERACAO = "/sem-acesso?aguardando=1";
+
+/** Telas de gestão da empresa: só o painel completo (fundador/cofundador). */
+const ROTAS_SO_PAINEL = ["/modulos", "/socios", "/configuracoes"];
+
+function casa(path: string, prefixo: string) {
+  return path === prefixo || path.startsWith(`${prefixo}/`);
+}
 
 /** Telas de entrada: quem já está logado é mandado para a sua casa. */
 export const ROTAS_DE_ENTRADA = ["/login", "/signup"];
@@ -50,6 +61,11 @@ export interface EntradaAcesso {
    */
   habilitados: readonly string[];
   /**
+   * Módulos com alguma permissão em `permissoes_membro` (leitura própria).
+   * Só vale para sócio/funcionário; falha de leitura vem vazio, o que nega.
+   */
+  permissoes?: readonly string[];
+  /**
    * Funcionário sem nenhum vínculo e sem empresa própria (cadastrou-se como
    * 'comercial' e ainda não entrou numa empresa). Só é consultado quando
    * `resolucao.status === "sem_empresa"`.
@@ -59,6 +75,7 @@ export interface EntradaAcesso {
 
 export function decidirAcesso(entrada: EntradaAcesso): Decisao {
   const { path, resolucao, habilitados, funcionarioSemVinculo } = entrada;
+  const permissoes = entrada.permissoes ?? [];
   if (isRotaIsenta(path)) return seguir;
 
   const naEntrada = ROTAS_DE_ENTRADA.includes(path);
@@ -68,7 +85,8 @@ export function decidirAcesso(entrada: EntradaAcesso): Decisao {
       return para(`${SEM_ACESSO}?erro=1`);
 
     case "legado":
-      return para(SEM_ACESSO);
+      // A tela do código vale para qualquer conta logada; o resto cai em /sem-acesso.
+      return isRotaDeAcessoVendedor(path) ? seguir : para(SEM_ACESSO);
 
     case "sem_empresa": {
       if (funcionarioSemVinculo) {
@@ -89,13 +107,38 @@ export function decidirAcesso(entrada: EntradaAcesso): Decisao {
         return liberada ? seguir : para(VENDEDOR_HOME);
       }
 
-      // Dono (painel por módulos) e sócio (permissões da Fase 3): fora de /vendedor/*.
+      if (resolucao.papel === "socio" || resolucao.papel === "funcionario") {
+        return decidirRestrito(path, naEntrada, habilitados, permissoes);
+      }
+
+      // Fundador e cofundador (painel por módulos): fora de /vendedor/*.
       if (naEntrada || isRotaDoVendedor(path)) return para(HOME_DONO);
-      const liberados = resolucao.papel === "dono" ? habilitados : [];
-      if (rotaPermitida(path, liberados)) return seguir;
-      return para(primeiraRotaHabilitada(liberados) ?? HOME_DONO);
+      if (rotaPermitida(path, habilitados)) return seguir;
+      return para(primeiraRotaHabilitada(habilitados) ?? HOME_DONO);
     }
   }
+}
+
+/**
+ * Sócio e funcionário: rotas = módulos habilitados da empresa ∩ módulos com
+ * permissão. Nunca /vendedor/*, /modulos, /socios, /configuracoes nem o
+ * detalhe do cliente. A casa deles é a 1ª rota permitida; sem nenhuma, a tela
+ * "Aguardando liberação de acesso" (isenta, sem ciclo).
+ */
+function decidirRestrito(
+  path: string,
+  naEntrada: boolean,
+  habilitados: readonly string[],
+  permissoes: readonly string[]
+): Decisao {
+  const liberados = modulosVisiveis(habilitados, permissoes);
+  const home = primeiraRotaHabilitada(liberados) ?? AGUARDANDO_LIBERACAO;
+
+  if (naEntrada || path === "/" || path === HOME_DONO) return para(home);
+  if (isRotaDoVendedor(path) || ROTAS_SO_PAINEL.some((p) => casa(path, p))) return para(home);
+  // Só a lista de clientes: o detalhe /clientes/[id] é do painel completo.
+  if (path.startsWith("/clientes/")) return para(home);
+  return rotaPermitida(path, liberados) ? seguir : para(home);
 }
 
 /** True se o caminho depende dos módulos ligados (precisa da leitura de workspace_modulos). */

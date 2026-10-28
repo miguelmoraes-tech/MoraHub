@@ -17,14 +17,20 @@ const STATUS_TONE: Record<ClienteStatus, ChipTone> = {
   encerrado: "zinc",
 };
 
-export function ClienteCard({ cliente }: { cliente: Cliente }) {
+export function ClienteCard({
+  cliente,
+  semDetalhe = false,
+}: {
+  cliente: Cliente;
+  /** Sócio/funcionário: o detalhe do cliente é só do painel completo, então o card não é um link. */
+  semDetalhe?: boolean;
+}) {
   const contato = cliente.telefone ?? cliente.contato ?? cliente.email;
+  const classe =
+    "group relative flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 transition-colors hover:border-zinc-700 hover:bg-zinc-900";
 
-  return (
-    <Link
-      href={`/clientes/${cliente.id}`}
-      className="group relative flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
-    >
+  const conteudo = (
+    <>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-400 group-hover:bg-zinc-800/80 group-hover:text-copper-400">
@@ -58,6 +64,14 @@ export function ClienteCard({ cliente }: { cliente: Cliente }) {
       {cliente.segmento && (
         <StatusChip tone="copper">{cliente.segmento}</StatusChip>
       )}
+    </>
+  );
+
+  return semDetalhe ? (
+    <div className={classe}>{conteudo}</div>
+  ) : (
+    <Link href={`/clientes/${cliente.id}`} className={classe}>
+      {conteudo}
     </Link>
   );
 }

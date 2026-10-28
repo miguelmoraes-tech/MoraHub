@@ -21,6 +21,9 @@ export function LeadsBoard({
   followups = [],
   campanhas = [],
   readOnly = false,
+  somenteLeitura = false,
+  semExportar = false,
+  ocultarContato = false,
 }: {
   leads: Lead[];
   propostas?: Proposta[];
@@ -28,6 +31,12 @@ export function LeadsBoard({
   campanhas?: CampanhaOption[];
   /** Vendedor view: same list, but no create/edit/delete/export/status changes. */
   readOnly?: boolean;
+  /** Sócio/funcionário com permissão de leitura: lista e detalhe, sem criar/editar/excluir. */
+  somenteLeitura?: boolean;
+  /** Só o painel completo exporta (a rota recusa os demais). */
+  semExportar?: boolean;
+  /** Sem o extra "contato": o contato não aparece nem nos formulários. */
+  ocultarContato?: boolean;
 }) {
   const searchParams = useSearchParams();
   const highlightLeadId = searchParams.get("lead");
@@ -111,8 +120,10 @@ export function LeadsBoard({
         </div>
         {!readOnly && (
           <div className="flex items-center gap-2">
-            <ExportButton href={exportHref} />
-            <NewLeadDialog campanhas={campanhas} />
+            {!semExportar && <ExportButton href={exportHref} />}
+            {!somenteLeitura && (
+              <NewLeadDialog campanhas={campanhas} ocultarContato={ocultarContato} />
+            )}
           </div>
         )}
       </div>
@@ -210,6 +221,8 @@ export function LeadsBoard({
               followups={followupsPorLead.get(lead.id) ?? []}
               campanhas={campanhas}
               readOnly={readOnly}
+              somenteLeitura={somenteLeitura}
+              ocultarContato={ocultarContato}
               autoOpenDetail={lead.id === highlightLeadId}
             />
           ))}

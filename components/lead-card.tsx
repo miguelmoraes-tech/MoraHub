@@ -54,6 +54,8 @@ export function LeadCard({
   followups = [],
   campanhas = [],
   readOnly = false,
+  somenteLeitura = false,
+  ocultarContato = false,
   autoOpenDetail = false,
 }: {
   lead: Lead;
@@ -62,6 +64,10 @@ export function LeadCard({
   campanhas?: CampanhaOption[];
   /** Vendedor view: only the "open lead" action is available. */
   readOnly?: boolean;
+  /** Sócio/funcionário com leitura: só abre o detalhe, sem editar, excluir ou mudar etapa. */
+  somenteLeitura?: boolean;
+  /** Sem o extra "contato": esconde o contato do card, do detalhe e dos formulários. */
+  ocultarContato?: boolean;
   autoOpenDetail?: boolean;
 }) {
   const [mode, setMode] = useState<"view" | "edit" | "followup">(
@@ -89,13 +95,13 @@ export function LeadCard({
     ? diffInDays(lead.proximo_followup, hoje)
     : null;
 
-  if (mode === "edit" && !readOnly) {
+  if (mode === "edit" && !readOnly && !somenteLeitura) {
     return (
       <form
         action={updateFormAction}
         className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4"
       >
-        <LeadFields lead={lead} campanhas={campanhas} />
+        <LeadFields lead={lead} campanhas={campanhas} ocultarContato={ocultarContato} />
         {lead.status === "abordado" && (
           <>
             <ResultadoFields lead={lead} />
@@ -167,7 +173,7 @@ export function LeadCard({
           </h3>
           {/* To hide the contact from vendedores until they open the lead,
               pass oculto={readOnly} here. */}
-          <LeadContato contato={lead.contato} variant="card" />
+          <LeadContato contato={lead.contato} variant="card" oculto={ocultarContato} />
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {!readOnly && (
@@ -176,6 +182,8 @@ export function LeadCard({
               propostas={propostas}
               followups={followups}
               autoOpen={autoOpenDetail}
+              somenteLeitura={somenteLeitura}
+              ocultarContato={ocultarContato}
             />
           )}
           <StatusChip tone={STATUS_TONE[lead.status]}>
@@ -272,7 +280,7 @@ export function LeadCard({
         <p className="text-xs text-zinc-600">abordado por {lead.abordado_por}</p>
       )}
 
-      {readOnly ? (
+      {somenteLeitura ? null : readOnly ? (
         <div className="mt-auto flex items-center justify-end border-t border-zinc-800/80 pt-3">
           <LeadDetailDialog
             lead={lead}

@@ -12,7 +12,7 @@ import { join, relative } from "node:path";
 
 const ISOLADAS = [
   "leads", "renegados", "clientes", "followups_lead", "propostas", "reunioes",
-  "lead_views", "solicitacoes_vendedor", "workspace_codigos",
+  "lead_views", "solicitacoes_vendedor", "workspace_codigos", "perfis_acesso", "permissoes_membro",
   "acessos", "assinaturas", "backups", "comprovantes", "contratos",
   "infraestrutura", "manutencoes", "projetos", "servicos", "campanhas",
 ];
@@ -62,3 +62,33 @@ console.log(`Sem workspace_id no trecho: ${sem.length}`);
 for (const s of sem) console.log("  ! " + s);
 console.log(`update/delete por id (barreira = RLS): ${porId.length}`);
 if (sem.length) process.exitCode = 1;
+
+// --- Escrita por papel (Fase 3) -------------------------------------------
+// Toda action exportada dos módulos que sócio/funcionário podem editar precisa
+// passar por uma guarda de edição (fundador/cofundador OU tem_permissao). A
+// barreira real é o RLS; isto pega uma action nova esquecida sem guarda.
+const GUARDAS = ["getAcessoEdicao", "podeEditarProposta", "getEmpresaPainel"];
+const ACTIONS_COM_GUARDA = [
+  "app/(dashboard)/leads/actions.ts",
+  "app/(dashboard)/renegados/actions.ts",
+  "app/(dashboard)/clientes/actions.ts",
+  "lib/actions/propostas.ts",
+  "app/(dashboard)/socios/actions.ts",
+];
+const semGuarda: string[] = [];
+let actionsVerificadas = 0;
+
+for (const rel of ACTIONS_COM_GUARDA) {
+  const texto = readFileSync(join(raiz, rel), "utf8").replace(/\r\n/g, "\n");
+  const partes = texto.split(/\nexport async function /).slice(1);
+  for (const parte of partes) {
+    const nome = parte.slice(0, parte.indexOf("(")).trim();
+    actionsVerificadas++;
+    if (!GUARDAS.some((g) => parte.includes(g))) semGuarda.push(`${rel} ${nome}`);
+  }
+}
+
+console.log(`\nActions de escrita verificadas: ${actionsVerificadas}`);
+console.log(`Sem guarda de edição: ${semGuarda.length}`);
+for (const s of semGuarda) console.log("  ! " + s);
+if (semGuarda.length) process.exitCode = 1;

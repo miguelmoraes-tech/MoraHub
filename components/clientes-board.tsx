@@ -8,7 +8,17 @@ import { NewClienteDialog } from "@/components/new-cliente-dialog";
 import { ExportButton } from "@/components/export-button";
 import { SegmentFilter } from "@/components/segment-filter";
 
-export function ClientesBoard({ clientes }: { clientes: Cliente[] }) {
+export function ClientesBoard({
+  clientes,
+  somenteLeitura = false,
+  listaApenas = false,
+}: {
+  clientes: Cliente[];
+  /** Sócio/funcionário com leitura: sem criar. */
+  somenteLeitura?: boolean;
+  /** Sócio/funcionário: só a lista (sem detalhe do cliente nem exportação). */
+  listaApenas?: boolean;
+}) {
   const [segmento, setSegmento] = useState("");
 
   const segmentos = useMemo(
@@ -37,8 +47,8 @@ export function ClientesBoard({ clientes }: { clientes: Cliente[] }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButton href={exportHref} />
-          <NewClienteDialog />
+          {!listaApenas && <ExportButton href={exportHref} />}
+          {!somenteLeitura && <NewClienteDialog />}
         </div>
       </div>
 
@@ -56,7 +66,7 @@ export function ClientesBoard({ clientes }: { clientes: Cliente[] }) {
       {filtrados.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtrados.map((cliente) => (
-            <ClienteCard key={cliente.id} cliente={cliente} />
+            <ClienteCard key={cliente.id} cliente={cliente} semDetalhe={listaApenas} />
           ))}
         </div>
       ) : (

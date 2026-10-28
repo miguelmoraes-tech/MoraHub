@@ -8,7 +8,7 @@
  * /dashboard e /vendedor/leads.
  */
 import assert from "node:assert/strict";
-import { decidirAcesso, SEM_ACESSO, type EntradaAcesso } from "@/lib/acesso";
+import { decidirAcesso, AGUARDANDO_LIBERACAO, SEM_ACESSO, type EntradaAcesso } from "@/lib/acesso";
 import {
   escolherEmpresa,
   resolverEmpresaAtiva,
@@ -16,12 +16,18 @@ import {
   type ResolucaoEmpresa,
 } from "@/lib/empresas";
 import { HOME_DONO } from "@/lib/modulos/registry";
+import { extrasDoCatalogo } from "@/lib/socios-shared";
+import {
+  lerPermissoesProprias,
+  modulosVisiveis,
+  normalizarPermissoes,
+} from "@/lib/modulos/permissoes";
 import { VENDEDOR_HOME } from "@/lib/vendedor-access";
 
 let total = 0;
 function teste(nome: string, fn: () => void | Promise<void>) {
   total++;
-  return Promise.resolve(fn()).then(
+  return Promise.resolve().then(fn).then(
     () => console.log(`  ok   ${nome}`),
     (e) => {
       console.log(`  FALHOU ${nome}\n         ${e.message.split("\n")[0]}`);
@@ -34,7 +40,8 @@ const WS_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"; // empresa onde sou dono
 const WS_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"; // empresa onde sou vendedor
 const WS_ALHEIA = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"; // de outra pessoa
 
-const ok = (papel: "dono" | "comercial" | "socio", corrigirCookie = false): ResolucaoEmpresa => ({
+type Papel = "dono" | "cofundador" | "socio" | "funcionario" | "comercial";
+const ok = (papel: Papel, corrigirCookie = false): ResolucaoEmpresa => ({
   status: "ok",
   workspaceId: papel === "comercial" ? WS_B : WS_A,
   papel,
@@ -45,9 +52,10 @@ function decide(
   path: string,
   resolucao: ResolucaoEmpresa,
   habilitados: string[] = ["leads", "clientes", "vendedores", "agenda"],
-  funcionarioSemVinculo = false
+  funcionarioSemVinculo = false,
+  permissoes: string[] = []
 ) {
-  const e: EntradaAcesso = { path, resolucao, habilitados, funcionarioSemVinculo };
+  const e: EntradaAcesso = { path, resolucao, habilitados, permissoes, funcionarioSemVinculo };
   return decidirAcesso(e);
 }
 const vaiPara = (d: ReturnType<typeof decidirAcesso>) =>
@@ -83,7 +91,7 @@ const PATHS = [
   "/vendedores", "/atividade-vendedores", "/rh", "/contas-pagar", "/pessoal", "/pessoal/contas",
   "/vendedor", "/vendedor/leads", "/vendedor/agenda", "/acesso-vendedor", "/acesso-vendedor/aguardando",
   "/nova-empresa", "/login", "/signup", "/convite/abc", "/api/export/leads", "/colaborador", "/metas",
-  "/sem-acesso",
+  "/sem-acesso", "/socios", "/clientes/abc", "/api/export/clientes",
 ];
 
 console.log("\nCaso 1 — funcionário que NUNCA criou empresa (só vínculo comercial)");
@@ -220,28 +228,31 @@ await teste("empreendedor sem empresa ainda vê /dashboard e /nova-empresa; mód
 console.log("\nSem loops (propriedade): todo destino de redirecionamento passa na mesma regra");
 await teste("para qualquer resolução x rota, o destino devolve 'seguir' (ponto fixo em 1 salto)", () => {
   const resolucoes: ResolucaoEmpresa[] = [
-    ok("dono"), ok("comercial"), ok("socio"), ok("dono", true), ok("comercial", true),
+    ok("dono"), ok("cofundador"), ok("socio"), ok("funcionario"), ok("comercial"),
+    ok("dono", true), ok("comercial", true), ok("socio", true),
     { status: "sem_empresa" }, { status: "erro" }, { status: "legado", workspaceId: WS_A, papel: "rh" },
   ];
   const modulos = [[], ["leads"], ["leads", "clientes", "vendedores", "agenda"], ["rh"]];
+  const permissoesPossiveis = [[], ["leads"], ["clientes"], ["leads", "renegados", "clientes", "agenda"], ["financeiro"]];
   let casos = 0;
   for (const res of resolucoes)
     for (const hab of modulos)
-      for (const semVinculo of [false, true])
-        for (const p of PATHS) {
-          const d = decide(p, res, hab, semVinculo);
-          if (d.tipo === "seguir") continue;
-          const destino = d.para.split("?")[0];
-          const d2 = decide(destino, res, hab, semVinculo);
-          assert.equal(d2.tipo, "seguir", `${res.status}/${"papel" in res ? res.papel : ""} ${p} -> ${d.para} -> ${vaiPara(d2)}`);
-          casos++;
-        }
-  assert.ok(casos > 500, `poucos casos exercitados (${casos})`);
+      for (const perm of permissoesPossiveis)
+        for (const semVinculo of [false, true])
+          for (const p of PATHS) {
+            const d = decide(p, res, hab, semVinculo, perm);
+            if (d.tipo === "seguir") continue;
+            const destino = d.para.split("?")[0];
+            const d2 = decide(destino, res, hab, semVinculo, perm);
+            assert.equal(d2.tipo, "seguir", `${res.status}/${"papel" in res ? res.papel : ""} ${p} -> ${d.para} -> ${vaiPara(d2)}`);
+            casos++;
+          }
+  assert.ok(casos > 2000, `poucos casos exercitados (${casos})`);
 });
 await teste("/dashboard e /vendedor/leads nunca se redirecionam mutuamente, para nenhum papel", () => {
-  for (const papel of ["dono", "comercial", "socio"] as const) {
-    const a = vaiPara(decide("/dashboard", ok(papel)));
-    const b = vaiPara(decide("/vendedor/leads", ok(papel)));
+  for (const papel of ["dono", "cofundador", "comercial", "socio", "funcionario"] as const) {
+    const a = vaiPara(decide("/dashboard", ok(papel), undefined, false, ["leads"]));
+    const b = vaiPara(decide("/vendedor/leads", ok(papel), undefined, false, ["leads"]));
     assert.ok(!(a === "/vendedor/leads" && b === "/dashboard"), papel);
   }
 });
@@ -257,6 +268,172 @@ await teste("escolherEmpresa respeita o cookie entre empresas com vínculo e ign
   assert.equal(escolherEmpresa(empresas, WS_ALHEIA)?.workspaceId, WS_A);
   assert.equal(escolherEmpresa(empresas, undefined)?.papel, "dono");
   assert.equal(escolherEmpresa([], WS_A), null);
+});
+
+
+console.log("\nFase 3 — cofundador = dono (menos /vendedor)");
+await teste("cofundador decide igual ao fundador em toda rota, com qualquer conjunto de módulos", () => {
+  for (const hab of [[], ["leads"], ["leads", "clientes", "vendedores", "agenda"], ["rh", "financeiro"]])
+    for (const p of PATHS) {
+      assert.deepEqual(decide(p, ok("cofundador"), hab), decide(p, ok("dono"), hab), `${p} ${hab}`);
+    }
+});
+await teste("cofundador usa o painel conforme os módulos e NÃO entra em /vendedor/*", () => {
+  assert.equal(vaiPara(decide("/dashboard", ok("cofundador"))), "seguir");
+  assert.equal(vaiPara(decide("/leads", ok("cofundador"))), "seguir");
+  assert.equal(vaiPara(decide("/socios", ok("cofundador"))), "seguir");
+  assert.equal(vaiPara(decide("/modulos", ok("cofundador"))), "seguir");
+  assert.equal(vaiPara(decide("/clientes/abc", ok("cofundador"))), "seguir");
+  assert.equal(vaiPara(decide("/rh", ok("cofundador"), ["leads"])), "/leads");
+  for (const p of ["/vendedor", "/vendedor/leads", "/vendedor/agenda"]) {
+    assert.equal(vaiPara(decide(p, ok("cofundador"))), HOME_DONO, p);
+  }
+});
+
+console.log("\nFase 3 — sócio e funcionário: módulos habilitados ∩ permissões");
+const HAB = ["leads", "renegados", "clientes", "agenda", "vendedores"];
+await teste("com permissão em leads e agenda: só essas rotas seguem; o resto volta à 1ª rota liberada", () => {
+  for (const papel of ["socio", "funcionario"] as const) {
+    const r = ok(papel);
+    for (const p of ["/leads", "/agenda", "/api/export/leads", "/pessoal", "/pessoal/contas", "/acesso-vendedor", "/nova-empresa", "/convite/abc", "/sem-acesso"]) {
+      assert.equal(vaiPara(decide(p, r, HAB, false, ["leads", "agenda"])), "seguir", `${papel} ${p}`);
+    }
+    for (const p of ["/renegados", "/clientes", "/vendedores", "/atividade-vendedores", "/rh", "/contas-pagar", "/metas", "/colaborador"]) {
+      assert.equal(vaiPara(decide(p, r, HAB, false, ["leads", "agenda"])), "/leads", `${papel} ${p}`);
+    }
+  }
+});
+await teste("nunca abrem /vendedor/*, /modulos, /socios, /configuracoes nem /dashboard", () => {
+  for (const papel of ["socio", "funcionario"] as const)
+    for (const p of ["/vendedor", "/vendedor/leads", "/vendedor/agenda", "/modulos", "/socios", "/configuracoes", "/dashboard", "/", "/login", "/signup"]) {
+      assert.equal(vaiPara(decide(p, ok(papel), HAB, false, ["leads", "renegados", "clientes", "agenda"])), "/leads", `${papel} ${p}`);
+    }
+});
+await teste("o detalhe do cliente (/clientes/[id]) é vetado mesmo com permissão em clientes; a lista segue", () => {
+  for (const papel of ["socio", "funcionario"] as const) {
+    assert.equal(vaiPara(decide("/clientes", ok(papel), HAB, false, ["clientes"])), "seguir");
+    assert.equal(vaiPara(decide("/clientes/abc", ok(papel), HAB, false, ["clientes"])), "/clientes");
+    assert.equal(vaiPara(decide("/clientes/abc", ok(papel), HAB, false, ["clientes", "leads"])), "/leads");
+  }
+});
+await teste("a casa é a 1ª rota liberada na ordem do registro (leads, renegados, clientes, agenda)", () => {
+  assert.equal(vaiPara(decide("/dashboard", ok("socio"), HAB, false, ["agenda", "clientes"])), "/clientes");
+  assert.equal(vaiPara(decide("/dashboard", ok("socio"), HAB, false, ["agenda"])), "/agenda");
+  assert.equal(vaiPara(decide("/dashboard", ok("funcionario"), HAB, false, ["renegados", "leads"])), "/leads");
+});
+await teste("permissão em módulo que a empresa DESLIGOU não vale", () => {
+  assert.equal(vaiPara(decide("/leads", ok("socio"), ["clientes"], false, ["leads"])), AGUARDANDO_LIBERACAO);
+  assert.equal(vaiPara(decide("/leads", ok("socio"), ["clientes"], false, ["leads", "clientes"])), "/clientes");
+});
+await teste("permissão em módulo fora da lista (financeiro, rh...) nunca libera rota", () => {
+  assert.deepEqual(modulosVisiveis(["financeiro", "rh", "leads"], ["financeiro", "rh"]), []);
+  assert.equal(vaiPara(decide("/contas-pagar", ok("socio"), ["financeiro"], false, ["financeiro"])), AGUARDANDO_LIBERACAO);
+  assert.equal(vaiPara(decide("/rh", ok("funcionario"), ["rh"], false, ["rh"])), AGUARDANDO_LIBERACAO);
+});
+
+console.log("\nFase 3 — sem permissão ou leitura falha: nega");
+await teste("funcionário sem nenhuma permissão cai em /sem-acesso (Aguardando liberação de acesso)", () => {
+  for (const papel of ["socio", "funcionario"] as const)
+    for (const p of ["/dashboard", "/", "/leads", "/agenda", "/clientes", "/renegados", "/login", "/vendedor/leads", "/socios"]) {
+      assert.equal(vaiPara(decide(p, ok(papel), HAB, false, [])), AGUARDANDO_LIBERACAO, `${papel} ${p}`);
+    }
+  assert.equal(AGUARDANDO_LIBERACAO.split("?")[0], SEM_ACESSO);
+});
+await teste("falha ao ler permissoes_membro => lista vazia => nega tudo de módulo", async () => {
+  const comErro = {
+    from: () => ({ select: () => ({ eq: () => ({ eq: async () => ({ data: null, error: { message: "boom" } }) }) }) }),
+  };
+  assert.deepEqual(await lerPermissoesProprias(comErro as never, WS_A, "eu"), []);
+  const comExcecao = {
+    from: () => {
+      throw new Error("ECONNRESET");
+    },
+  };
+  assert.deepEqual(await lerPermissoesProprias(comExcecao as never, WS_A, "eu"), []);
+});
+await teste("lerPermissoesProprias: normaliza linhas e descarta nível/módulo inválidos", async () => {
+  const linhasBanco = [
+    { modulo_chave: "leads", nivel: "edicao", extras: ["contato"] },
+    { modulo_chave: "agenda", nivel: "leitura", extras: null },
+    { modulo_chave: "clientes", nivel: "admin", extras: [] },
+    { modulo_chave: "financeiro", nivel: "edicao", extras: [] },
+    { modulo_chave: "leads", nivel: "leitura", extras: [] },
+  ];
+  const client = {
+    from: () => ({ select: () => ({ eq: () => ({ eq: async () => ({ data: linhasBanco, error: null }) }) }) }),
+  };
+  assert.deepEqual(await lerPermissoesProprias(client as never, WS_A, "eu"), [
+    { modulo: "leads", nivel: "edicao", extras: ["contato"] },
+    { modulo: "agenda", nivel: "leitura", extras: [] },
+  ]);
+  assert.deepEqual(normalizarPermissoes("lixo"), []);
+  assert.deepEqual(normalizarPermissoes([null, 3, { modulo: 7 }]), []);
+});
+await teste("papel vazio, nulo ou desconhecido nega: nunca vira painel", async () => {
+  for (const papel of ["", null, "admin", "root"]) {
+    const { client } = bancoFalso(async (nome) =>
+      nome === "meu_papel_na_empresa" ? { data: papel, error: null } : { data: [], error: null }
+    );
+    const r = await resolverEmpresaAtiva(client, WS_A);
+    assert.ok(r.status === "sem_empresa" || r.status === "legado", `${papel}: ${r.status}`);
+  }
+});
+await teste("o banco devolve cofundador/sócio/funcionário: a resolução confirma o papel (cookie válido)", async () => {
+  for (const papel of ["cofundador", "socio", "funcionario"]) {
+    const { client } = bancoFalso(async () => ({ data: papel, error: null }));
+    assert.deepEqual(await resolverEmpresaAtiva(client, WS_A), {
+      status: "ok",
+      workspaceId: WS_A,
+      papel,
+      corrigirCookie: false,
+    });
+  }
+});
+await teste("cookie forjado com papéis novos: o papel vem do banco e a empresa alheia cai no fallback", async () => {
+  const multi = [
+    { workspace_id: WS_B, nome: "Sociedade", papel: "socio", dono_id: "chefe" },
+    { workspace_id: WS_A, nome: "Minha", papel: "cofundador", dono_id: "outro" },
+  ];
+  const { client } = bancoFalso(async (nome, args) =>
+    nome === "meu_papel_na_empresa"
+      ? { data: args?.p_workspace_id === WS_A ? "cofundador" : args?.p_workspace_id === WS_B ? "socio" : null, error: null }
+      : { data: multi, error: null }
+  );
+  const r = await resolverEmpresaAtiva(client, WS_ALHEIA);
+  // Fallback: cofundador antes de sócio.
+  assert.deepEqual(r, { status: "ok", workspaceId: WS_A, papel: "cofundador", corrigirCookie: true });
+});
+
+console.log("\nFase 3 — tela do código para qualquer conta logada");
+await teste("/acesso-vendedor e /aguardando seguem para todo papel e para sem_empresa/legado", () => {
+  const todos: ResolucaoEmpresa[] = [
+    ok("dono"), ok("cofundador"), ok("socio"), ok("funcionario"), ok("comercial"),
+    { status: "sem_empresa" }, { status: "legado", workspaceId: WS_A, papel: "rh" },
+  ];
+  for (const res of todos)
+    for (const p of ["/acesso-vendedor", "/acesso-vendedor/aguardando"]) {
+      assert.equal(vaiPara(decide(p, res, ["leads"], false, [])), "seguir", `${res.status} ${p}`);
+    }
+});
+await teste("com erro de consulta a tela do código NÃO é liberada", () => {
+  assert.ok(vaiPara(decide("/acesso-vendedor", { status: "erro" })).startsWith(SEM_ACESSO));
+});
+await teste("escolherEmpresa: fundador > cofundador > sócio > funcionário > vendedor", () => {
+  const e = (papel: EmpresaVinculo["papel"], id: string): EmpresaVinculo => ({ workspaceId: id, nome: papel, papel, donoId: "x" });
+  const todas = [e("comercial", "1"), e("funcionario", "2"), e("socio", "3"), e("cofundador", "4"), e("dono", "5")];
+  assert.equal(escolherEmpresa(todas, undefined)?.papel, "dono");
+  assert.equal(escolherEmpresa(todas.filter((x) => x.papel !== "dono"), undefined)?.papel, "cofundador");
+  assert.equal(escolherEmpresa(todas.filter((x) => !["dono", "cofundador"].includes(x.papel)), undefined)?.papel, "socio");
+  assert.equal(escolherEmpresa(todas.slice(0, 2), undefined)?.papel, "funcionario");
+});
+
+await teste("permissoes_extras: {nome, chave} usa nome como rótulo e chave como id; aceita o formato antigo", () => {
+  assert.deepEqual(extrasDoCatalogo([{ nome: "Ver contato dos leads", chave: "contato" }]), [
+    { chave: "contato", rotulo: "Ver contato dos leads" },
+  ]);
+  assert.deepEqual(extrasDoCatalogo(["contato"]), [{ chave: "contato", rotulo: "Contato" }]);
+  assert.deepEqual(extrasDoCatalogo([{ nome: "sem chave" }, 5, null]), []);
+  assert.deepEqual(extrasDoCatalogo(null), []);
 });
 
 console.log(`\n${total} testes`);

@@ -19,10 +19,15 @@ import type { SolicitacaoVendedor } from "@/lib/vendedor-shared";
 export type SolicitacaoPendente = Pick<
   SolicitacaoVendedor,
   "id" | "email" | "created_at"
->;
+> & {
+  /** null = pedido de vendedor; senão, o setor (perfis_acesso) cujo código foi usado. */
+  perfil_acesso_id: string | null;
+};
 
 type SolicitacoesApi = {
   pendentes: SolicitacaoPendente[];
+  /** Nome de cada setor (perfis_acesso.id -> nome), para rotular o pedido. */
+  setores: Record<string, string>;
   /** Drops a request from the list (after this tab approved/refused it). */
   remover: (id: string) => void;
   somAtivo: boolean;
@@ -113,16 +118,19 @@ function ordenar(lista: SolicitacaoPendente[]) {
 export function SolicitacoesVendedorProvider({
   workspaceId,
   initialPendentes,
+  initialSetores = {},
   children,
 }: {
   workspaceId: string;
   initialPendentes: SolicitacaoPendente[];
+  initialSetores?: Record<string, string>;
   children: React.ReactNode;
 }) {
   const toast = useToast();
   const router = useRouter();
   const pathname = usePathname();
   const [pendentes, setPendentes] = useState(() => ordenar(initialPendentes));
+  const [setores, setSetores] = useState(initialSetores);
   const somAtivo = useSyncExternalStore(assinarSom, lerSom, () => true);
 
   // The /vendedores page lists the same requests from server props; let it
@@ -139,10 +147,22 @@ export function SolicitacoesVendedorProvider({
     const supabase = createClient();
     let ativo = true;
 
+    async function buscarSetores() {
+      const { data } = await supabase
+        .from("perfis_acesso")
+        .select("id, nome")
+        .eq("workspace_id", workspaceId);
+      if (ativo && data) {
+        setSetores(
+          Object.fromEntries((data as { id: string; nome: string }[]).map((s) => [s.id, s.nome]))
+        );
+      }
+    }
+
     async function buscarPendentes() {
       const { data } = await supabase
         .from("solicitacoes_vendedor")
-        .select("id, email, created_at")
+        .select("id, email, created_at, perfil_acesso_id")
         .eq("workspace_id", workspaceId)
         .eq("status", "pendente")
         .order("created_at", { ascending: true });
@@ -174,9 +194,16 @@ export function SolicitacoesVendedorProvider({
                 ? atual
                 : ordenar([
                     ...atual,
-                    { id: row.id, email: row.email, created_at: row.created_at },
+                    {
+                      id: row.id,
+                      email: row.email,
+                      created_at: row.created_at,
+                      perfil_acesso_id: row.perfil_acesso_id ?? null,
+                    },
                   ])
             );
+            // Setor criado depois do carregamento da página: busca o nome.
+            if (row.perfil_acesso_id) void buscarSetores();
             if (payload.eventType === "INSERT") {
               toast.info(`Novo pedido de acesso: ${row.email ?? "sem e-mail"}`);
               if (lerSom()) tocarSom();
@@ -188,7 +215,10 @@ export function SolicitacoesVendedorProvider({
         }
       )
       .subscribe((status) => {
-        if (status === "SUBSCRIBED") void buscarPendentes();
+        if (status === "SUBSCRIBED") {
+          void buscarPendentes();
+          void buscarSetores();
+        }
       });
 
     return () => {
@@ -202,8 +232,8 @@ export function SolicitacoesVendedorProvider({
   }, []);
 
   const api = useMemo<SolicitacoesApi>(
-    () => ({ pendentes, remover, somAtivo, setSomAtivo: gravarSom }),
-    [pendentes, remover, somAtivo]
+    () => ({ pendentes, setores, remover, somAtivo, setSomAtivo: gravarSom }),
+    [pendentes, setores, remover, somAtivo]
   );
 
   return (

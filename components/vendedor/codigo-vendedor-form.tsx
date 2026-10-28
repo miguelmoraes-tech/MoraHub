@@ -1,35 +1,36 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { solicitarAcessoVendedor } from "@/lib/actions/vendedor-codigo";
+import { solicitarAcesso } from "@/lib/actions/vendedor-codigo";
 import { useActionToast } from "@/lib/hooks/use-action-toast";
 import {
-  CODIGO_VENDEDOR_LENGTH,
-  formatarCodigoVendedor,
+  CODIGO_ACESSO_MIN,
+  formatarCodigoAcesso,
+  limparCodigoAcesso,
 } from "@/lib/vendedor-shared";
 
 export function CodigoVendedorForm() {
   const [state, formAction, pending] = useActionState(
-    solicitarAcessoVendedor,
+    solicitarAcesso,
     undefined
   );
   const [codigo, setCodigo] = useState("");
   useActionToast(state);
 
-  const completo = codigo.replace("-", "").length === CODIGO_VENDEDOR_LENGTH;
+  const completo = limparCodigoAcesso(codigo).length >= CODIGO_ACESSO_MIN;
 
   return (
     <form action={formAction} className="space-y-4">
       <div className="space-y-1.5">
         <label htmlFor="codigo" className="text-xs font-medium text-zinc-400">
-          Código do gestor
+          Código de acesso
         </label>
         <input
           id="codigo"
           name="codigo"
           type="text"
           value={codigo}
-          onChange={(e) => setCodigo(formatarCodigoVendedor(e.target.value))}
+          onChange={(e) => setCodigo(formatarCodigoAcesso(e.target.value))}
           autoComplete="off"
           autoCapitalize="characters"
           spellCheck={false}

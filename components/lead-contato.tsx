@@ -60,11 +60,14 @@ export function LeadContato({
   contato,
   variant,
   oculto = false,
+  ocultoNoDetalhe = false,
 }: {
   contato: string | null;
   variant: "card" | "detalhe";
-  /** Hide the value (list card only; the detail view always shows it). */
+  /** Hide the value. The vendedor's detail view always shows it; sócio/funcionário without the "contato" extra never see it. */
   oculto?: boolean;
+  /** Also hide it in the detail view (extra "contato" missing). */
+  ocultoNoDetalhe?: boolean;
 }) {
   if (variant === "card") {
     if (!contato || oculto) return null;
@@ -75,6 +78,7 @@ export function LeadContato({
     );
   }
 
+  if (ocultoNoDetalhe) return null;
   return (
     <div>
       <dt className="text-xs font-medium text-zinc-500">Contato</dt>

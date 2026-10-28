@@ -250,8 +250,10 @@ export function getModuloRegistro(chave: string): ModuloRegistro | undefined {
 const ROTAS_LIVRES_EXATAS = ["/", "/dashboard"];
 /**
  * Acesso (login, cadastro, convite, código do vendedor, criação da empresa),
- * a área do vendedor (que tem a própria guarda), a página de Módulos (a
- * própria página confere que quem abre é o dono) e a Conta Pessoal.
+ * a área do vendedor (que tem a própria guarda), as páginas de Módulos e
+ * Sócios (a própria página confere que quem abre é o fundador/cofundador;
+ * para sócio e funcionário o proxy as bloqueia em lib/acesso.ts) e a Conta
+ * Pessoal.
  */
 const ROTAS_LIVRES_PREFIXOS = [
   "/login",
@@ -261,6 +263,7 @@ const ROTAS_LIVRES_PREFIXOS = [
   "/nova-empresa",
   "/vendedor",
   "/modulos",
+  "/socios",
   "/configuracoes",
   "/pessoal",
   "/api/pessoal",

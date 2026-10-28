@@ -1,12 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoModulo, temExtra } from "@/lib/empresa-ativa";
 import { LeadsBoard } from "@/components/leads-board";
 import { todayISO, subtractDaysISO } from "@/lib/vencimentos/dates";
 import type { Lead, Proposta, FollowupLead, Campanha } from "@/lib/types";
 
 export default async function LeadsPage() {
   const supabase = await createClient();
-  const workspaceId = await getWorkspaceIdAtivo();
+  // Fundador/cofundador: tudo. Sócio/funcionário: o que a permissão de leads libera.
+  const acesso = await getAcessoModulo("leads");
+  const workspaceId = acesso?.workspaceId ?? null;
+  const ocultarContato = !acesso || !temExtra(acesso, "contato");
   const noventaDiasAtras = subtractDaysISO(todayISO(), 90);
 
   const [{ data: leads }, { data: propostas }, { data: followups }, { data: campanhas }] =
@@ -44,10 +47,14 @@ export default async function LeadsPage() {
 
   return (
     <LeadsBoard
-      leads={leads ?? []}
+      // Sem o extra "contato" o valor nem vai para a tela (só interface; não é barreira).
+      leads={(leads ?? []).map((l) => (ocultarContato ? { ...l, contato: null } : l))}
       propostas={propostas ?? []}
       followups={followups ?? []}
       campanhas={campanhas ?? []}
+      somenteLeitura={acesso?.nivel !== "edicao"}
+      semExportar={!acesso?.completo}
+      ocultarContato={ocultarContato}
     />
   );
 }

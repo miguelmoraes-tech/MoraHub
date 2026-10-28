@@ -8,7 +8,17 @@ import { NewRenegadoDialog } from "@/components/new-renegado-dialog";
 import { ExportButton } from "@/components/export-button";
 import { SegmentFilter } from "@/components/segment-filter";
 
-export function RenegadosBoard({ renegados }: { renegados: Renegado[] }) {
+export function RenegadosBoard({
+  renegados,
+  somenteLeitura = false,
+  semExportar = false,
+}: {
+  renegados: Renegado[];
+  /** Sócio/funcionário com leitura: sem criar, editar nem excluir. */
+  somenteLeitura?: boolean;
+  /** Só o painel completo exporta. */
+  semExportar?: boolean;
+}) {
   const [nicho, setNicho] = useState("");
 
   const nichos = useMemo(
@@ -37,8 +47,8 @@ export function RenegadosBoard({ renegados }: { renegados: Renegado[] }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButton href={exportHref} />
-          <NewRenegadoDialog />
+          {!semExportar && <ExportButton href={exportHref} />}
+          {!somenteLeitura && <NewRenegadoDialog />}
         </div>
       </div>
 
@@ -56,7 +66,7 @@ export function RenegadosBoard({ renegados }: { renegados: Renegado[] }) {
       {filtrados.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtrados.map((renegado) => (
-            <RenegadoCard key={renegado.id} renegado={renegado} />
+            <RenegadoCard key={renegado.id} renegado={renegado} somenteLeitura={somenteLeitura} />
           ))}
         </div>
       ) : (

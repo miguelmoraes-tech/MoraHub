@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2, ShieldAlert } from "lucide-react";
+import { Building2, Clock, KeyRound, ShieldAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getEmpresaAtiva, getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 import { EmpresaSwitcher } from "@/components/empresa/empresa-switcher";
 import { NOVA_EMPRESA } from "@/lib/empresa";
+import { ACESSO_VENDEDOR_CODIGO } from "@/lib/vendedor-access";
 
 /**
  * Para onde o proxy manda quem não pode usar a empresa ativa: papel sem
@@ -16,7 +17,7 @@ import { NOVA_EMPRESA } from "@/lib/empresa";
 export default async function SemAcessoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ erro?: string }>;
+  searchParams: Promise<{ erro?: string; aguardando?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -24,22 +25,28 @@ export default async function SemAcessoPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { erro } = await searchParams;
+  const { erro, aguardando } = await searchParams;
   const [empresas, ativa] = await Promise.all([getEmpresasDoUsuario(), getEmpresaAtiva()]);
 
   return (
     <div className="space-y-6">
       <div className="text-center">
         <span className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-zinc-800 text-zinc-300">
-          <ShieldAlert className="h-5 w-5" />
+          {aguardando && !erro ? <Clock className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5" />}
         </span>
         <h1 className="text-xl font-semibold tracking-tight text-zinc-50">
-          {erro ? "Não foi possível verificar seu acesso" : "Sem acesso nesta empresa"}
+          {erro
+            ? "Não foi possível verificar seu acesso"
+            : aguardando
+              ? "Aguardando liberação de acesso"
+              : "Sem acesso nesta empresa"}
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
           {erro
             ? "Houve uma falha ao confirmar o seu acesso. Tente de novo em instantes."
-            : "O seu vínculo com esta empresa não dá acesso a nenhuma tela. Escolha outra empresa ou crie a sua."}
+            : aguardando
+              ? "Você já faz parte desta empresa, mas ainda não tem nenhum módulo liberado. Peça ao responsável para liberar o seu acesso."
+              : "O seu vínculo com esta empresa não dá acesso a nenhuma tela. Escolha outra empresa ou crie a sua."}
         </p>
       </div>
 
@@ -52,7 +59,14 @@ export default async function SemAcessoPage({
           <Building2 className="h-4 w-4" />
           Criar minha empresa
         </Link>
-        {erro && (
+        <Link
+          href={ACESSO_VENDEDOR_CODIGO}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
+        >
+          <KeyRound className="h-4 w-4" />
+          Entrar com um código
+        </Link>
+        {(erro || aguardando) && (
           <Link
             href="/"
             className="block text-center text-xs font-medium text-zinc-400 hover:text-zinc-200"

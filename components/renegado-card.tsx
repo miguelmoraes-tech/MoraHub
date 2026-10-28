@@ -12,7 +12,14 @@ import { RenegadoFields } from "@/components/renegado-fields";
 import { StatusChip } from "@/components/status-chip";
 import { formatDate } from "@/lib/format";
 
-export function RenegadoCard({ renegado }: { renegado: Renegado }) {
+export function RenegadoCard({
+  renegado,
+  somenteLeitura = false,
+}: {
+  renegado: Renegado;
+  /** Permissão de leitura: sem editar nem excluir. */
+  somenteLeitura?: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -20,7 +27,7 @@ export function RenegadoCard({ renegado }: { renegado: Renegado }) {
   const [state, formAction, pending] = useActionState(updateAction, undefined);
   useActionSuccess(state, () => setEditing(false));
 
-  if (editing) {
+  if (editing && !somenteLeitura) {
     return (
       <form
         action={formAction}
@@ -117,6 +124,7 @@ export function RenegadoCard({ renegado }: { renegado: Renegado }) {
         {renegado.data_abordagem && ` · ${formatDate(renegado.data_abordagem)}`}
       </p>
 
+      {!somenteLeitura && (
       <div className="mt-auto flex items-center justify-between border-t border-zinc-800/80 pt-3">
         {confirmingDelete ? (
           <div className="flex items-center gap-2 text-xs">
@@ -156,6 +164,7 @@ export function RenegadoCard({ renegado }: { renegado: Renegado }) {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

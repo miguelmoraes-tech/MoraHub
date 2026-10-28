@@ -2,14 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Building2, Check, ChevronDown, Plus } from "lucide-react";
+import { Building2, Check, ChevronDown, KeyRound, Plus } from "lucide-react";
 import { selecionarEmpresa } from "@/lib/actions/empresa";
 import { NOVA_EMPRESA } from "@/lib/empresa";
+import { ACESSO_VENDEDOR_CODIGO } from "@/lib/vendedor-access";
 import { PAPEL_ROTULO, type EmpresaVinculo } from "@/lib/empresas";
 
 /**
  * Seletor de empresa do topo do menu: lista todas as empresas em que a conta
- * tem vínculo ativo (dono, sócio ou vendedor) e troca a ativa sem logout. A
+ * tem vínculo ativo (fundador, cofundador, sócio, funcionário ou vendedor) e
+ * troca a ativa sem logout. A
  * troca é uma server action, que só aceita empresas com vínculo no banco.
  */
 export function EmpresaSwitcher({
@@ -127,6 +129,16 @@ export function EmpresaSwitcher({
             <Plus className="h-3.5 w-3.5" />
           </span>
           Criar minha empresa
+        </Link>
+        <Link
+          href={ACESSO_VENDEDOR_CODIGO}
+          onClick={() => setOpen(false)}
+          className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-900"
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed border-zinc-600 text-zinc-500">
+            <KeyRound className="h-3.5 w-3.5" />
+          </span>
+          Entrar com um código
         </Link>
       </div>
     </div>
