@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { VENDEDOR_HOME, getVendedorAcesso } from "@/lib/vendedor-access";
+import { VENDEDOR_HOME } from "@/lib/vendedor-access";
+import { listarEmpresas } from "@/lib/empresas";
 import { gravarEmpresaAtiva } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
 
@@ -34,21 +35,17 @@ export async function aceitarConvite(
 
   if (error || !donoId) return { error: friendlyError(error?.message) };
 
-  // Someone whose only role is the 'comercial' they just accepted goes
-  // straight to the vendedor area instead of the colaborador picker.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user) {
-    const acesso = await getVendedorAcesso(supabase, user.id);
-    const vinculo = acesso.vinculos.find((v) => v.dono_id === donoId);
-    if (acesso.somenteVendedor && vinculo) {
-      await gravarEmpresaAtiva(vinculo.workspace_id);
-      redirect(VENDEDOR_HOME);
-    }
+  // O destino depende do papel na empresa ativa. Quem acabou de aceitar um
+  // convite de vendedor passa a atuar nessa empresa e vai para a área dele;
+  // qualquer outro papel segue para o painel (o seletor /colaborador está fora
+  // do ar).
+  const empresas = await listarEmpresas(supabase);
+  const nova = empresas.find((e) => e.donoId === donoId && e.papel === "comercial");
+  if (nova) {
+    await gravarEmpresaAtiva(nova.workspaceId);
+    redirect(VENDEDOR_HOME);
   }
 
-  // O seletor /colaborador está fora do ar: vai direto para o destino.
   redirect(HOME_DONO);
 }
 

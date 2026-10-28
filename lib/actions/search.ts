@@ -156,6 +156,7 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
     const { data: clientesRelacionados } = await supabase
       .from("clientes")
       .select("id, nome")
+      .eq("workspace_id", workspaceId ?? "")
       .in("id", [...clienteIdsRelacionados]);
     for (const c of clientesRelacionados ?? []) {
       nomesPorClienteId.set(c.id, c.nome);

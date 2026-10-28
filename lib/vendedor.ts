@@ -21,42 +21,33 @@ export interface VendedorContext {
   /** Workspace whose leads/reuniões the vendedor is acting on. */
   workspaceId: string;
   donoId: string;
-  somenteVendedor: boolean;
 }
 
 /**
- * The vendedor session for the current request, or null when the caller is
- * not an active 'comercial' member. With several links, the active company
- * (lib/empresa-ativa.ts) wins when the caller is a vendedor there; it is only a
- * hint — it must match a link that is still 'ativo' in `membros`.
+ * The vendedor session for the current request, or null when the ACTIVE
+ * company is not one where the caller is a 'comercial' member. The interface
+ * depends on the papel in the active company (lib/empresa-ativa.ts, always
+ * revalidated in the database), never on the user as a whole.
  */
 export const getVendedorContext = cache(
   async (): Promise<VendedorContext | null> => {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return null;
-
-    const acesso = await getVendedorAcesso(supabase, user.id);
-    if (acesso.vinculos.length === 0) return null;
-
     const ativa = await getEmpresaAtiva();
-    const vinculo =
-      acesso.vinculos.find((v) => v.workspace_id === ativa?.workspaceId) ??
-      acesso.vinculos[0];
+    if (!ativa || ativa.papel !== "comercial") return null;
 
     return {
-      userId: user.id,
-      email: user.email ?? "",
-      workspaceId: vinculo.workspace_id,
-      donoId: vinculo.dono_id,
-      somenteVendedor: acesso.somenteVendedor,
+      userId: ativa.userId,
+      email: ativa.email,
+      workspaceId: ativa.workspaceId,
+      donoId: ativa.donoId,
     };
   }
 );
 
-/** Page/action guard: anonymous -> /login, non-vendedor -> /. */
+/**
+ * Page/action guard: anonymous -> /login; anyone who is not a vendedor in the
+ * active company -> "sem acesso" (a page the proxy never redirects away from,
+ * so a mismatch can't bounce between /dashboard and /vendedor/*).
+ */
 export async function requireVendedor(): Promise<VendedorContext> {
   const ctx = await getVendedorContext();
   if (ctx) return ctx;
@@ -65,7 +56,7 @@ export async function requireVendedor(): Promise<VendedorContext> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  redirect(user ? "/" : "/login");
+  redirect(user ? "/sem-acesso?erro=1" : "/login");
 }
 
 export interface SemVinculoContext {
@@ -88,7 +79,7 @@ export async function requireComercialSemVinculo(): Promise<SemVinculoContext> {
   if (!user) redirect("/login");
 
   const acesso = await getVendedorAcesso(supabase, user.id);
-  if (acesso.somenteVendedor) redirect(VENDEDOR_HOME);
+  if ((await getEmpresaAtiva())?.papel === "comercial") redirect(VENDEDOR_HOME);
   if (!(await isComercialSemVinculo(supabase, user, acesso))) redirect("/");
 
   const { data } = await supabase

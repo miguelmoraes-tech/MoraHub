@@ -16,6 +16,7 @@ import {
   getVendedorAcesso,
   isComercialSemVinculo,
 } from "@/lib/vendedor-access";
+import { SEM_ACESSO } from "@/lib/acesso";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { NOVA_EMPRESA } from "@/lib/empresa";
 import {
@@ -25,7 +26,7 @@ import {
   tipoContaDaMetadata,
 } from "@/lib/perfil";
 import { gravarEmpresaAtiva, limparEmpresaAtiva } from "@/lib/empresa-ativa";
-import { EMPRESA_ATIVA_COOKIE } from "@/lib/empresas";
+import { EMPRESA_ATIVA_COOKIE, resolverEmpresaAtiva } from "@/lib/empresas";
 
 const HUB_MODE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
@@ -74,19 +75,33 @@ export async function login(
     redirect(redirectTo);
   }
 
-  // A vendedor (invited 'comercial', no company of their own) always lands
-  // in their own area — the proxy keeps them there afterwards.
-  const acesso = await getVendedorAcesso(supabase, data.user.id);
-  if (acesso.somenteVendedor) {
-    const cookieStore = await cookies();
-    if (!cookieStore.get(EMPRESA_ATIVA_COOKIE)?.value) {
-      await gravarEmpresaAtiva(acesso.vinculos[0].workspace_id);
+  // O destino depende do PAPEL NA EMPRESA ATIVA (cookie revalidado no banco;
+  // vazio ou inválido cai numa empresa válida): vendedor vai para a área dele,
+  // dono para o painel. Falha de consulta nega — nunca presume dono.
+  const cookieStore = await cookies();
+  const resolucao = await resolverEmpresaAtiva(
+    supabase,
+    cookieStore.get(EMPRESA_ATIVA_COOKIE)?.value
+  );
+  if (resolucao.status === "erro") redirect(`${SEM_ACESSO}?erro=1`);
+  if (resolucao.status === "legado") redirect(SEM_ACESSO);
+  if (resolucao.status === "ok") {
+    if (resolucao.corrigirCookie) await gravarEmpresaAtiva(resolucao.workspaceId);
+    if (resolucao.papel === "comercial") redirect(VENDEDOR_HOME);
+    if (cookieStore.get(HUB_MODE_COOKIE)?.value === "pessoal") {
+      redirect(MODE_HOME_ROUTE.pessoal);
     }
-    redirect(VENDEDOR_HOME);
+    cookieStore.set(HUB_MODE_COOKIE, "business", {
+      path: "/",
+      maxAge: HUB_MODE_COOKIE_MAX_AGE,
+      sameSite: "lax",
+    });
+    redirect(HOME_DONO);
   }
 
-  // A vendedor who signed up but isn't linked to a company yet: the only
-  // place for them is the screen to type the gestor's code (or wait for it).
+  // Sem empresa nenhuma. Funcionário que ainda não entrou numa: o único lugar
+  // é a tela para digitar o código do gestor (ou esperar a aprovação).
+  const acesso = await getVendedorAcesso(supabase, data.user.id);
   if (await isComercialSemVinculo(supabase, data.user, acesso)) {
     redirect(ACESSO_VENDEDOR_CODIGO);
   }
@@ -101,7 +116,6 @@ export async function login(
 
   // Empreendedor que ainda não tem empresa (o cadastro não pede o nome): o
   // primeiro login cai na tela "Dê um nome à sua empresa".
-  const cookieStore = await cookies();
   const lastMode = cookieStore.get(HUB_MODE_COOKIE)?.value;
   if (
     tipoPadrao === "empresarial" &&

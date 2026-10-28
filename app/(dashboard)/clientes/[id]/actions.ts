@@ -149,6 +149,7 @@ export async function updateContrato(
       .from("contratos")
       .select("arquivo_path")
       .eq("id", contratoId)
+      .eq("workspace_id", workspaceId)
       .single();
     arquivoAntigoPath = (existente as { arquivo_path: string | null } | null)
       ?.arquivo_path ?? null;
@@ -177,12 +178,13 @@ export async function updateContrato(
 }
 
 export async function deleteContrato(clienteId: string, contratoId: string) {
-  const { supabase } = await requireUser();
+  const { supabase, workspaceId } = await requireUser();
 
   const { data: existente } = await supabase
     .from("contratos")
     .select("arquivo_path")
     .eq("id", contratoId)
+    .eq("workspace_id", workspaceId ?? "")
     .single();
 
   await supabase.from("contratos").delete().eq("id", contratoId);
@@ -282,6 +284,7 @@ export async function updateComprovante(
       .from("comprovantes")
       .select("arquivo_path")
       .eq("id", comprovanteId)
+      .eq("workspace_id", workspaceId)
       .single();
     arquivoAntigoPath = (existente as { arquivo_path: string | null } | null)
       ?.arquivo_path ?? null;
@@ -313,12 +316,13 @@ export async function deleteComprovante(
   clienteId: string,
   comprovanteId: string
 ) {
-  const { supabase } = await requireUser();
+  const { supabase, workspaceId } = await requireUser();
 
   const { data: existente } = await supabase
     .from("comprovantes")
     .select("arquivo_path")
     .eq("id", comprovanteId)
+    .eq("workspace_id", workspaceId ?? "")
     .single();
 
   await supabase.from("comprovantes").delete().eq("id", comprovanteId);

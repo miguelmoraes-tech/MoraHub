@@ -20,7 +20,11 @@ export default async function VendedorAgendaPage() {
 
   const leadIds = [...new Set(reunioes.map((r) => r.lead_id))];
   const { data: leads } = leadIds.length
-    ? ((await supabase.from("leads").select("id, nome").in("id", leadIds)) as {
+    ? ((await supabase
+        .from("leads")
+        .select("id, nome")
+        .eq("workspace_id", workspaceId)
+        .in("id", leadIds)) as {
         data: { id: string; nome: string }[] | null;
       })
     : { data: [] };

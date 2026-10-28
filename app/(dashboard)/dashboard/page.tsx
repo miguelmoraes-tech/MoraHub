@@ -7,15 +7,14 @@ import { DashboardHomeBoard } from "@/components/dashboard-home/dashboard-home-b
 import { NOVA_EMPRESA } from "@/lib/empresa";
 import { tipoContaDaMetadata } from "@/lib/perfil";
 import { getEmpresaAtiva } from "@/lib/empresa-ativa";
-import { VENDEDOR_HOME } from "@/lib/vendedor-access";
 
 // Home do dono: só atalhos e resumos dos módulos ligados na empresa ativa. O
 // Dashboard Executivo completo (getDashboardExecutivoOverview +
 // DashboardExecutivoBoard) segue no repositório, sem uso, para ser religado.
 export default async function DashboardHomePage() {
-  // A interface depende do papel na empresa ativa: vendedor só tem /vendedor/*.
+  // Quem manda para /vendedor/* é o proxy, pelo papel na empresa ativa; esta
+  // página nunca redireciona por papel (evita ciclo com /vendedor/leads).
   const ativa = await getEmpresaAtiva();
-  if (ativa?.papel === "comercial") redirect(VENDEDOR_HOME);
 
   const overview = await getDashboardHomeOverview();
 

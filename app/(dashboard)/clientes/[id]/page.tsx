@@ -147,6 +147,7 @@ export default async function ClienteDetailPage({
         .from("leads")
         .select("id, nome, descricao, nicho")
         .eq("id", cliente.lead_origem_id)
+        .eq("workspace_id", workspaceId)
         .maybeSingle()) as {
         data: { id: string; nome: string; descricao: string | null; nicho: string | null } | null;
       })

@@ -34,9 +34,7 @@ export function temInterface(papel: string | null | undefined): papel is PapelEm
   return !!papel && (PAPEIS_COM_INTERFACE as readonly string[]).includes(papel);
 }
 
-/** Todas as empresas em que a conta é dono, sócio ou vendedor (vínculo ativo). */
-export async function listarEmpresas(supabase: SupabaseClient): Promise<EmpresaVinculo[]> {
-  const { data } = await supabase.rpc("minhas_empresas");
+function paraVinculos(data: unknown): EmpresaVinculo[] {
   const linhas = (data ?? []) as {
     workspace_id: string;
     nome: string | null;
@@ -51,6 +49,20 @@ export async function listarEmpresas(supabase: SupabaseClient): Promise<EmpresaV
       papel: l.papel as PapelEmpresa,
       donoId: l.dono_id,
     }));
+}
+
+/**
+ * Todas as empresas em que a conta é dono, sócio ou vendedor (vínculo ativo),
+ * na ordem do banco: donos primeiro, da mais antiga para a mais nova. Falha de
+ * leitura devolve lista vazia (nega por padrão: sem empresa, sem dados).
+ */
+export async function listarEmpresas(supabase: SupabaseClient): Promise<EmpresaVinculo[]> {
+  try {
+    const { data, error } = await supabase.rpc("minhas_empresas");
+    return error ? [] : paraVinculos(data);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -70,23 +82,55 @@ export function escolherEmpresa(
   return null;
 }
 
+/** Só UUID de verdade vai para a RPC: cookie com lixo é tratado como ausente. */
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type ResolucaoEmpresa =
+  /** Empresa ativa válida, com o papel confirmado pelo banco. */
+  | { status: "ok"; workspaceId: string; papel: PapelEmpresa; corrigirCookie: boolean }
+  /** A conta não tem vínculo ativo com nenhuma empresa que tenha interface. */
+  | { status: "sem_empresa" }
+  /** O cookie aponta para uma empresa em que o papel não tem interface (financeiro, rh...). */
+  | { status: "legado"; workspaceId: string; papel: string }
+  /** Não deu para consultar (RPC, rede): nega, nunca presume dono. */
+  | { status: "erro" };
+
 /**
  * Caminho curto para o proxy: com cookie, uma única RPC (meu_papel_na_empresa)
- * confirma vínculo e papel; só se o cookie faltar ou não valer é que lista as
- * empresas. `corrigirCookie` avisa que o cookie deve ser regravado.
+ * confirma vínculo e papel; só se o cookie faltar ou não valer (empresa alheia,
+ * vínculo removido) é que lista as empresas e cai numa válida
+ * (`corrigirCookie`). Qualquer falha de consulta vira `erro`.
  */
 export async function resolverEmpresaAtiva(
   supabase: SupabaseClient,
   cookie: string | undefined
-): Promise<{ workspaceId: string; papel: PapelEmpresa; corrigirCookie: boolean } | null> {
-  if (cookie) {
-    const { data: papel } = await supabase.rpc("meu_papel_na_empresa", {
-      p_workspace_id: cookie,
-    });
-    if (temInterface(papel)) return { workspaceId: cookie, papel, corrigirCookie: false };
+): Promise<ResolucaoEmpresa> {
+  try {
+    if (cookie && UUID_RE.test(cookie)) {
+      const { data: papel, error } = await supabase.rpc("meu_papel_na_empresa", {
+        p_workspace_id: cookie,
+      });
+      if (error) return { status: "erro" };
+      if (temInterface(papel)) {
+        return { status: "ok", workspaceId: cookie, papel, corrigirCookie: false };
+      }
+      if (typeof papel === "string" && papel !== "") {
+        return { status: "legado", workspaceId: cookie, papel };
+      }
+      // papel nulo: empresa alheia ou vínculo encerrado — cai no fallback.
+    }
+    const { data, error } = await supabase.rpc("minhas_empresas");
+    if (error) return { status: "erro" };
+    const escolhida = escolherEmpresa(paraVinculos(data), undefined);
+    return escolhida
+      ? {
+          status: "ok",
+          workspaceId: escolhida.workspaceId,
+          papel: escolhida.papel,
+          corrigirCookie: true,
+        }
+      : { status: "sem_empresa" };
+  } catch {
+    return { status: "erro" };
   }
-  const escolhida = escolherEmpresa(await listarEmpresas(supabase), undefined);
-  return escolhida
-    ? { workspaceId: escolhida.workspaceId, papel: escolhida.papel, corrigirCookie: true }
-    : null;
 }
