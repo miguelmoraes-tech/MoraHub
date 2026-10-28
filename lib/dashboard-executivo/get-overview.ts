@@ -135,8 +135,14 @@ export async function getDashboardExecutivoOverview(
         .eq("workspace_id", workspaceId ?? "")
         .eq("status", "ativa"),
       supabase.from("leads").select("status").eq("workspace_id", workspaceId ?? ""),
-      supabase.from("compliance_juridico").select("status").eq("user_id", donoId),
-      supabase.from("processos").select("fase, proximo_prazo").eq("user_id", donoId),
+      supabase
+        .from("compliance_juridico")
+        .select("status")
+        .eq("workspace_id", workspaceId ?? ""),
+      supabase
+        .from("processos")
+        .select("fase, proximo_prazo")
+        .eq("workspace_id", workspaceId ?? ""),
       supabase
         .from("fechamentos_mensais")
         .select("status")

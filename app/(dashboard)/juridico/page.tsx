@@ -1,63 +1,68 @@
 import { ShieldCheck, FileStack, Copyright, Gavel } from "lucide-react";
-import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getColaboradoresDaEmpresa } from "@/lib/colaboradores";
+import { getAcessoJuridico } from "@/lib/juridico-acesso";
 import { JuridicoBoard } from "@/components/juridico-board";
-import { ColaboradoresSection } from "@/components/colaboradores-section";
+import { SemAcessoAviso } from "@/components/financeiro/sem-valores";
 import { VisaoGeralCards, type VisaoGeralCard } from "@/components/juridico/visao-geral-cards";
 import {
   ComplianceReadonlyList,
   PropriedadeIntelectualReadonlyList,
   ProcessosReadonlyList,
 } from "@/components/juridico/juridico-readonly-lists";
-import { getConversasComoDono, getUnreadCountsByConversa } from "@/lib/chat";
 import { todayISO, diffInDays } from "@/lib/vencimentos/dates";
 import type {
-  ColaboradorVinculado,
   Cliente,
   ComplianceJuridico,
-  Convite,
   Juridico,
   Processo,
   PropriedadeIntelectual,
 } from "@/lib/types";
 
+/**
+ * Visão geral do Jurídico da empresa ativa: pendências (CRUD aqui mesmo),
+ * resumos e atalhos para as telas de processos, compliance, propriedade
+ * intelectual e modelos. Equipe, convites e chat ficam em /socios e /vendedores.
+ */
 export default async function JuridicoPage() {
+  const jur = await getAcessoJuridico();
+  if (!jur) return <SemAcessoAviso titulo="Jurídico & Contábil" />;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const workspaceId = user ? await getWorkspaceIdAtivo() : null;
+  const workspaceId = jur.workspaceId;
 
   const [
     { data: items },
-    { data: convites },
-    { data: colaboradores },
     { data: compliance },
     { data: propriedades },
     { data: processos },
     { data: clientes },
     { count: modelosCount },
   ] = (await Promise.all([
-    supabase.from("juridico").select("*").order("prazo", { ascending: true }),
     supabase
-      .from("convites")
+      .from("juridico")
       .select("*")
-      .eq("workspace_id", workspaceId ?? "")
-      .order("created_at", { ascending: false }),
-    getColaboradoresDaEmpresa(supabase, workspaceId).then((data) => ({ data })),
-    supabase.from("compliance_juridico").select("*"),
+      .eq("workspace_id", workspaceId)
+      .order("prazo", { ascending: true }),
+    supabase.from("compliance_juridico").select("*").eq("workspace_id", workspaceId),
     supabase
       .from("propriedade_intelectual")
       .select("*")
+      .eq("workspace_id", workspaceId)
       .order("data_renovacao", { ascending: true }),
-    supabase.from("processos").select("*").order("proximo_prazo", { ascending: true }),
-    supabase.from("clientes").select("id, nome").eq("workspace_id", workspaceId ?? ""),
-    supabase.from("modelos_contrato").select("id", { count: "exact", head: true }),
+    supabase
+      .from("processos")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("proximo_prazo", { ascending: true }),
+    // Nomes dos clientes: leitura auxiliar, só com permissão em Clientes ("—" sem ela).
+    jur.clientes
+      ? supabase.from("clientes").select("id, nome").eq("workspace_id", jur.clientes.workspaceId)
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from("modelos_contrato")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId),
   ])) as [
     { data: Juridico[] | null },
-    { data: Convite[] | null },
-    { data: ColaboradorVinculado[] | null },
     { data: ComplianceJuridico[] | null },
     { data: PropriedadeIntelectual[] | null },
     { data: Processo[] | null },
@@ -69,9 +74,7 @@ export default async function JuridicoPage() {
   const clienteNome = new Map((clientes ?? []).map((c) => [c.id, c.nome]));
 
   const complianceRegistros = compliance ?? [];
-  const complianceConforme = complianceRegistros.filter(
-    (c) => c.status === "conforme"
-  ).length;
+  const complianceConforme = complianceRegistros.filter((c) => c.status === "conforme").length;
 
   const propriedadesItens = propriedades ?? [];
   const piEmAtencao = propriedadesItens.filter((p) => {
@@ -88,65 +91,63 @@ export default async function JuridicoPage() {
     return dias >= 0 && dias <= 7;
   }).length;
 
-  const conversas = await getConversasComoDono();
-  const conversaByColaborador = new Map(
-    conversas.map((c) => [`${c.membro_id}|${c.papel}`, c.id])
-  );
-  const unreadByConversa = await getUnreadCountsByConversa(
-    conversas.map((c) => c.id)
-  );
-
   const cards: VisaoGeralCard[] = [
     {
       icon: ShieldCheck,
       label: "Compliance",
       value: `${complianceConforme} de ${complianceRegistros.length}`,
       hint: "itens conformes",
-      tone: complianceRegistros.length > 0 && complianceConforme === complianceRegistros.length ? "emerald" : "zinc",
-      href: "#compliance",
+      tone:
+        complianceRegistros.length > 0 && complianceConforme === complianceRegistros.length
+          ? "emerald"
+          : "zinc",
+      href: "/juridico/compliance",
     },
     {
       icon: FileStack,
       label: "Modelos disponíveis",
       value: String(modelosCount ?? 0),
-      href: "/documentos",
+      href: "/juridico/modelos-contrato",
     },
     {
       icon: Copyright,
       label: "Propriedade Intelectual em atenção",
       value: String(piEmAtencao),
       tone: piEmAtencao > 0 ? "amber" : "zinc",
-      href: "#propriedade-intelectual",
+      href: "/juridico/propriedade-intelectual",
     },
     {
       icon: Gavel,
       label: "Processos com prazo próximo",
       value: String(processosProximos),
       tone: processosProximos > 0 ? "amber" : "zinc",
-      href: "#processos",
+      href: "/juridico/processos",
     },
   ];
+
+  const clientesIndisponiveis = !jur.clientes;
 
   return (
     <>
       <div className="mx-auto max-w-4xl px-6 pt-8">
         <VisaoGeralCards cards={cards} />
       </div>
-      <JuridicoBoard items={items ?? []} />
-      <ComplianceReadonlyList registros={complianceRegistros} clienteNome={clienteNome} />
-      <PropriedadeIntelectualReadonlyList itens={propriedadesItens} clienteNome={clienteNome} />
-      <ProcessosReadonlyList processos={processosItens} clienteNome={clienteNome} />
-      <div className="mx-auto max-w-4xl px-6 pb-8">
-        {user && (
-          <ColaboradoresSection
-            convites={convites ?? []}
-            colaboradores={colaboradores ?? []}
-            conversaByColaborador={conversaByColaborador}
-            unreadByConversa={unreadByConversa}
-            currentUserId={user.id}
-          />
-        )}
-      </div>
+      <JuridicoBoard items={items ?? []} somenteLeitura={jur.somenteLeitura} />
+      <ComplianceReadonlyList
+        registros={complianceRegistros}
+        clienteNome={clienteNome}
+        clientesIndisponiveis={clientesIndisponiveis}
+      />
+      <PropriedadeIntelectualReadonlyList
+        itens={propriedadesItens}
+        clienteNome={clienteNome}
+        clientesIndisponiveis={clientesIndisponiveis}
+      />
+      <ProcessosReadonlyList
+        processos={processosItens}
+        clienteNome={clienteNome}
+        clientesIndisponiveis={clientesIndisponiveis}
+      />
     </>
   );
 }

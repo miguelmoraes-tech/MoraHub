@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getAcessoEdicao, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { JuridicoSchema } from "@/lib/validations/juridico";
 import { ConviteSchema } from "@/lib/validations/colaborador";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
@@ -41,11 +43,13 @@ export async function createJuridico(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
-  if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  const acesso = await getAcessoEdicao("juridico");
+  if (!acesso) return { error: SEM_PERMISSAO };
 
+  const { supabase } = await requireUser();
   const { error } = await supabase.from("juridico").insert({
-    user_id: user.id,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     titulo: parsed.data.titulo,
     tipo: parsed.data.tipo,
     prazo: parsed.data.prazo ?? null,
@@ -68,6 +72,9 @@ export async function updateJuridico(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  const acesso = await getAcessoEdicao("juridico");
+  if (!acesso) return { error: SEM_PERMISSAO };
+
   const { supabase } = await requireUser();
   const { error } = await supabase
     .from("juridico")
@@ -78,7 +85,8 @@ export async function updateJuridico(
       status: parsed.data.status,
       nota: parsed.data.nota ?? null,
     })
-    .eq("id", juridicoId);
+    .eq("id", juridicoId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar a pendência." };
 
   revalidatePath("/juridico");
@@ -86,8 +94,15 @@ export async function updateJuridico(
 }
 
 export async function deleteJuridico(juridicoId: string) {
+  const acesso = await getAcessoEdicao("juridico");
+  if (!acesso) return;
+
   const { supabase } = await requireUser();
-  await supabase.from("juridico").delete().eq("id", juridicoId);
+  await supabase
+    .from("juridico")
+    .delete()
+    .eq("id", juridicoId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidatePath("/juridico");
 }
 

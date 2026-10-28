@@ -73,6 +73,7 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
     supabase
       .from("juridico")
       .select("id, titulo, tipo, prazo")
+      .eq("workspace_id", workspaceId ?? "")
       .eq("status", "pendente")
       .not("prazo", "is", null),
     supabase
@@ -85,6 +86,7 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
     supabase
       .from("propriedade_intelectual")
       .select("id, cliente_id, nome, tipo, data_renovacao")
+      .eq("workspace_id", workspaceId ?? "")
       .not("data_renovacao", "is", null),
     supabase
       .from("ferias")

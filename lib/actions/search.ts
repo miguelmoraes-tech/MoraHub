@@ -132,6 +132,7 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
       ? supabase
           .from("documentos")
           .select("id, cliente_id, titulo")
+          .eq("workspace_id", workspaceId ?? "")
           .ilike("titulo", pattern)
           .limit(ate)
       : Promise.resolve({ data: null }),

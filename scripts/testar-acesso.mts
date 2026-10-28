@@ -23,7 +23,8 @@ import {
   normalizarPermissoes,
 } from "@/lib/modulos/permissoes";
 import { VENDEDOR_HOME } from "@/lib/vendedor-access";
-import { MODULOS, menuDoDono, primeiraRotaHabilitada, rotaPermitida } from "@/lib/modulos/registry";
+import { MODULOS, menuDoDono, moduloDaRota, primeiraRotaHabilitada, rotaPermitida } from "@/lib/modulos/registry";
+import { permissoesJuridico } from "@/lib/juridico-shared";
 import { filtrarPermissoesOferecidas, modulosOferecidos } from "@/lib/socios-shared";
 import { getModulosPermiteMembrosDoCatalogo } from "@/lib/modulos/catalogo";
 import { readFileSync } from "node:fs";
@@ -695,6 +696,43 @@ await teste("gerarFolhaDoMes lê por workspace_id e grava workspace_id em contas
     assert.ok(f.coluna !== "user_id", `${f.tabela} filtrou por user_id`);
   }
   assert.ok(filtros.some((f) => f.tabela === "funcionarios" && f.coluna === "workspace_id" && f.valor === WS_A));
+});
+
+console.log("\nFase 3.5 — Jurídico: rotas, menu e escrita");
+await teste("rotas do Jurídico (telas novas e /documentos) pertencem ao módulo; ligado abre, desligado nega", () => {
+  for (const p of [
+    "/juridico", "/juridico/processos", "/juridico/compliance",
+    "/juridico/propriedade-intelectual", "/juridico/modelos-contrato", "/documentos",
+  ]) {
+    assert.equal(moduloDaRota(p), "juridico", p);
+    assert.equal(rotaPermitida(p, ["juridico"]), true, p);
+    assert.equal(rotaPermitida(p, ATUAIS), false, p);
+  }
+  const hrefs = menuDoDono(["juridico"]).flatMap((g) => g.itens.map((i) => i.href));
+  assert.deepEqual(hrefs, [
+    "/juridico", "/juridico/processos", "/juridico/compliance",
+    "/juridico/propriedade-intelectual", "/juridico/modelos-contrato", "/documentos",
+  ]);
+});
+await teste("sócio com Jurídico abre as telas do módulo; sem permissão volta; dono vê tudo", () => {
+  for (const p of ["/juridico", "/juridico/processos", "/juridico/modelos-contrato", "/documentos"]) {
+    assert.equal(vaiPara(decide(p, ok("socio"), TODOS, false, ["juridico"])), "seguir", p);
+    assert.equal(vaiPara(decide(p, ok("funcionario"), TODOS, false, ["marketing"])), "/marketing", p);
+    assert.equal(vaiPara(decide(p, ok("dono"), TODOS)), "seguir", p);
+    assert.equal(vaiPara(decide(p, ok("cofundador"), TODOS)), "seguir", p);
+  }
+});
+await teste("permissoesJuridico: leitura nunca escreve; telas por cliente exigem Clientes; modelos só o nível", () => {
+  assert.deepEqual(permissoesJuridico("edicao", true), { somenteLeitura: false, somenteLeituraPorCliente: false });
+  assert.deepEqual(permissoesJuridico("edicao", false), { somenteLeitura: false, somenteLeituraPorCliente: true });
+  assert.deepEqual(permissoesJuridico("leitura", true), { somenteLeitura: true, somenteLeituraPorCliente: true });
+  assert.deepEqual(permissoesJuridico("leitura", false), { somenteLeitura: true, somenteLeituraPorCliente: true });
+});
+await teste("o guard exige Jurídico ligado: o dono sem o módulo é negado; leitura de sócio não escreve", () => {
+  assert.equal(guard("juridico", "dono", "edicao", { habilitados: ATUAIS }), null);
+  assert.equal(guard("juridico", "socio", "edicao", { permissoes: [perm("juridico", "leitura")] }), null);
+  assert.equal(guard("juridico", "socio", "leitura", { permissoes: [perm("juridico", "leitura")] })?.nivel, "leitura");
+  assert.equal(guard("juridico", "socio", "leitura", { permissoes: [perm("clientes", "edicao")] }), null);
 });
 
 console.log(`\n${total} testes`);

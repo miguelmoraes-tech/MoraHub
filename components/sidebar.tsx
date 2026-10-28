@@ -108,7 +108,7 @@ function NavGroup({
       <ul className="mt-2 space-y-0.5">
         {visiveis.map((item) => {
           const isActive =
-            item.href === "/pessoal" || item.href === "/rh" || item.href === "/marketing" || item.href === "/dashboard"
+            item.href === "/pessoal" || item.href === "/rh" || item.href === "/marketing" || item.href === "/juridico" || item.href === "/dashboard"
               ? pathname === item.href
               : pathname.startsWith(item.href);
           const Icon = item.icon;

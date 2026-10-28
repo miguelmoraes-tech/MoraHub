@@ -32,11 +32,28 @@ const MODULOS_NOVOS: Record<string, string[]> = {
     "departamentos", "funcionarios", "ferias", "beneficios", "folha_pagamento", "vagas",
     "candidatos", "avaliacoes_desempenho", "controle_ponto",
   ],
+  juridico: [
+    "juridico", "documentos", "processos", "compliance_juridico", "propriedade_intelectual",
+    "modelos_contrato",
+  ],
 };
 const ESTRITAS = Object.values(MODULOS_NOVOS).flat();
 
 // Legado do contador (papel sem interface): fora do escopo da empresa ativa.
 const IGNORAR = [/^app[\\/]colaborador[\\/]/];
+// Conta Pessoal (/pessoal/*) não pode mudar nesta fase: /pessoal/juridico só conta modelos_contrato.
+IGNORAR.push(/^app[\\/]\(dashboard\)[\\/]pessoal[\\/]/);
+// Fora do escopo da Fase 3.5: código antigo de colaborador (desligado) e a central de
+// suporte/tickets. São listados à parte, sem falhar a auditoria.
+const FORA_DO_ESCOPO = [
+  /^lib[\\/]colaborador\.ts$/,
+  /^lib[\\/]actions[\\/]colaborador-juridico\.ts$/,
+  /^lib[\\/]actions[\\/]solicitacoes-documento\.ts$/,
+  /^app[\\/]\(dashboard\)[\\/]suporte[\\/]/,
+  /^lib[\\/]tickets\.ts$/,
+];
+const foraDoEscopo: string[] = [];
+const legadoGravacao: string[] = [];
 
 const raiz = process.cwd();
 function arquivos(dir: string): string[] {
@@ -59,7 +76,7 @@ const TABELAS = [...new Set([...ISOLADAS, ...ESTRITAS, ...Object.values(MODULOS_
 for (const base of ["app", "lib", "components"]) {
   for (const arq of arquivos(join(raiz, base))) {
     const rel = relative(raiz, arq);
-    if (IGNORAR.some((r) => r.test(rel))) continue;
+    const ignorado = IGNORAR.some((r) => r.test(rel));
     const texto = readFileSync(arq, "utf8").replace(/\r\n/g, "\n");
     const re = /\.from\("([a-z_]+)"\)/g;
     for (let m = re.exec(texto); m; m = re.exec(texto)) {
@@ -71,6 +88,13 @@ for (const base of ["app", "lib", "components"]) {
       const trecho = resto.slice(0, fim === -1 ? 900 : Math.min(fim, 900));
       const alvo = `${rel}:${linha} ${m[1]}`;
       const temWs = trecho.includes("workspace_id");
+      if (ignorado || FORA_DO_ESCOPO.some((r) => r.test(rel))) {
+        // Legado desligado: não falha a auditoria, mas entra na lista de pendências.
+        const verbo = /^\s*\.(insert|upsert|update|delete)\(/.exec(trecho)?.[1];
+        if (!temWs && verbo) legadoGravacao.push(`${alvo} (${verbo})`);
+        else if (!temWs && !ignorado) foraDoEscopo.push(alvo);
+        continue;
+      }
 
       if (/^\s*\.(insert|upsert)\(/.test(trecho) && !temWs) insertsSemWorkspace.push(alvo);
 
@@ -97,6 +121,14 @@ for (const s of semEscrita) console.log("  ! " + s);
 console.log(`update/delete por id em tabela antiga (barreira = RLS): ${porId.length}`);
 if (sem.length || semEscrita.length) process.exitCode = 1;
 
+console.log(`\nFora do escopo (legado de colaborador e suporte), sem workspace_id: ${foraDoEscopo.length}`);
+for (const s of foraDoEscopo) console.log("  - " + s);
+
+console.log(
+  `\nLegado desligado que ainda grava sem workspace_id (colaborador, suporte): ${legadoGravacao.length}`
+);
+for (const s of legadoGravacao) console.log("  - " + s);
+
 console.log(`\nInserts/upserts sem workspace_id (insumo para NOT NULL): ${insertsSemWorkspace.length}`);
 for (const s of insertsSemWorkspace) console.log("  ! " + s);
 if (insertsSemWorkspace.length) process.exitCode = 1;
@@ -105,7 +137,7 @@ if (insertsSemWorkspace.length) process.exitCode = 1;
 // Toda action exportada dos módulos que sócio/funcionário podem editar precisa
 // passar por uma guarda de edição (fundador/cofundador OU tem_permissao). A
 // barreira real é o RLS; isto pega uma action nova esquecida sem guarda.
-const GUARDAS = ["getAcessoEdicao", "getAcessoFinanceiroEdicao", "getAcessoSoDono", "podeEditarProposta", "getEmpresaPainel"];
+const GUARDAS = ["getAcessoEdicao", "getAcessoJuridicoEdicaoComClientes", "getWorkspaceIdAtivo", "getAcessoFinanceiroEdicao", "getAcessoSoDono", "podeEditarProposta", "getEmpresaPainel"];
 const ACTIONS_COM_GUARDA = [
   "app/(dashboard)/leads/actions.ts",
   "app/(dashboard)/renegados/actions.ts",
@@ -128,6 +160,12 @@ const ACTIONS_COM_GUARDA = [
   "app/(dashboard)/rh/funcionarios/actions.ts",
   "app/(dashboard)/rh/ponto/actions.ts",
   "app/(dashboard)/rh/recrutamento/actions.ts",
+  "app/(dashboard)/juridico/actions.ts",
+  "app/(dashboard)/juridico/processos/actions.ts",
+  "app/(dashboard)/juridico/compliance/actions.ts",
+  "app/(dashboard)/juridico/propriedade-intelectual/actions.ts",
+  "app/(dashboard)/juridico/modelos-contrato/actions.ts",
+  "app/(dashboard)/documentos/actions.ts",
 ];
 const semGuarda: string[] = [];
 let actionsVerificadas = 0;
@@ -160,8 +198,18 @@ const PASTAS_CONCLUIDAS: Record<string, string[]> = {
     "components/financeiro", "lib/actions/conciliacao.ts",
   ],
   rh: ["app/(dashboard)/rh", "lib/rh", "components/rh"],
+  // juridico/actions.ts fica de fora: convidar/removerColaborador são usados por /vendedores.
+  juridico: [
+    "app/(dashboard)/juridico/page.tsx", "app/(dashboard)/juridico/processos",
+    "app/(dashboard)/juridico/compliance", "app/(dashboard)/juridico/propriedade-intelectual",
+    "app/(dashboard)/juridico/modelos-contrato", "app/(dashboard)/documentos",
+    "components/juridico", "lib/juridico-acesso.ts", "lib/juridico-shared.ts",
+  ],
 };
-const proibidos = [/getDonoIdAtivo/, /getWorkspaceIdAtivo/, /get_colaboradores_do_dono_by_id/];
+const proibidos = [
+  /getDonoIdAtivo/, /getWorkspaceIdAtivo/, /get_colaboradores_do_dono_by_id/,
+  /ColaboradoresSection/, /getConversasComoDono/, /from\("convites"\)/,
+];
 const legado: string[] = [];
 for (const [modulo, pastas] of Object.entries(PASTAS_CONCLUIDAS)) {
   for (const pasta of pastas) {

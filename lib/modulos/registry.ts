@@ -41,6 +41,10 @@ export type IconeNome =
   | "megaphone"
   | "scale"
   | "file-text"
+  | "file-stack"
+  | "gavel"
+  | "shield-check"
+  | "copyright"
   | "blocks";
 
 export interface ItemMenu {
@@ -136,9 +140,10 @@ export const MODULOS: ModuloRegistro[] = [
       },
     ],
   },
-  // --- "Em breve" (modulos.ativo = false): o código existe, mas as tabelas
-  // ainda isolam só por user_id. Registrados para que a rota seja reconhecida
-  // como de um módulo (e bloqueada enquanto ele estiver desligado).
+  // --- Módulos novos (Fase 3.5): Financeiro, RH, Marketing e Jurídico. O código
+  // lê e grava por workspace_id e as tabelas isolam por empresa na RLS. Seguem
+  // "em breve" no catálogo (modulos.ativo = false) até serem ligados; a rota é
+  // reconhecida como de um módulo e bloqueada enquanto ele estiver desligado.
   {
     chave: "financeiro",
     rotas: [
@@ -233,6 +238,20 @@ export const MODULOS: ModuloRegistro[] = [
     ],
     menu: [
       { label: "Jurídico & Contábil", href: "/juridico", icone: "scale", grupo: "Jurídico & Contábil" },
+      { label: "Processos", href: "/juridico/processos", icone: "gavel", grupo: "Jurídico & Contábil" },
+      { label: "Compliance", href: "/juridico/compliance", icone: "shield-check", grupo: "Jurídico & Contábil" },
+      {
+        label: "Propriedade Intelectual",
+        href: "/juridico/propriedade-intelectual",
+        icone: "copyright",
+        grupo: "Jurídico & Contábil",
+      },
+      {
+        label: "Modelos de Contrato",
+        href: "/juridico/modelos-contrato",
+        icone: "file-stack",
+        grupo: "Jurídico & Contábil",
+      },
       { label: "Documentos", href: "/documentos", icone: "file-text", grupo: "Jurídico & Contábil" },
     ],
   },
