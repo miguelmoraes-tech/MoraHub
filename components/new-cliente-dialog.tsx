@@ -2,9 +2,12 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { Plus, X } from "lucide-react";
+import { useRotulos } from "@/components/rotulos-provider";
 import { createCliente } from "@/app/(dashboard)/clientes/actions";
 
 export function NewClienteDialog() {
+  const rotulos = useRotulos();
+  const tituloNovo = rotulos.texto("clientes", "Novo cliente", ({ singular }) => `Adicionar ${singular}`);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(createCliente, undefined);
@@ -24,7 +27,7 @@ export function NewClienteDialog() {
         className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
       >
         <Plus className="h-4 w-4" />
-        Novo cliente
+        {tituloNovo}
       </button>
 
       {/* Tailwind's Preflight resets `margin: 0` on every element, which
@@ -43,7 +46,7 @@ export function NewClienteDialog() {
       >
         <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-950">
           <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-            <h2 className="text-sm font-semibold">Novo cliente</h2>
+            <h2 className="text-sm font-semibold">{tituloNovo}</h2>
             <button
               type="button"
               onClick={() => dialogRef.current?.close()}
@@ -172,7 +175,7 @@ export function NewClienteDialog() {
                 disabled={pending}
                 className="rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-copper-500 disabled:opacity-60"
               >
-                {pending ? "Salvando..." : "Criar cliente"}
+                {pending ? "Salvando..." : rotulos.texto("clientes", "Criar cliente", ({ singular }) => `Adicionar ${singular}`)}
               </button>
             </div>
           </form>

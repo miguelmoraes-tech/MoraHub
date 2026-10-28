@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { Check, Plus } from "lucide-react";
 import { definirModulo } from "@/lib/actions/modulos";
+import { adicionarRecomendados } from "@/lib/actions/nichos";
+import { ordemParaLigar } from "@/lib/rotulos-shared";
 import { useToast } from "@/components/toast";
 import { iconeDe } from "@/components/modulos/icones";
 import { getModuloRegistro } from "@/lib/modulos/registry";
@@ -16,14 +18,19 @@ export interface ModuloCatalogo {
   /** false = "Em breve": existe no catálogo, mas ainda não pode ser ligado. */
   ativo: boolean;
   dependeDe: string[];
+  /** Faz parte dos módulos recomendados do nicho da empresa. */
+  recomendado?: boolean;
 }
 
 export function ModulosBoard({
   modulos,
   habilitados,
+  nichoNome = null,
 }: {
   modulos: ModuloCatalogo[];
   habilitados: string[];
+  /** Nome do nicho da empresa, para o selo "Recomendado para ...". */
+  nichoNome?: string | null;
 }) {
   const toast = useToast();
   const [pending, startTransition] = useTransition();
@@ -46,7 +53,47 @@ export function ModulosBoard({
     });
   }
 
+  // Recomendados do nicho que ainda não estão ligados (e que dá para ligar).
+  const recomendadosFaltando = nichoNome
+    ? ordemParaLigar(
+        modulos.filter((m) => m.recomendado).map((m) => m.chave),
+        modulos,
+        habilitados
+      )
+    : [];
+
+  function adicionarTodos() {
+    setEmAndamento("recomendados");
+    startTransition(async () => {
+      const resultado = await adicionarRecomendados();
+      setEmAndamento(null);
+      if ("error" in resultado) {
+        toast.error(resultado.error);
+        return;
+      }
+      toast.success("Módulos recomendados adicionados.");
+    });
+  }
+
   return (
+    <div className="space-y-4">
+    {recomendadosFaltando.length > 0 && (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-copper-600/30 bg-copper-600/5 px-4 py-3">
+        <p className="text-sm text-zinc-300">
+          Recomendados para <strong className="text-zinc-100">{nichoNome}</strong> que ainda não
+          estão ligados: {recomendadosFaltando.map(nomeDe).join(", ")}.
+        </p>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={adicionarTodos}
+          className="flex items-center gap-1.5 rounded-md bg-copper-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-copper-500 disabled:opacity-60"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {pending && emAndamento === "recomendados" ? "Adicionando..." : "Adicionar recomendados"}
+        </button>
+      </div>
+    )}
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {modulos.map((m) => {
         const ligado = habilitados.includes(m.chave);
@@ -76,6 +123,11 @@ export function ModulosBoard({
                 <p className="text-sm font-semibold text-zinc-100">{m.nome}</p>
                 {m.categoria && (
                   <p className="text-[11px] uppercase tracking-wider text-zinc-600">{m.categoria}</p>
+                )}
+                {m.recomendado && !ligado && m.ativo && nichoNome && (
+                  <p className="mt-0.5 text-[11px] font-medium text-copper-400">
+                    Recomendado para {nichoNome}
+                  </p>
                 )}
               </div>
               {ligado && (
@@ -158,6 +210,7 @@ export function ModulosBoard({
           </div>
         );
       })}
+    </div>
     </div>
   );
 }

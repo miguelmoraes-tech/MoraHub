@@ -31,6 +31,20 @@ import { readFileSync } from "node:fs";
 import { resolverAcessoModulo } from "@/lib/modulos/guard";
 import { permissoesFinanceiro } from "@/lib/financeiro/permissoes";
 import { computeCampanhaDerived } from "@/lib/marketing/campanha-metrics-shared";
+import {
+  ROTULOS_PADRAO,
+  SEM_ROTULOS,
+  criarRotulos,
+  labelDoItemMenu,
+  lerMapaRotulos,
+  mesclarRotulos,
+  minusculo,
+  ordemParaLigar,
+  rotulo,
+  validarRotulo,
+  type MapaRotulos,
+} from "@/lib/rotulos-shared";
+import { erroDeNicho, resumoModulos } from "@/lib/nichos-shared";
 
 let total = 0;
 function teste(nome: string, fn: () => void | Promise<void>) {
@@ -733,6 +747,216 @@ await teste("o guard exige Jurídico ligado: o dono sem o módulo é negado; lei
   assert.equal(guard("juridico", "socio", "edicao", { permissoes: [perm("juridico", "leitura")] }), null);
   assert.equal(guard("juridico", "socio", "leitura", { permissoes: [perm("juridico", "leitura")] })?.nivel, "leitura");
   assert.equal(guard("juridico", "socio", "leitura", { permissoes: [perm("clientes", "edicao")] }), null);
+});
+
+// ===========================================================================
+// Fase 4 — nichos, modelos e rótulos por empresa
+// ===========================================================================
+
+console.log("\nFase 4 — empresa sem workspace_config fica idêntica (mesmos textos, menu e rotas)");
+await teste("sem rótulos, todo item do menu de todo módulo mantém o label do registro", () => {
+  const rotulos = criarRotulos(SEM_ROTULOS);
+  let n = 0;
+  for (const m of MODULOS)
+    for (const item of m.menu) {
+      assert.equal(labelDoItemMenu(rotulos, item.href, item.label), item.label, item.href);
+      n++;
+    }
+  assert.ok(n >= 20, `poucos itens (${n})`);
+});
+await teste("sem rótulos, o menu renderizado (label por item) é idêntico ao do snapshot", () => {
+  const rotulos = criarRotulos(lerMapaRotulos(undefined));
+  const rendered = menuDoDono(ATUAIS).map((g) => ({
+    titulo: g.titulo,
+    itens: g.itens.map((i) => ({ ...i, label: labelDoItemMenu(rotulos, i.href, i.label) })),
+  }));
+  assert.deepEqual(JSON.parse(JSON.stringify(rendered)), dourado.menu);
+});
+await teste("sem rótulos: texto() devolve o padrão intacto e singular/plural são os nomes de hoje", () => {
+  const r = criarRotulos();
+  for (const m of Object.keys(ROTULOS_PADRAO)) {
+    assert.equal(r.personalizado(m), false, m);
+    assert.equal(r.texto(m, "texto de hoje", () => "NUNCA"), "texto de hoje", m);
+  }
+  assert.equal(r.plural("leads"), "Leads");
+  assert.equal(r.plural("renegados"), "Renegados");
+  assert.equal(r.plural("clientes"), "Clientes");
+  assert.equal(r.plural("agenda"), "Agenda");
+  assert.equal(r.singular("clientes"), "Cliente");
+});
+await teste("os padrões de plural dos módulos de um item coincidem com o menu do registro", () => {
+  for (const m of MODULOS.filter((x) => x.menu.length === 1)) {
+    assert.equal(ROTULOS_PADRAO[m.chave]?.plural, m.menu[0].label, m.chave);
+  }
+});
+await teste("o código dos rótulos não muda rotas nem acesso: rotaPermitida/decisão seguem o snapshot", () => {
+  for (const [p, esperado] of Object.entries(dourado.rotaPermitida)) {
+    assert.equal(rotaPermitida(p, ATUAIS), esperado, p);
+  }
+});
+
+console.log("\nFase 4 — rotulo() com configuração");
+const SAUDE: MapaRotulos = lerMapaRotulos({
+  labels: {
+    clientes: { singular: "Paciente", plural: "Pacientes" },
+    agenda: { singular: "Consulta", plural: "Consultas" },
+  },
+});
+await teste("rotulo() devolve o configurado; módulo sem rótulo cai no padrão", () => {
+  assert.equal(rotulo(SAUDE, "clientes", "singular"), "Paciente");
+  assert.equal(rotulo(SAUDE, "clientes", "plural"), "Pacientes");
+  assert.equal(rotulo(SAUDE, "agenda", "plural"), "Consultas");
+  assert.equal(rotulo(SAUDE, "leads", "plural"), "Leads");
+  assert.equal(rotulo(SAUDE, "modulo_que_nao_existe", "singular"), "modulo_que_nao_existe");
+});
+await teste("o menu troca só o módulo configurado e só quando ele tem UM item no menu", () => {
+  const r = criarRotulos(SAUDE);
+  assert.equal(labelDoItemMenu(r, "/clientes", "Clientes"), "Pacientes");
+  assert.equal(labelDoItemMenu(r, "/agenda", "Agenda"), "Consultas");
+  assert.equal(labelDoItemMenu(r, "/leads", "Leads"), "Leads");
+  const financeiro = criarRotulos({ financeiro: { singular: "Caixa", plural: "Caixa" } });
+  assert.equal(labelDoItemMenu(financeiro, "/contas-pagar", "Contas a Pagar"), "Contas a Pagar");
+  assert.equal(labelDoItemMenu(r, "/dashboard", "Visão Geral"), "Visão Geral");
+});
+await teste("texto() usa formulações neutras só no módulo renomeado", () => {
+  const r = criarRotulos(SAUDE);
+  assert.equal(r.texto("clientes", "Novo cliente", ({ singular }) => `Adicionar ${singular}`), "Adicionar Paciente");
+  assert.equal(r.texto("clientes", "x", ({ plural }) => `Lista de ${plural}`), "Lista de Pacientes");
+  assert.equal(r.texto("clientes", "x", ({ pluralMin }) => `${pluralMin} hoje`), "pacientes hoje");
+  assert.equal(r.texto("leads", "Novo lead", () => "NUNCA"), "Novo lead");
+});
+await teste("rótulo igual ao padrão (ex.: Cliente/Clientes da estética) conta como sem rótulo", () => {
+  const r = criarRotulos(lerMapaRotulos({ labels: { clientes: { singular: "Cliente", plural: "Clientes" } } }));
+  assert.equal(r.personalizado("clientes"), false);
+  assert.equal(r.texto("clientes", "Novo cliente", () => "NUNCA"), "Novo cliente");
+  assert.equal(labelDoItemMenu(r, "/clientes", "Clientes"), "Clientes");
+});
+await teste("minusculo preserva siglas", () => {
+  assert.equal(minusculo("Consultas"), "consultas");
+  assert.equal(minusculo("SST"), "SST");
+  assert.equal(minusculo(""), "");
+});
+await teste("lerMapaRotulos ignora lixo: config ausente, tipos errados, módulo desconhecido, tamanhos", () => {
+  for (const ruim of [null, undefined, 42, "x", [], {}, { labels: null }, { labels: [] }, { labels: "x" }])
+    assert.deepEqual(lerMapaRotulos(ruim), {});
+  const mapa = lerMapaRotulos({
+    labels: {
+      clientes: { singular: "  Aluno ", plural: "Alunos" },
+      leads: { singular: "", plural: "Contatos" },
+      agenda: { singular: "Aula" },
+      renegados: { singular: "x".repeat(41), plural: "Y" },
+      inexistente: { singular: "A", plural: "B" },
+      marketing: "Campanhas",
+    },
+  });
+  assert.deepEqual(mapa, { clientes: { singular: "Aluno", plural: "Alunos" } });
+});
+
+console.log("\nFase 4 — salvar_rotulos recebe o mapa COMPLETO");
+await teste("mesclarRotulos parte do gravado e aplica só as edições (nada some)", () => {
+  const atual: MapaRotulos = {
+    clientes: { singular: "Paciente", plural: "Pacientes" },
+    agenda: { singular: "Consulta", plural: "Consultas" },
+  };
+  const novo = mesclarRotulos(atual, { leads: { singular: "Contato", plural: "Contatos" } });
+  assert.deepEqual(Object.keys(novo).sort(), ["agenda", "clientes", "leads"]);
+  assert.deepEqual(novo.clientes, atual.clientes);
+  assert.deepEqual(novo.agenda, atual.agenda);
+  assert.deepEqual(atual, { clientes: { singular: "Paciente", plural: "Pacientes" }, agenda: { singular: "Consulta", plural: "Consultas" } });
+});
+await teste("mesclarRotulos: editar um módulo troca só ele; voltar ao padrão remove a entrada", () => {
+  const atual: MapaRotulos = {
+    clientes: { singular: "Paciente", plural: "Pacientes" },
+    agenda: { singular: "Consulta", plural: "Consultas" },
+  };
+  const a = mesclarRotulos(atual, { clientes: { singular: " Aluno ", plural: "Alunos" } });
+  assert.deepEqual(a.clientes, { singular: "Aluno", plural: "Alunos" });
+  assert.deepEqual(a.agenda, atual.agenda);
+  const b = mesclarRotulos(atual, { clientes: { singular: "Cliente", plural: "Clientes" } });
+  assert.equal("clientes" in b, false);
+  assert.deepEqual(b.agenda, atual.agenda);
+  assert.deepEqual(mesclarRotulos({}, { leads: { singular: "Lead", plural: "Leads" } }), {});
+});
+await teste("validarRotulo: 1 a 40 caracteres em singular e plural (como a RPC)", () => {
+  assert.equal(validarRotulo({ singular: "A", plural: "B" }), null);
+  assert.equal(validarRotulo({ singular: "x".repeat(40), plural: "y".repeat(40) }), null);
+  assert.ok(validarRotulo({ singular: "", plural: "B" }));
+  assert.ok(validarRotulo({ singular: "  ", plural: "B" }));
+  assert.ok(validarRotulo({ singular: "A", plural: "y".repeat(41) }));
+});
+
+console.log("\nFase 4 — erros de nicho/modelo e módulos recomendados");
+await teste("nicho/modelo inválido e sem permissão viram mensagens claras (sem estourar)", () => {
+  assert.match(erroDeNicho("Nicho inválido"), /tipo de negócio/);
+  assert.match(erroDeNicho("Modelo inválido"), /modelo/i);
+  assert.match(erroDeNicho("Sem permissão"), /dono|cofundador/);
+  assert.match(erroDeNicho("Use de 1 a 40 caracteres nos rótulos de clientes"), /1 a 40/);
+  assert.match(erroDeNicho("Módulo inválido para rótulo: xyz"), /inválid|Dados/);
+  assert.ok(erroDeNicho(undefined));
+  assert.ok(erroDeNicho("qualquer coisa"));
+});
+await teste("resumoModulos monta 'A, B e C'", () => {
+  assert.equal(resumoModulos([]), "");
+  assert.equal(resumoModulos(["Clientes"]), "Clientes");
+  assert.equal(resumoModulos(["Clientes", "Agenda"]), "Clientes e Agenda");
+  assert.equal(resumoModulos(["Clientes", "Agenda", "Financeiro"]), "Clientes, Agenda e Financeiro");
+});
+const CAT = [
+  { chave: "leads", ativo: true, dependeDe: [] },
+  { chave: "clientes", ativo: true, dependeDe: [] },
+  { chave: "agenda", ativo: true, dependeDe: [] },
+  { chave: "financeiro", ativo: true, dependeDe: ["clientes"] },
+  { chave: "rh", ativo: true, dependeDe: ["financeiro"] },
+  { chave: "juridico", ativo: false, dependeDe: ["clientes"] },
+  { chave: "marketing", ativo: true, dependeDe: [] },
+];
+await teste("ordemParaLigar põe dependências antes, pula ligados, inativos e desconhecidos", () => {
+  assert.deepEqual(ordemParaLigar(["rh"], CAT, []), ["clientes", "financeiro", "rh"]);
+  assert.deepEqual(ordemParaLigar(["financeiro", "agenda"], CAT, ["clientes"]), ["financeiro", "agenda"]);
+  assert.deepEqual(ordemParaLigar(["juridico", "desconhecido", "marketing"], CAT, []), ["marketing"]);
+  assert.deepEqual(ordemParaLigar(["leads", "leads"], CAT, ["leads"]), []);
+});
+await teste("ordemParaLigar não entra em loop com dependência circular", () => {
+  const ciclo = [
+    { chave: "leads", ativo: true, dependeDe: ["clientes"] },
+    { chave: "clientes", ativo: true, dependeDe: ["leads"] },
+  ];
+  const ordem = ordemParaLigar(["leads"], ciclo, []);
+  assert.ok(ordem.length <= 2);
+  assert.equal(new Set(ordem).size, ordem.length);
+});
+
+console.log("\nFase 4 — acesso: só fundador/cofundador mexe; sem loops de redirecionamento");
+function seguirRedirects(path: string, res: ResolucaoEmpresa, habilitados: string[], permissoes: string[] = []) {
+  const visitados: string[] = [];
+  let atual = path;
+  for (let i = 0; i < 6; i++) {
+    visitados.push(atual);
+    const d = decide(atual, res, habilitados, false, permissoes);
+    if (d.tipo === "seguir") return { final: atual, visitados };
+    const destino = d.para.split("?")[0]; // o proxy decide pelo caminho, sem a query
+    if (visitados.includes(destino)) return { final: null, visitados: [...visitados, destino] };
+    atual = destino;
+  }
+  return { final: null, visitados };
+}
+await teste("fundador e cofundador abrem /configuracoes, /modulos e /nova-empresa", () => {
+  for (const papel of ["dono", "cofundador"] as const)
+    for (const p of ["/configuracoes", "/modulos", "/nova-empresa"])
+      assert.equal(vaiPara(decide(p, ok(papel), ATUAIS)), "seguir", `${papel} ${p}`);
+});
+await teste("sócio e funcionário não abrem /configuracoes nem /modulos (onde se troca nicho e nomes)", () => {
+  for (const papel of ["socio", "funcionario"] as const)
+    for (const p of ["/configuracoes", "/modulos"])
+      assert.notEqual(vaiPara(decide(p, ok(papel), ATUAIS, false, ["leads"])), "seguir", `${papel} ${p}`);
+});
+await teste("nenhuma combinação papel x rota de Fase 4 entra em loop (termina em até 3 saltos)", () => {
+  for (const papel of ["dono", "cofundador", "socio", "funcionario", "comercial"] as const)
+    for (const hab of [[], ATUAIS, TODOS])
+      for (const p of ["/configuracoes", "/modulos", "/nova-empresa", "/dashboard", "/clientes", "/agenda", "/leads", "/renegados"]) {
+        const r = seguirRedirects(p, ok(papel), hab, ["leads", "clientes"]);
+        assert.ok(r.final !== null && r.visitados.length <= 3, `${papel} ${p} [${hab.length}]: ${r.visitados.join(" -> ")}`);
+      }
 });
 
 console.log(`\n${total} testes`);

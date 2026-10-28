@@ -17,6 +17,8 @@ import {
 } from "@/lib/modulos/permissoes";
 import { getEmpresaAtiva, getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 import { ToastProvider } from "@/components/toast";
+import { RotulosProvider } from "@/components/rotulos-provider";
+import { getConfigEmpresa } from "@/lib/rotulos";
 import {
   SolicitacoesVendedorProvider,
   type SolicitacaoPendente,
@@ -40,7 +42,11 @@ export default async function DashboardLayout({
   // cofundador = painel completo; sócio e funcionário = só os módulos da
   // empresa que as permissões deles liberam. Vendedor tem interface própria
   // em /vendedor/*.
-  const [ativa, empresas] = await Promise.all([getEmpresaAtiva(), getEmpresasDoUsuario()]);
+  const [ativa, empresas, configEmpresa] = await Promise.all([
+    getEmpresaAtiva(),
+    getEmpresasDoUsuario(),
+    getConfigEmpresa(),
+  ]);
   const painel = ativa && temPainelCompleto(ativa.papel) ? ativa : null;
   const restrito = !!ativa && ehPapelRestrito(ativa.papel);
   let modulosHabilitados: string[] = [];
@@ -116,6 +122,7 @@ export default async function DashboardLayout({
 
   return (
     <ToastProvider>
+      <RotulosProvider mapa={configEmpresa.mapa}>
       {workspacePedidosId ? (
         <SolicitacoesVendedorProvider
           workspaceId={workspacePedidosId}
@@ -127,6 +134,7 @@ export default async function DashboardLayout({
       ) : (
         conteudo
       )}
+      </RotulosProvider>
     </ToastProvider>
   );
 }

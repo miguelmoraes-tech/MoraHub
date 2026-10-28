@@ -2,6 +2,8 @@
 
 import type { ModuloPermissivel } from "@/lib/socios-shared";
 import type { NivelPermissao, PermissaoModulo } from "@/lib/modulos/permissoes";
+import { useRotulos } from "@/components/rotulos-provider";
+import { resumoModulos } from "@/lib/nichos-shared";
 
 type Escolha = NivelPermissao | "nenhum";
 
@@ -28,11 +30,16 @@ export function MatrizPermissoes({
   onChange: (proximo: PermissaoModulo[]) => void;
   desabilitado?: boolean;
 }) {
+  const rotulos = useRotulos();
+
   if (modulos.length === 0) {
+    const nomes = resumoModulos(
+      ["leads", "renegados", "clientes", "agenda"].map((m) => rotulos.plural(m))
+    );
     return (
       <p className="rounded-lg border border-dashed border-zinc-800 px-3 py-3 text-xs text-zinc-500">
-        Nenhum módulo da empresa aceita permissão por enquanto (Leads, Renegados, Clientes e Agenda
-        precisam estar ligados em Módulos).
+        Nenhum módulo da empresa aceita permissão por enquanto ({nomes} precisam estar ligados em
+        Módulos).
       </p>
     );
   }

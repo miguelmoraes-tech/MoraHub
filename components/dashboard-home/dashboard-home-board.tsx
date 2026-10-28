@@ -14,8 +14,9 @@ import {
 } from "lucide-react";
 import { SetorResumoCard } from "@/components/dashboard-executivo/setor-resumo-card";
 import type { DashboardHomeOverview } from "@/lib/dashboard-home/get-overview";
+import { getRotulos } from "@/lib/rotulos";
 
-export function DashboardHomeBoard({ overview }: { overview: DashboardHomeOverview }) {
+export async function DashboardHomeBoard({ overview }: { overview: DashboardHomeOverview }) {
   const {
     leads,
     renegados,
@@ -29,6 +30,7 @@ export function DashboardHomeBoard({ overview }: { overview: DashboardHomeOvervi
     juridico,
     habilitados,
   } = overview;
+  const rotulos = await getRotulos();
   const com = (chave: string) => habilitados.includes(chave);
   const temResumo = [
     "leads",
@@ -75,7 +77,7 @@ export function DashboardHomeBoard({ overview }: { overview: DashboardHomeOvervi
         {com("leads") && (
           <SetorResumoCard
             icon={Target}
-            titulo="Leads"
+            titulo={rotulos.plural("leads")}
             href="/leads"
             stats={[
               {
@@ -96,22 +98,32 @@ export function DashboardHomeBoard({ overview }: { overview: DashboardHomeOvervi
         {com("renegados") && (
           <SetorResumoCard
             icon={UserX}
-            titulo="Renegados"
+            titulo={rotulos.plural("renegados")}
             href="/renegados"
-            stats={[{ label: "cadastrados", value: String(renegados.total) }]}
+            stats={[
+              {
+                label: rotulos.texto("renegados", "cadastrados", () => "no total"),
+                value: String(renegados.total),
+              },
+            ]}
           />
         )}
 
         {com("clientes") && (
           <SetorResumoCard
             icon={Users}
-            titulo="Clientes"
+            titulo={rotulos.plural("clientes")}
             href="/clientes"
             stats={[
               { label: "ativos", value: String(clientes.ativos), tone: "emerald" },
               { label: "no total", value: String(clientes.total) },
               ...(com("leads")
-                ? [{ label: "leads convertidos", value: String(leads.convertidos) }]
+                ? [
+                    {
+                      label: rotulos.texto("leads", "leads convertidos", ({ pluralMin }) => `conversões de ${pluralMin}`),
+                      value: String(leads.convertidos),
+                    },
+                  ]
                 : []),
             ]}
           />
@@ -120,11 +132,11 @@ export function DashboardHomeBoard({ overview }: { overview: DashboardHomeOvervi
         {com("agenda") && (
           <SetorResumoCard
             icon={CalendarClock}
-            titulo="Agenda"
+            titulo={rotulos.plural("agenda")}
             href="/agenda"
             stats={[
               {
-                label: "reuniões hoje",
+                label: rotulos.texto("agenda", "reuniões hoje", ({ pluralMin }) => `${pluralMin} hoje`),
                 value: String(agenda.hoje),
                 tone: agenda.hoje > 0 ? "copper" : "zinc",
               },

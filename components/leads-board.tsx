@@ -12,6 +12,7 @@ import { ExportButton } from "@/components/export-button";
 import { SegmentFilter } from "@/components/segment-filter";
 import { todayISO } from "@/lib/vencimentos/dates";
 import { isFollowupPendente } from "@/lib/leads";
+import { useRotulos } from "@/components/rotulos-provider";
 
 const PREVIA_OPTIONS = ["Prévia enviada", "Prévia pendente"];
 
@@ -38,6 +39,7 @@ export function LeadsBoard({
   /** Sem o extra "contato": o contato não aparece nem nos formulários. */
   ocultarContato?: boolean;
 }) {
+  const rotulos = useRotulos();
   const searchParams = useSearchParams();
   const highlightLeadId = searchParams.get("lead");
   const highlightedLead = highlightLeadId
@@ -113,9 +115,13 @@ export function LeadsBoard({
     <div className="mx-auto max-w-6xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-zinc-100">Leads</h1>
+          <h1 className="text-lg font-semibold text-zinc-100">{rotulos.plural("leads")}</h1>
           <p className="text-sm text-zinc-500">
-            {porNicho.length} lead(s) no total
+            {rotulos.texto(
+              "leads",
+              `${porNicho.length} lead(s) no total`,
+              ({ plural }) => `Total de ${plural}: ${porNicho.length}`
+            )}
           </p>
         </div>
         {!readOnly && (
@@ -231,13 +237,17 @@ export function LeadsBoard({
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-zinc-800 py-20 text-center">
           <Target className="h-8 w-8 text-zinc-700" />
           <p className="text-sm text-zinc-500">
-            {somenteAtrasados
-              ? "Nenhum lead com follow-up atrasado."
-              : tab === "abordar"
-                ? "Nenhum lead para abordar."
-                : tab === "abordado"
-                  ? "Nenhum lead abordado ainda."
-                  : "Nenhum lead convertido ainda."}
+            {rotulos.texto(
+              "leads",
+              somenteAtrasados
+                ? "Nenhum lead com follow-up atrasado."
+                : tab === "abordar"
+                  ? "Nenhum lead para abordar."
+                  : tab === "abordado"
+                    ? "Nenhum lead abordado ainda."
+                    : "Nenhum lead convertido ainda.",
+              ({ plural }) => `Nenhum registro em ${plural} nesta lista.`
+            )}
           </p>
         </div>
       )}

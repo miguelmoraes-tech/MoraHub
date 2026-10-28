@@ -3,6 +3,8 @@ import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { ModulosBoard, type ModuloCatalogo } from "@/components/modulos/modulos-board";
+import { getConfigEmpresa } from "@/lib/rotulos";
+import { criarRotulos } from "@/lib/rotulos-shared";
 
 /** Catálogo de módulos da empresa. Só o dono vê e altera. */
 export default async function ModulosPage() {
@@ -19,18 +21,37 @@ export default async function ModulosPage() {
   const { data: ehDono } = await supabase.rpc("eh_dono_workspace", { p_ws: workspaceId });
   if (ehDono !== true) redirect(HOME_DONO);
 
-  const [{ data: catalogo }, { data: ligados }] = await Promise.all([
+  // Nicho da empresa (se houver): marca os módulos recomendados que faltam ligar.
+  const config = await getConfigEmpresa();
+  const rotulos = criarRotulos(config.mapa);
+
+  const [{ data: catalogo }, { data: ligados }, nichoInfo, recomendadosDb] = await Promise.all([
     supabase.from("modulos").select("*").order("ordem"),
     supabase
       .from("workspace_modulos")
       .select("modulo_chave")
       .eq("workspace_id", workspaceId)
       .eq("habilitado", true),
+    config.nichoChave
+      ? supabase.from("nichos").select("nome").eq("chave", config.nichoChave).maybeSingle()
+      : Promise.resolve({ data: null }),
+    config.nichoChave
+      ? supabase
+          .from("nicho_modulos")
+          .select("modulo_chave")
+          .eq("nicho_chave", config.nichoChave)
+          .eq("recomendado", true)
+      : Promise.resolve({ data: [] }),
   ]);
+  const recomendados = new Set(
+    ((recomendadosDb.data ?? []) as { modulo_chave: string }[]).map((r) => r.modulo_chave)
+  );
 
   const modulos: ModuloCatalogo[] = (catalogo ?? []).map((m) => ({
     chave: m.chave,
-    nome: m.nome,
+    // Rótulo da empresa (nicho/modelo) tem preferência sobre o nome do catálogo.
+    nome: rotulos.personalizado(m.chave) ? rotulos.plural(m.chave) : m.nome,
+    recomendado: recomendados.has(m.chave),
     descricao: m.descricao,
     icone: m.icone,
     categoria: m.categoria,
@@ -47,7 +68,11 @@ export default async function ModulosPage() {
         </p>
       </div>
 
-      <ModulosBoard modulos={modulos} habilitados={(ligados ?? []).map((l) => l.modulo_chave)} />
+      <ModulosBoard
+        modulos={modulos}
+        habilitados={(ligados ?? []).map((l) => l.modulo_chave)}
+        nichoNome={(nichoInfo.data as { nome: string } | null)?.nome ?? null}
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { EMPRESA_NOME_MAX, EMPRESA_NOME_MIN } from "@/lib/empresa";
 import { listarEmpresas } from "@/lib/empresas";
 import { getEmpresaPainel, gravarEmpresaAtiva } from "@/lib/empresa-ativa";
 import { garantirPerfil } from "@/lib/perfil";
+import { erroDeNicho } from "@/lib/nichos-shared";
 import type { ActionState } from "@/lib/actions/types";
 
 function validarNome(bruto: FormDataEntryValue | null): { nome: string } | { error: string } {
@@ -54,10 +55,42 @@ export async function criarEmpresa(
 
   await garantirPerfil(supabase, user);
 
-  const { data: workspaceId, error } = await supabase.rpc("criar_empresa", {
-    p_nome: validado.nome,
-  });
-  if (error || typeof workspaceId !== "string") return { error: erroDaEmpresa(error?.message) };
+  // Tipo de negócio e modelo são opcionais ("Pular, personalizo depois"). Sem
+  // nicho a chamada é a de sempre (só o nome). O modelo só vale dentro de um nicho.
+  const nicho = String(formData.get("nicho") ?? "").trim();
+  const modelo = nicho ? String(formData.get("modelo") ?? "").trim() : "";
+  if (nicho && modelo) {
+    // Confere antes de criar: não deixa uma empresa meio configurada por modelo inválido.
+    const { data: modeloOk } = await supabase
+      .from("modelos")
+      .select("chave")
+      .eq("nicho_chave", nicho)
+      .eq("chave", modelo)
+      .maybeSingle();
+    if (!modeloOk) return { error: erroDeNicho("Modelo inválido") };
+  }
+
+  const { data: workspaceId, error } = nicho
+    ? await supabase.rpc("criar_empresa", { p_nome: validado.nome, p_nicho: nicho })
+    : await supabase.rpc("criar_empresa", { p_nome: validado.nome });
+  if (error || typeof workspaceId !== "string") {
+    return {
+      error: error?.message?.includes("Nicho inválido")
+        ? erroDeNicho(error.message)
+        : erroDaEmpresa(error?.message),
+    };
+  }
+
+  // criar_empresa já aplicou o nicho; com modelo, reaplica para gravar os nomes
+  // do modelo. A empresa existe de qualquer jeito: se isto falhar, o dono ajusta
+  // em Configurações em vez de perder a empresa recém-criada.
+  if (nicho && modelo) {
+    await supabase.rpc("aplicar_nicho", {
+      p_workspace_id: workspaceId,
+      p_nicho: nicho,
+      p_modelo: modelo,
+    });
+  }
 
   await gravarEmpresaAtiva(workspaceId);
   const cookieStore = await cookies();

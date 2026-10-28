@@ -13,6 +13,7 @@ import {
   Target,
   FileText,
 } from "lucide-react";
+import { useRotulos } from "@/components/rotulos-provider";
 import { buscarGlobal, type BuscaResposta, type BuscaResultado } from "@/lib/actions/search";
 
 type GrupoKey = keyof BuscaResposta;
@@ -22,9 +23,11 @@ const GRUPOS: {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   verTodosHref?: string;
+  /** Módulo cujo rótulo (plural) substitui `label` quando a empresa tem um. */
+  modulo?: string;
 }[] = [
-  { key: "clientes", label: "Clientes", icon: Users, verTodosHref: "/clientes" },
-  { key: "leads", label: "Leads", icon: Target, verTodosHref: "/leads" },
+  { key: "clientes", label: "Clientes", icon: Users, verTodosHref: "/clientes", modulo: "clientes" },
+  { key: "leads", label: "Leads", icon: Target, verTodosHref: "/leads", modulo: "leads" },
   { key: "documentos", label: "Documentos", icon: FileText, verTodosHref: "/documentos" },
   { key: "acessos", label: "Acessos", icon: KeyRound },
   { key: "infraestrutura", label: "Infraestrutura", icon: Server },
@@ -34,6 +37,7 @@ const GRUPOS: {
 
 export function GlobalSearch({ incluirDocumentos }: { incluirDocumentos: boolean }) {
   const router = useRouter();
+  const rotulos = useRotulos();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const latestQueryRef = useRef("");
@@ -197,7 +201,7 @@ export function GlobalSearch({ incluirDocumentos }: { incluirDocumentos: boolean
                   <div key={grupo.key} className="mb-2 last:mb-0">
                     <p className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
                       <Icon className="h-3 w-3" />
-                      {grupo.label}
+                      {grupo.modulo ? rotulos.plural(grupo.modulo) : grupo.label}
                     </p>
                     <div className="space-y-0.5">
                       {itens.map((item) => {

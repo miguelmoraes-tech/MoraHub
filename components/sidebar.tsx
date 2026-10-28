@@ -32,6 +32,8 @@ import type { AccountType } from "@/lib/hub-mode";
 import type { EmpresaVinculo } from "@/lib/empresas";
 import { iconeDe } from "@/components/modulos/icones";
 import { CHAT_HABILITADO, menuDoDono, rotaPermitida, type ItemMenu } from "@/lib/modulos/registry";
+import { useRotulos } from "@/components/rotulos-provider";
+import { labelDoItemMenu, type Rotulos } from "@/lib/rotulos-shared";
 
 type NavItem = {
   label: string;
@@ -54,9 +56,10 @@ const EMPRESA_ITEMS: NavItem[] = [
   { label: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
-function itemDeMenu(item: ItemMenu): NavItem {
+function itemDeMenu(item: ItemMenu, rotulos: Rotulos): NavItem {
   return {
-    label: item.label,
+    // Rótulo da empresa (nicho/modelo) quando houver; senão o nome do registro.
+    label: labelDoItemMenu(rotulos, item.href, item.label),
     href: item.href,
     icon: iconeDe(item.icone),
     badge: item.badge,
@@ -173,6 +176,7 @@ export function Sidebar({
   empresaAtivaId: string | null;
 }) {
   const pathname = usePathname();
+  const rotulos = useRotulos();
   const isPessoal = pathname.startsWith("/pessoal");
   const accent: Accent = isPessoal ? "petrol" : "copper";
 
@@ -233,7 +237,7 @@ export function Sidebar({
                 <NavGroup
                   key={grupo.titulo}
                   title={grupo.titulo}
-                  items={grupo.itens.map(itemDeMenu)}
+                  items={grupo.itens.map((item) => itemDeMenu(item, rotulos))}
                   accent={accent}
                   habilitados={modulosHabilitados}
                 />

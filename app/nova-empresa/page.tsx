@@ -6,6 +6,7 @@ import { getEmpresaAtiva, getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { VENDEDOR_HOME } from "@/lib/vendedor-access";
 import { NovaEmpresaForm } from "@/components/empresa/nova-empresa-form";
+import { listarNichosDoCatalogo } from "@/lib/nichos";
 
 export default async function NovaEmpresaPage() {
   const supabase = await createClient();
@@ -16,7 +17,11 @@ export default async function NovaEmpresaPage() {
 
   // Quem já pertence a alguma empresa pode criar outra (a própria) sem perder
   // as que já tem; quem não tem nenhuma está criando a primeira.
-  const [empresas, ativa] = await Promise.all([getEmpresasDoUsuario(), getEmpresaAtiva()]);
+  const [empresas, ativa, nichos] = await Promise.all([
+    getEmpresasDoUsuario(),
+    getEmpresaAtiva(),
+    listarNichosDoCatalogo(supabase),
+  ]);
   const primeira = empresas.length === 0;
   const voltarPara = ativa?.papel === "comercial" ? VENDEDOR_HOME : HOME_DONO;
 
@@ -37,7 +42,7 @@ export default async function NovaEmpresaPage() {
       </div>
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 shadow-lg shadow-black/20">
-        <NovaEmpresaForm />
+        <NovaEmpresaForm nichos={nichos} />
       </div>
 
       {!primeira && (

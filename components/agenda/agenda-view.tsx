@@ -29,6 +29,7 @@ import {
 import { useIsClient } from "@/lib/hooks/use-is-client";
 import { StatusChip } from "@/components/status-chip";
 import { ReuniaoActions } from "@/components/agenda/reuniao-actions";
+import { useRotulos } from "@/components/rotulos-provider";
 
 export type VendedorOption = { id: string; nome: string };
 
@@ -139,6 +140,7 @@ function ListaView({
   mode: "vendedor" | "dono";
   periodo: Periodo;
 }) {
+  const rotulos = useRotulos();
   const dias = useMemo(() => {
     const grupos = [...groupByDay(reunioes).entries()];
     // Upcoming reads top-down from today; past ones from the most recent.
@@ -150,7 +152,13 @@ function ListaView({
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-zinc-800 py-16 text-center">
         <CalendarDays className="h-8 w-8 text-zinc-700" />
-        <p className="text-sm text-zinc-500">Nenhuma reunião encontrada.</p>
+        <p className="text-sm text-zinc-500">
+          {rotulos.texto(
+            "agenda",
+            "Nenhuma reunião encontrada.",
+            ({ plural }) => `Nenhum registro em ${plural} encontrado.`
+          )}
+        </p>
       </div>
     );
   }
@@ -180,6 +188,7 @@ function CalendarioView({
   reunioes: ReuniaoComLead[];
   mode: "vendedor" | "dono";
 }) {
+  const rotulos = useRotulos();
   const hoje = new Date();
   const hojeKey = localDateKey(hoje);
   const [cursor, setCursor] = useState({
@@ -291,7 +300,13 @@ function CalendarioView({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-zinc-600">Nenhuma reunião neste dia.</p>
+          <p className="text-sm text-zinc-600">
+            {rotulos.texto(
+              "agenda",
+              "Nenhuma reunião neste dia.",
+              ({ plural }) => `Nenhum registro em ${plural} neste dia.`
+            )}
+          </p>
         )}
       </section>
     </div>
@@ -308,6 +323,7 @@ export function AgendaView({
   /** Dono only: options for the "filter by vendedor" select. */
   vendedores?: VendedorOption[];
 }) {
+  const rotulos = useRotulos();
   const isClient = useIsClient();
   const [visao, setVisao] = useState<Visao>("lista");
   const [periodo, setPeriodo] = useState<Periodo>("proximas");
@@ -335,11 +351,14 @@ export function AgendaView({
     <div className="mx-auto max-w-4xl px-6 py-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-zinc-100">Agenda</h1>
+          <h1 className="text-lg font-semibold text-zinc-100">{rotulos.plural("agenda")}</h1>
           <p className="text-sm text-zinc-500">
-            {mode === "dono"
-              ? "Reuniões marcadas pelos vendedores"
-              : "Suas reuniões com leads"}
+            {rotulos.texto(
+              "agenda",
+              mode === "dono" ? "Reuniões marcadas pelos vendedores" : "Suas reuniões com leads",
+              ({ plural }) =>
+                mode === "dono" ? `Lista de ${plural} dos vendedores` : `Sua lista de ${plural}`
+            )}
           </p>
         </div>
 

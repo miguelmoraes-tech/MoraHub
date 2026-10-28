@@ -7,6 +7,7 @@ import { ClienteCard } from "@/components/cliente-card";
 import { NewClienteDialog } from "@/components/new-cliente-dialog";
 import { ExportButton } from "@/components/export-button";
 import { SegmentFilter } from "@/components/segment-filter";
+import { useRotulos } from "@/components/rotulos-provider";
 
 export function ClientesBoard({
   clientes,
@@ -19,6 +20,7 @@ export function ClientesBoard({
   /** Sócio/funcionário: só a lista (sem detalhe do cliente nem exportação). */
   listaApenas?: boolean;
 }) {
+  const rotulos = useRotulos();
   const [segmento, setSegmento] = useState("");
 
   const segmentos = useMemo(
@@ -41,9 +43,13 @@ export function ClientesBoard({
     <div className="mx-auto max-w-6xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-zinc-100">Clientes</h1>
+          <h1 className="text-lg font-semibold text-zinc-100">{rotulos.plural("clientes")}</h1>
           <p className="text-sm text-zinc-500">
-            {filtrados.length} cliente(s) na carteira
+            {rotulos.texto(
+              "clientes",
+              `${filtrados.length} cliente(s) na carteira`,
+              ({ plural }) => `Total de ${plural}: ${filtrados.length}`
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -73,9 +79,14 @@ export function ClientesBoard({
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-zinc-800 py-20 text-center">
           <Users className="h-8 w-8 text-zinc-700" />
           <p className="text-sm text-zinc-500">
-            {segmento
-              ? "Nenhum cliente neste segmento."
-              : "Nenhum cliente cadastrado ainda."}
+            {rotulos.texto(
+              "clientes",
+              segmento ? "Nenhum cliente neste segmento." : "Nenhum cliente cadastrado ainda.",
+              ({ plural }) =>
+                segmento
+                  ? `Nenhum registro em ${plural} neste segmento.`
+                  : `Nenhum cadastro em ${plural} ainda.`
+            )}
           </p>
         </div>
       )}

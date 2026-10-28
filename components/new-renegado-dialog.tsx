@@ -2,10 +2,13 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { Plus, X } from "lucide-react";
+import { useRotulos } from "@/components/rotulos-provider";
 import { createRenegado } from "@/app/(dashboard)/renegados/actions";
 import { RenegadoFields } from "@/components/renegado-fields";
 
 export function NewRenegadoDialog() {
+  const rotulos = useRotulos();
+  const tituloNovo = rotulos.texto("renegados", "Novo renegado", ({ singular }) => `Adicionar ${singular}`);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(
@@ -28,7 +31,7 @@ export function NewRenegadoDialog() {
         className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
       >
         <Plus className="h-4 w-4" />
-        Novo renegado
+        {tituloNovo}
       </button>
 
       <dialog
@@ -38,7 +41,7 @@ export function NewRenegadoDialog() {
       >
         <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-950">
           <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-            <h2 className="text-sm font-semibold">Novo renegado</h2>
+            <h2 className="text-sm font-semibold">{tituloNovo}</h2>
             <button
               type="button"
               onClick={() => dialogRef.current?.close()}
@@ -74,7 +77,7 @@ export function NewRenegadoDialog() {
                 disabled={pending}
                 className="rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-copper-500 disabled:opacity-60"
               >
-                {pending ? "Salvando..." : "Criar renegado"}
+                {pending ? "Salvando..." : rotulos.texto("renegados", "Criar renegado", ({ singular }) => `Adicionar ${singular}`)}
               </button>
             </div>
           </form>

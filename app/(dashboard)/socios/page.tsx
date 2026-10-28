@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getEmpresaPainel } from "@/lib/empresa-ativa";
+import { getRotulos } from "@/lib/rotulos";
 import { getModulosHabilitados, getModulosPermiteMembros } from "@/lib/modulos/habilitados";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import {
@@ -27,6 +28,7 @@ export default async function SociosPage() {
 
   const supabase = await createClient();
   const ws = empresa.workspaceId;
+  const rotulos = await getRotulos();
 
   const [habilitados, permiteMembros] = await Promise.all([
     getModulosHabilitados(ws),
@@ -62,7 +64,10 @@ export default async function SociosPage() {
   );
   const modulos: ModuloPermissivel[] = chaves.map((chave) => ({
     chave,
-    nome: porChave.get(chave)?.nome ?? MODULO_ROTULO[chave] ?? chave,
+    // Rótulo da empresa (nicho/modelo) tem preferência sobre o nome do catálogo.
+    nome: rotulos.personalizado(chave)
+      ? rotulos.plural(chave)
+      : (porChave.get(chave)?.nome ?? MODULO_ROTULO[chave] ?? chave),
     extras: extrasDoCatalogo(porChave.get(chave)?.permissoes_extras),
   }));
 
