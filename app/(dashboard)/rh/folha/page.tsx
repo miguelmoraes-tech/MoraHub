@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForFolha } from "@/lib/rh";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { FolhaPagamentoBoard } from "@/components/rh/folha-pagamento-board";
 import type { FolhaPagamento, Funcionario } from "@/lib/types";
 
 export default async function FolhaPagamentoPage() {
-  const donoId = await getEffectiveDonoIdForFolha();
+  const donoId = await getDonoIdAtivo();
   const supabase = await createClient();
 
   const [{ data: folhas }, { data: funcionarios }] = donoId

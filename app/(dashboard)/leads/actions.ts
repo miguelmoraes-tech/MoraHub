@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getDonoIdAtivo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -10,7 +11,6 @@ import {
   FollowupLeadSchema,
 } from "@/lib/validations/lead";
 import { ClienteSchema } from "@/lib/validations/cliente";
-import { getEffectiveDonoIdForComercial, getEffectiveWorkspaceIdForComercial } from "@/lib/comercial";
 import { todayISO } from "@/lib/vencimentos/dates";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -55,8 +55,8 @@ export async function createLead(
 
   const { supabase } = await requireUser();
   const [donoId, workspaceId] = await Promise.all([
-    getEffectiveDonoIdForComercial(),
-    getEffectiveWorkspaceIdForComercial(),
+    getDonoIdAtivo(),
+    getWorkspaceIdAtivo(),
   ]);
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
@@ -201,8 +201,8 @@ export async function registrarFollowup(
   const { supabase, user } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
   const [donoId, workspaceId] = await Promise.all([
-    getEffectiveDonoIdForComercial(),
-    getEffectiveWorkspaceIdForComercial(),
+    getDonoIdAtivo(),
+    getWorkspaceIdAtivo(),
   ]);
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
@@ -261,8 +261,8 @@ export async function convertLeadToCliente(
 
   const { supabase } = await requireUser();
   const [donoId, workspaceId] = await Promise.all([
-    getEffectiveDonoIdForComercial(),
-    getEffectiveWorkspaceIdForComercial(),
+    getDonoIdAtivo(),
+    getWorkspaceIdAtivo(),
   ]);
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 

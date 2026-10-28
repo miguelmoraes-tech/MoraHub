@@ -24,7 +24,8 @@ import {
   temEmpresaPropria,
   tipoContaDaMetadata,
 } from "@/lib/perfil";
-import { COMERCIAL_DONO_COOKIE, COMERCIAL_DONO_COOKIE_MAX_AGE } from "@/lib/comercial";
+import { gravarEmpresaAtiva, limparEmpresaAtiva } from "@/lib/empresa-ativa";
+import { EMPRESA_ATIVA_COOKIE } from "@/lib/empresas";
 
 const HUB_MODE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
@@ -78,12 +79,8 @@ export async function login(
   const acesso = await getVendedorAcesso(supabase, data.user.id);
   if (acesso.somenteVendedor) {
     const cookieStore = await cookies();
-    if (!cookieStore.get(COMERCIAL_DONO_COOKIE)?.value) {
-      cookieStore.set(COMERCIAL_DONO_COOKIE, acesso.vinculos[0].dono_id, {
-        path: "/",
-        maxAge: COMERCIAL_DONO_COOKIE_MAX_AGE,
-        sameSite: "lax",
-      });
+    if (!cookieStore.get(EMPRESA_ATIVA_COOKIE)?.value) {
+      await gravarEmpresaAtiva(acesso.vinculos[0].workspace_id);
     }
     redirect(VENDEDOR_HOME);
   }
@@ -271,5 +268,6 @@ export async function signup(
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  await limparEmpresaAtiva();
   redirect("/login");
 }

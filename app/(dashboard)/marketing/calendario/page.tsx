@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForMarketing } from "@/lib/marketing";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { getResponsaveisMarketing } from "@/lib/marketing/get-responsaveis";
 import { CalendarioConteudoBoard } from "@/components/marketing/calendario-conteudo-board";
 import type { CalendarioConteudo } from "@/lib/types";
 
 export default async function MarketingCalendarioPage() {
-  const donoId = await getEffectiveDonoIdForMarketing();
+  const donoId = await getDonoIdAtivo();
   const supabase = await createClient();
 
   const [{ data: itens }, responsaveis] = donoId

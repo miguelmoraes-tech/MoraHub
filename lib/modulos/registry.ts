@@ -261,6 +261,7 @@ const ROTAS_LIVRES_PREFIXOS = [
   "/nova-empresa",
   "/vendedor",
   "/modulos",
+  "/configuracoes",
   "/pessoal",
   "/api/pessoal",
   "/api/auth",

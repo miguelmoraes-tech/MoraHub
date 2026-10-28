@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { ModulosBoard, type ModuloCatalogo } from "@/components/modulos/modulos-board";
 
@@ -14,7 +14,7 @@ export default async function ModulosPage() {
 
   // A empresa é a do próprio usuário; a RPC ainda confere no banco que ele é
   // o dono — quem não é cai de volta no início.
-  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
+  const workspaceId = await getWorkspaceIdAtivo();
   if (!workspaceId) redirect(HOME_DONO);
   const { data: ehDono } = await supabase.rpc("eh_dono_workspace", { p_ws: workspaceId });
   if (ehDono !== true) redirect(HOME_DONO);

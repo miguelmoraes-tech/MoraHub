@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForRH } from "@/lib/rh";
 import { ControlePontoSchema } from "@/lib/validations/controle-ponto";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -56,7 +56,7 @@ export async function salvarPonto(
       .eq("id", existingId);
     if (error) return { error: "Não foi possível atualizar o registro." };
   } else {
-    const donoId = await getEffectiveDonoIdForRH();
+    const donoId = await getDonoIdAtivo();
     if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
     const { error } = await supabase.from("controle_ponto").insert({

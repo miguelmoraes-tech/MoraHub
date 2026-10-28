@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { ClientesBoard } from "@/components/clientes-board";
 import type { Cliente } from "@/lib/types";
 
 export default async function ClientesPage() {
   const supabase = await createClient();
-  const workspaceId = await getEffectiveWorkspaceIdGeral();
+  const workspaceId = await getWorkspaceIdAtivo();
   const { data: clientes } = (await supabase
     .from("clientes")
     .select("*")

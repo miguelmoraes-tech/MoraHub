@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { buildXlsxResponse, type ExportColumn } from "@/lib/export/xlsx";
 import { computeDre } from "@/lib/dre/compute";
-import { getEffectiveDonoId } from "@/lib/financeiro";
 import { filtrarContasPorPapel, getContasVinculadas } from "@/lib/colaborador";
 import type { Comprovante, Gasto } from "@/lib/types";
 
@@ -19,7 +19,7 @@ async function resolveDonoId(donoIdParam: string | null) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  if (!donoIdParam) return getEffectiveDonoId();
+  if (!donoIdParam) return getDonoIdAtivo();
   if (donoIdParam === user.id) return user.id;
 
   const contas = filtrarContasPorPapel(await getContasVinculadas(), "contador");

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { getClienteArquivoSignedUrls } from "@/lib/supabase/storage";
 import { ClienteForm } from "@/components/cliente-form";
 import { ContratosSection } from "@/components/contratos-section";
@@ -39,6 +40,10 @@ export default async function ClienteDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  // O detalhe do cliente é só do dono da empresa ativa: leituras sempre
+  // filtradas pelo workspace_id dela.
+  const workspaceId = await getWorkspaceIdAtivo();
+  if (!workspaceId) notFound();
 
   const [
     { data: cliente },
@@ -54,56 +59,66 @@ export default async function ClienteDetailPage({
     { data: propostas },
     { data: gastos },
   ] = (await Promise.all([
-    supabase.from("clientes").select("*").eq("id", id).single(),
+    supabase.from("clientes").select("*").eq("id", id).eq("workspace_id", workspaceId).single(),
     supabase
       .from("contratos")
       .select("*")
       .eq("cliente_id", id)
+      .eq("workspace_id", workspaceId)
       .order("data", { ascending: false }),
     supabase
       .from("comprovantes")
       .select("*")
       .eq("cliente_id", id)
+      .eq("workspace_id", workspaceId)
       .order("data", { ascending: false }),
     supabase
       .from("servicos")
       .select("*")
       .eq("cliente_id", id)
+      .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
     supabase
       .from("assinaturas")
       .select("*")
       .eq("cliente_id", id)
+      .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
     supabase
       .from("acessos")
       .select("*")
       .eq("cliente_id", id)
+      .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
     supabase
       .from("infraestrutura")
       .select("*")
       .eq("cliente_id", id)
+      .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
     supabase
       .from("projetos")
       .select("*")
       .eq("cliente_id", id)
+      .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
     supabase
       .from("manutencoes")
       .select("*")
       .eq("cliente_id", id)
+      .eq("workspace_id", workspaceId)
       .order("data", { ascending: false }),
     supabase
       .from("backups")
       .select("*")
       .eq("cliente_id", id)
+      .eq("workspace_id", workspaceId)
       .order("data", { ascending: false }),
     supabase
       .from("propostas")
       .select("*")
       .eq("cliente_id", id)
+      .eq("workspace_id", workspaceId)
       .order("versao", { ascending: false }),
     supabase
       .from("gastos")

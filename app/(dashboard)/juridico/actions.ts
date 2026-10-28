@@ -1,11 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { JuridicoSchema } from "@/lib/validations/juridico";
 import { ConviteSchema } from "@/lib/validations/colaborador";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import type { ActionState } from "@/lib/actions/types";
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -119,10 +119,15 @@ export async function convidarColaborador(
   const { supabase, user } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
 
+  // O convite nasce vinculado à empresa ATIVA, em que o usuário é o dono.
+  const workspaceId = await getWorkspaceIdAtivo();
+  if (!workspaceId) return { error: "Selecione uma empresa em que você é o dono." };
+
   const { data: existente } = await supabase
     .from("convites")
     .select("id")
     .eq("dono_id", user.id)
+    .eq("workspace_id", workspaceId)
     .eq("email_convidado", parsed.data.email)
     .eq("status", "pendente")
     .maybeSingle();
@@ -130,12 +135,6 @@ export async function convidarColaborador(
   if (existente) {
     return { error: "Já existe um convite pendente para esse e-mail." };
   }
-
-  // Todo colaborador (financeiro/rh/comercial/marketing/contador/advogado)
-  // atua sobre o lado empresarial do dono — o convite já nasce vinculado a
-  // um workspace específico (hoje sempre o padrão, já que o seletor de
-  // múltiplos workspaces ainda não existe) em vez de nascer sem nenhum.
-  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
 
   const { data: convite, error } = await supabase
     .from("convites")
@@ -159,7 +158,14 @@ export async function convidarColaborador(
 
 export async function removerColaborador(membroId: string) {
   const { supabase } = await requireUser();
-  await supabase.from("membros").update({ status: "removido" }).eq("id", membroId);
+  // Só remove vínculo da empresa ativa (não de outra empresa do mesmo dono).
+  const workspaceId = await getWorkspaceIdAtivo();
+  if (!workspaceId) return;
+  await supabase
+    .from("membros")
+    .update({ status: "removido" })
+    .eq("id", membroId)
+    .eq("workspace_id", workspaceId);
   revalidatePath("/juridico");
   revalidatePath("/vendedores");
 }
@@ -170,11 +176,15 @@ export async function cancelarConvite(conviteId: string) {
 
   // Scoped to "pendente" so an invite that was already accepted/declined in
   // the meantime can't be wiped out by a stale button in the UI.
+  const workspaceId = await getWorkspaceIdAtivo();
+  if (!workspaceId) return;
+
   await supabase
     .from("convites")
     .delete()
     .eq("id", conviteId)
     .eq("dono_id", user.id)
+    .eq("workspace_id", workspaceId)
     .eq("status", "pendente");
 
   revalidatePath("/juridico");

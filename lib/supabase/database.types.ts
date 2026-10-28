@@ -3918,6 +3918,10 @@ export type Database = {
         Args: { p_lead_id: string }
         Returns: string
       }
+      criar_empresa: {
+        Args: { p_nicho?: string; p_nome: string }
+        Returns: string
+      }
       current_user_email: { Args: never; Returns: string }
       definir_modulo: {
         Args: { p_chave: string; p_habilitado: boolean; p_workspace_id: string }
@@ -3980,6 +3984,19 @@ export type Database = {
       lead_view_ping: { Args: { p_view_id: string }; Returns: undefined }
       lead_view_start: { Args: { p_lead_id: string }; Returns: string }
       meu_codigo_vendedor: { Args: { p_workspace_id: string }; Returns: string }
+      meu_papel_na_empresa: {
+        Args: { p_workspace_id: string }
+        Returns: string
+      }
+      minhas_empresas: {
+        Args: never
+        Returns: {
+          dono_id: string
+          nome: string
+          papel: string
+          workspace_id: string
+        }[]
+      }
       modulo_habilitado: {
         Args: { p_chave: string; ws: string }
         Returns: boolean
@@ -4004,6 +4021,10 @@ export type Database = {
           vendedor_email: string
           vendedor_id: string
         }[]
+      }
+      renomear_empresa: {
+        Args: { p_nome: string; p_workspace_id: string }
+        Returns: undefined
       }
       responder_solicitacao_vendedor: {
         Args: { p_aprovar: boolean; p_id: string }

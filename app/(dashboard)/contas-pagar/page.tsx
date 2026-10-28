@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { ContasPagarBoard } from "@/components/contas-pagar-board";
 import type { ContaPagar } from "@/lib/types";
 
 export default async function ContasPagarPage() {
-  const donoId = await getEffectiveDonoId();
+  const donoId = await getDonoIdAtivo();
   const supabase = await createClient();
 
   const { data: contas } = donoId

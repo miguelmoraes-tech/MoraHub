@@ -1,7 +1,7 @@
 import Link from "next/link";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { Users, BadgeCheck, Percent, LayoutDashboard } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
 import { StatCard } from "@/components/stat-card";
 import { BarList } from "@/components/bar-list";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
@@ -32,7 +32,7 @@ const STATUS_TONE: Record<ClienteStatus, ChipTone> = {
 
 export default async function DashboardClientesPage() {
   const supabase = await createClient();
-  const workspaceId = await getEffectiveWorkspaceIdGeral();
+  const workspaceId = await getWorkspaceIdAtivo();
 
   const [{ data: clientes }, { data: assinaturas }, { data: leads }] =
     (await Promise.all([
@@ -41,7 +41,7 @@ export default async function DashboardClientesPage() {
         .select("id, nome, status, created_at, lead_origem_id")
         .eq("workspace_id", workspaceId ?? "")
         .order("created_at", { ascending: false }),
-      supabase.from("assinaturas").select("status"),
+      supabase.from("assinaturas").select("status").eq("workspace_id", workspaceId ?? ""),
       supabase.from("leads").select("status").eq("workspace_id", workspaceId ?? ""),
     ])) as [
       { data: ClienteRow[] | null },

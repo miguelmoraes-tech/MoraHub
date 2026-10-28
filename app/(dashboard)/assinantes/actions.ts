@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { AssinanteSchema } from "@/lib/validations/assinante";
 import type { ActionState } from "@/lib/actions/types";
@@ -42,9 +43,12 @@ export async function createAssinante(
 
   const { supabase, user } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  const workspaceId = await getWorkspaceIdAtivo();
+  if (!workspaceId) return { error: "Selecione uma empresa em que você é o dono." };
 
   const { error } = await supabase.from("assinaturas").insert({
     user_id: user.id,
+    workspace_id: workspaceId,
     cliente_id: parsed.data.cliente_id,
     plano: parsed.data.plano,
     valor: parsed.data.valor ?? null,

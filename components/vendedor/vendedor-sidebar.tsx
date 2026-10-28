@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Target, CalendarDays, LogOut } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
+import { EmpresaSwitcher } from "@/components/empresa/empresa-switcher";
+import type { EmpresaVinculo } from "@/lib/empresas";
 
 // The vendedor menu is intentionally just these two entries. Route blocking
 // for everything else lives in the proxy (lib/supabase/proxy.ts), not here.
@@ -13,7 +15,16 @@ const ITEMS = [
   { label: "Agenda", href: "/vendedor/agenda", icon: CalendarDays },
 ];
 
-export function VendedorSidebar({ userEmail }: { userEmail: string }) {
+export function VendedorSidebar({
+  userEmail,
+  empresas,
+  empresaAtivaId,
+}: {
+  userEmail: string;
+  /** Empresas com vínculo ativo da conta (vendedor, dono ou sócio). */
+  empresas: EmpresaVinculo[];
+  empresaAtivaId: string | null;
+}) {
   const pathname = usePathname();
 
   return (
@@ -33,6 +44,10 @@ export function VendedorSidebar({ userEmail }: { userEmail: string }) {
         <span className="rounded-full border border-teal-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-teal-400">
           Vendedor
         </span>
+      </div>
+
+      <div className="border-b border-zinc-900 px-3 pb-4">
+        <EmpresaSwitcher empresas={empresas} ativaId={empresaAtivaId} />
       </div>
 
       <nav className="flex-1 px-3 py-4">

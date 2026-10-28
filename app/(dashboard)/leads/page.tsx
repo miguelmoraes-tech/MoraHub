@@ -1,15 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForComercial, getEffectiveWorkspaceIdForComercial } from "@/lib/comercial";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { LeadsBoard } from "@/components/leads-board";
 import { todayISO, subtractDaysISO } from "@/lib/vencimentos/dates";
 import type { Lead, Proposta, FollowupLead, Campanha } from "@/lib/types";
 
 export default async function LeadsPage() {
   const supabase = await createClient();
-  const [donoId, workspaceId] = await Promise.all([
-    getEffectiveDonoIdForComercial(),
-    getEffectiveWorkspaceIdForComercial(),
-  ]);
+  const workspaceId = await getWorkspaceIdAtivo();
   const noventaDiasAtras = subtractDaysISO(todayISO(), 90);
 
   const [{ data: leads }, { data: propostas }, { data: followups }, { data: campanhas }] =
@@ -35,7 +32,7 @@ export default async function LeadsPage() {
       supabase
         .from("campanhas")
         .select("id, nome, status, canal")
-        .eq("user_id", donoId ?? "")
+        .eq("workspace_id", workspaceId ?? "")
         .or(`status.eq.ativa,created_at.gte.${noventaDiasAtras}`)
         .order("created_at", { ascending: false }),
     ])) as [

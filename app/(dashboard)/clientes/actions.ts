@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getDonoIdAtivo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ClienteSchema } from "@/lib/validations/cliente";
-import { getEffectiveDonoIdGeral, getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
 import type { ActionState } from "@/lib/actions/types";
 
 function textOrNull(value: FormDataEntryValue | null) {
@@ -46,8 +46,8 @@ export async function createCliente(
 
   const { supabase } = await requireUser();
   const [donoId, workspaceId] = await Promise.all([
-    getEffectiveDonoIdGeral(),
-    getEffectiveWorkspaceIdGeral(),
+    getDonoIdAtivo(),
+    getWorkspaceIdAtivo(),
   ]);
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 

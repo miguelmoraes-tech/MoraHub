@@ -1,8 +1,7 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { COMERCIAL_DONO_COOKIE } from "@/lib/comercial";
+import { getEmpresaAtiva } from "@/lib/empresa-ativa";
 import {
   VENDEDOR_HOME,
   getVendedorAcesso,
@@ -27,8 +26,8 @@ export interface VendedorContext {
 
 /**
  * The vendedor session for the current request, or null when the caller is
- * not an active 'comercial' member. With several links, the company picked in
- * the colaborador screen (COMERCIAL_DONO_COOKIE) wins; the cookie is only a
+ * not an active 'comercial' member. With several links, the active company
+ * (lib/empresa-ativa.ts) wins when the caller is a vendedor there; it is only a
  * hint — it must match a link that is still 'ativo' in `membros`.
  */
 export const getVendedorContext = cache(
@@ -42,10 +41,10 @@ export const getVendedorContext = cache(
     const acesso = await getVendedorAcesso(supabase, user.id);
     if (acesso.vinculos.length === 0) return null;
 
-    const cookieStore = await cookies();
-    const preferido = cookieStore.get(COMERCIAL_DONO_COOKIE)?.value;
+    const ativa = await getEmpresaAtiva();
     const vinculo =
-      acesso.vinculos.find((v) => v.dono_id === preferido) ?? acesso.vinculos[0];
+      acesso.vinculos.find((v) => v.workspace_id === ativa?.workspaceId) ??
+      acesso.vinculos[0];
 
     return {
       userId: user.id,

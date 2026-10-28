@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForRH } from "@/lib/rh";
 import {
   uploadCandidatoCurriculo,
   removeClienteArquivo,
@@ -47,7 +47,7 @@ export async function createVaga(_prevState: ActionState, formData: FormData): P
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getEffectiveDonoIdForRH();
+  const donoId = await getDonoIdAtivo();
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const supabase = await createClient();
@@ -123,7 +123,7 @@ export async function createCandidato(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getEffectiveDonoIdForRH();
+  const donoId = await getDonoIdAtivo();
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const supabase = await createClient();
@@ -222,7 +222,7 @@ export async function contratarCandidato(
   candidatoId: string,
   vagaId: string
 ): Promise<ActionState> {
-  const donoId = await getEffectiveDonoIdForRH();
+  const donoId = await getDonoIdAtivo();
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const supabase = await createClient();

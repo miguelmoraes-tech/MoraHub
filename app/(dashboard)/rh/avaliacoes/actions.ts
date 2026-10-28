@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForRH } from "@/lib/rh";
 import { AvaliacaoDesempenhoSchema } from "@/lib/validations/avaliacao-desempenho";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -34,7 +34,7 @@ export async function createAvaliacao(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getEffectiveDonoIdForRH();
+  const donoId = await getDonoIdAtivo();
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const supabase = await createClient();

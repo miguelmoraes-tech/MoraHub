@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getDonoIdAtivo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForMarketing } from "@/lib/marketing";
 import { CampanhaSchema } from "@/lib/validations/campanha";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -36,12 +36,16 @@ export async function createCampanha(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getEffectiveDonoIdForMarketing();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  const donoId = await getDonoIdAtivo();
+  const workspaceId = await getWorkspaceIdAtivo();
+  if (!donoId || !workspaceId) {
+    return { error: "Selecione uma empresa em que você é o dono." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.from("campanhas").insert({
     user_id: donoId,
+    workspace_id: workspaceId,
     nome: parsed.data.nome,
     canal: parsed.data.canal,
     status: parsed.data.status,

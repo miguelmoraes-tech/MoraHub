@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
+import { getColaboradoresDaEmpresa } from "@/lib/colaboradores";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { getModulosHabilitados } from "@/lib/modulos/habilitados";
 import { isFollowupPendente } from "@/lib/leads";
 import { todayISO } from "@/lib/vencimentos/dates";
@@ -53,7 +54,7 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
   } = await supabase.auth.getUser();
   if (!user) return VAZIO;
 
-  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
+  const workspaceId = await getWorkspaceIdAtivo();
   if (!workspaceId) return VAZIO;
 
   const habilitados = await getModulosHabilitados(workspaceId);
@@ -99,7 +100,9 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
           .gte("data_hora", agora.toISOString())
           .lte("data_hora", fimJanela.toISOString())
       : nada,
-    com("vendedores") ? supabase.rpc("get_colaboradores_do_dono") : nada,
+    com("vendedores")
+      ? getColaboradoresDaEmpresa(supabase, workspaceId).then((data) => ({ data }))
+      : nada,
     com("vendedores")
       ? supabase
           .from("solicitacoes_vendedor")

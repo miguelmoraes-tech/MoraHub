@@ -1,12 +1,12 @@
 "use client";
 
 import { useActionState } from "react";
-import { criarEmpresaInicial } from "@/lib/actions/empresa";
+import { criarEmpresa } from "@/lib/actions/empresa";
 import { useActionToast } from "@/lib/hooks/use-action-toast";
 import { EMPRESA_NOME_MAX, EMPRESA_NOME_MIN } from "@/lib/empresa";
 
 export function NovaEmpresaForm() {
-  const [state, formAction, pending] = useActionState(criarEmpresaInicial, undefined);
+  const [state, formAction, pending] = useActionState(criarEmpresa, undefined);
   useActionToast(state);
 
   return (

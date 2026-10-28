@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdGeral } from "@/lib/dono-efetivo";
 import { ObjetivoSchema, ResultadoChaveSchema } from "@/lib/validations/meta-okr";
 import type { ActionState } from "@/lib/actions/types";
 import type { MetaOkrSetor } from "@/lib/types";
@@ -44,7 +44,7 @@ export async function createObjetivo(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getEffectiveDonoIdGeral();
+  const donoId = await getDonoIdAtivo();
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const supabase = await createClient();
@@ -113,7 +113,7 @@ export async function createResultadoChave(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getEffectiveDonoIdGeral();
+  const donoId = await getDonoIdAtivo();
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const supabase = await createClient();

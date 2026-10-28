@@ -1,12 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
+import { getDonoIdAtivo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { ContasReceberBoard } from "@/components/contas-receber-board";
 import type { Cliente, ContaReceber, Proposta } from "@/lib/types";
 
 export default async function ContasReceberPage() {
-  const donoId = await getEffectiveDonoId();
-  const workspaceId = donoId ? await getWorkspaceIdPadrao(donoId, "empresarial") : null;
+  const donoId = await getDonoIdAtivo();
+  const workspaceId = donoId ? await getWorkspaceIdAtivo() : null;
   const supabase = await createClient();
 
   const [{ data: contas }, { data: clientes }, { data: propostas }] = donoId

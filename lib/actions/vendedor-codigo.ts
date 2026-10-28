@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { getWorkspaceIdAtivo, gravarEmpresaAtiva } from "@/lib/empresa-ativa";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -9,8 +9,6 @@ import {
   VENDEDOR_HOME,
   getVendedorAcesso,
 } from "@/lib/vendedor-access";
-import { COMERCIAL_DONO_COOKIE, COMERCIAL_DONO_COOKIE_MAX_AGE } from "@/lib/comercial";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import {
   CODIGO_VENDEDOR_LENGTH,
   gestorErrorMessage,
@@ -64,12 +62,7 @@ export async function verificarSolicitacaoVendedor(): Promise<VerificacaoState> 
 
   const acesso = await getVendedorAcesso(supabase, user.id);
   if (acesso.vinculos.length > 0) {
-    const cookieStore = await cookies();
-    cookieStore.set(COMERCIAL_DONO_COOKIE, acesso.vinculos[0].dono_id, {
-      path: "/",
-      maxAge: COMERCIAL_DONO_COOKIE_MAX_AGE,
-      sameSite: "lax",
-    });
+    await gravarEmpresaAtiva(acesso.vinculos[0].workspace_id);
     redirect(VENDEDOR_HOME);
   }
 
@@ -95,7 +88,7 @@ export async function regenerarCodigoVendedor(): Promise<CodigoState> {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
 
-  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
+  const workspaceId = await getWorkspaceIdAtivo();
   if (!workspaceId) return { error: "Workspace empresarial não encontrado." };
 
   const { data, error } = await supabase.rpc("regenerar_codigo_vendedor", {

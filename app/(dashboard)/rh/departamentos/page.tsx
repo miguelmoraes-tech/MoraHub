@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForRH } from "@/lib/rh";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { DepartamentosBoard } from "@/components/rh/departamentos-board";
 import type { Departamento, Funcionario } from "@/lib/types";
 
 export default async function DepartamentosPage() {
-  const donoId = await getEffectiveDonoIdForRH();
+  const donoId = await getDonoIdAtivo();
   const supabase = await createClient();
 
   const [{ data: departamentos }, { data: funcionarios }] = donoId

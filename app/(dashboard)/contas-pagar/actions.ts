@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
 import { syncFolhaFromContaPagar } from "@/lib/rh/folha-sync";
 import { ContaPagarSchema } from "@/lib/validations/conta-pagar";
 import type { ActionState } from "@/lib/actions/types";
@@ -35,7 +35,7 @@ export async function createContaPagar(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getEffectiveDonoId();
+  const donoId = await getDonoIdAtivo();
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const supabase = await createClient();

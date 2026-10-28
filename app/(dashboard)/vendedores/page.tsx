@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
+import { getColaboradoresDaEmpresa } from "@/lib/colaboradores";
 import { ColaboradoresSection } from "@/components/colaboradores-section";
 import { CodigoGestorSection } from "@/components/vendedor/codigo-gestor-section";
 import { ToastProvider } from "@/components/toast";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import type { SolicitacaoVendedor } from "@/lib/vendedor-shared";
 import { getConversasComoDono, getUnreadCountsByConversa } from "@/lib/chat";
-import type { ColaboradorVinculado, Convite } from "@/lib/types";
+import type { Convite } from "@/lib/types";
 
 /**
  * Manage vendedores: the company's access code and the requests it brings,
@@ -23,7 +24,7 @@ export default async function VendedoresPage() {
   // The code (and who asked for it) belongs to the caller's own company. The
   // RPC creates it on first view and is idempotent; if it refuses (e.g. the
   // caller is a colaborador, not the dono) the section just doesn't show.
-  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
+  const workspaceId = await getWorkspaceIdAtivo();
   const [{ data: codigo }, { data: solicitacoes }] = workspaceId
     ? await Promise.all([
         supabase.rpc("meu_codigo_vendedor", { p_workspace_id: workspaceId }),
@@ -40,13 +41,12 @@ export default async function VendedoresPage() {
     supabase
       .from("convites")
       .select("*")
+      .eq("workspace_id", workspaceId ?? "")
       .eq("papel", "comercial")
       .order("created_at", { ascending: false }) as unknown as Promise<{
       data: Convite[] | null;
     }>,
-    supabase.rpc("get_colaboradores_do_dono") as unknown as Promise<{
-      data: ColaboradorVinculado[] | null;
-    }>,
+    getColaboradoresDaEmpresa(supabase, workspaceId).then((data) => ({ data })),
     getConversasComoDono(),
   ]);
   const unreadByConversa = await getUnreadCountsByConversa(conversas.map((c) => c.id));

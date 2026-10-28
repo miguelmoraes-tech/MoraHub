@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import type { CalendarioItem } from "@/lib/vencimentos/types";
 
 type ClienteAssinaturaRow = {
@@ -45,7 +45,7 @@ type FuncionarioNomeRow = { id: string; nome: string };
 
 export async function getCalendarioItems(): Promise<CalendarioItem[]> {
   const supabase = await createClient();
-  const workspaceId = await getEffectiveWorkspaceIdGeral();
+  const workspaceId = await getWorkspaceIdAtivo();
 
   const [
     { data: vencimentos },
@@ -68,6 +68,7 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
     supabase
       .from("contratos")
       .select("id, cliente_id, descricao, vencimento")
+      .eq("workspace_id", workspaceId ?? "")
       .not("vencimento", "is", null),
     supabase
       .from("juridico")
@@ -77,6 +78,7 @@ export async function getCalendarioItems(): Promise<CalendarioItem[]> {
     supabase
       .from("assinaturas")
       .select("id, cliente_id, plano, proxima_cobranca")
+      .eq("workspace_id", workspaceId ?? "")
       .eq("status", "ativa")
       .not("proxima_cobranca", "is", null),
     supabase.from("clientes").select("id, nome").eq("workspace_id", workspaceId ?? ""),

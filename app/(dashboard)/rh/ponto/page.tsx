@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForRH } from "@/lib/rh";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { PontoBoard } from "@/components/rh/ponto-board";
 import type { ControlePonto, Funcionario } from "@/lib/types";
 
 export default async function PontoPage() {
-  const donoId = await getEffectiveDonoIdForRH();
+  const donoId = await getDonoIdAtivo();
   const supabase = await createClient();
 
   const [{ data: registros }, { data: funcionarios }] = donoId

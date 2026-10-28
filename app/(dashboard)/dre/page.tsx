@@ -1,16 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
+import { getDonoIdAtivo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { DreView } from "@/components/dre-view";
 import type { Comprovante, Gasto } from "@/lib/types";
 
 export default async function DrePage() {
-  const donoId = await getEffectiveDonoId();
+  const donoId = await getDonoIdAtivo();
+  const workspaceId = await getWorkspaceIdAtivo();
   const supabase = await createClient();
 
-  const [{ data: gastos }, { data: comprovantes }] = donoId
+  const [{ data: gastos }, { data: comprovantes }] = donoId && workspaceId
     ? await Promise.all([
         supabase.from("gastos").select("*").eq("user_id", donoId),
-        supabase.from("comprovantes").select("*").eq("user_id", donoId),
+        supabase.from("comprovantes").select("*").eq("workspace_id", workspaceId),
       ])
     : [{ data: [] }, { data: [] }];
 

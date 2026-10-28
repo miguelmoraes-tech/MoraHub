@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { todayISO } from "@/lib/vencimentos/dates";
 import { getCampanhaMetricsMap } from "@/lib/marketing/campanha-metrics";
 import { computeCampanhaDerived } from "@/lib/marketing/campanha-metrics-shared";
@@ -28,7 +29,8 @@ function ultimoDiaDoMes(mesAtual: string) {
 }
 
 export async function getMarketingOverview(donoId: string | null): Promise<MarketingOverview> {
-  if (!donoId) return VAZIO;
+  const workspaceId = await getWorkspaceIdAtivo();
+  if (!donoId || !workspaceId) return VAZIO;
 
   const supabase = await createClient();
   const hoje = todayISO();
@@ -45,7 +47,7 @@ export async function getMarketingOverview(donoId: string | null): Promise<Marke
       .select("id, data_publicacao, status")
       .eq("user_id", donoId)
       .eq("status", "publicado"),
-    supabase.from("campanhas").select("*").eq("user_id", donoId),
+    supabase.from("campanhas").select("*").eq("workspace_id", workspaceId),
   ])) as [{ data: ConteudoRow[] | null }, { data: Campanha[] | null }];
 
   const conteudosList = conteudos ?? [];

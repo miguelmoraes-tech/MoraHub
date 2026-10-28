@@ -1,6 +1,6 @@
 import { Target, UserCheck, Percent, PieChart, Send } from "lucide-react";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
 import { StatCard } from "@/components/stat-card";
 import { BarList } from "@/components/bar-list";
 import { formatDate } from "@/lib/format";
@@ -20,7 +20,7 @@ type LeadRow = Pick<
 
 export default async function DashboardLeadsPage() {
   const supabase = await createClient();
-  const workspaceId = await getEffectiveWorkspaceIdGeral();
+  const workspaceId = await getWorkspaceIdAtivo();
 
   const { data: leads } = (await supabase
     .from("leads")

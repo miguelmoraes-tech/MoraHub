@@ -14,7 +14,12 @@ import {
   primeiraRotaHabilitada,
   rotaPermitida,
 } from "@/lib/modulos/registry";
-import { getEmpresaDoUsuario } from "@/lib/modulos/habilitados";
+import { getModulosDaEmpresa } from "@/lib/modulos/habilitados";
+import {
+  EMPRESA_ATIVA_COOKIE,
+  EMPRESA_ATIVA_COOKIE_MAX_AGE,
+  resolverEmpresaAtiva,
+} from "@/lib/empresas";
 import { NOVA_EMPRESA } from "@/lib/empresa";
 
 // Exact-path routes usable without a session. Also the set a logged-in user
@@ -95,7 +100,12 @@ export async function updateSession(request: NextRequest) {
   if (onPublicRoute || !isPublicPath(path)) {
     const acesso = await getVendedorAcesso(supabase, user.id);
     if (acesso.somenteVendedor) {
-      if (onPublicRoute || !(isRotaDoVendedor(path) || isRotaDeAcessoVendedor(path))) {
+      // Criar a própria empresa também é permitido: é como um vendedor vira
+      // dono sem perder o acesso à empresa onde trabalha.
+      if (
+        onPublicRoute ||
+        !(isRotaDoVendedor(path) || isRotaDeAcessoVendedor(path) || path === NOVA_EMPRESA)
+      ) {
         const url = request.nextUrl.clone();
         url.pathname = VENDEDOR_HOME;
         url.search = "";
@@ -113,13 +123,30 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Módulo desligado na empresa do usuário (workspace_modulos) fica
-  // inalcançável: o código continua no repo, mas a rota volta para o início.
-  // Rotas livres (acesso, home, vendedor, módulos...) nem chegam ao banco; as
-  // demais custam uma única consulta (empresa + módulos ligados). Quem só é
-  // vendedor, ou ainda não tem vínculo, já foi tratado acima.
+  // Módulo desligado na empresa ATIVA fica inalcançável: o código continua no
+  // repo, mas a rota volta para o início. A empresa ativa vem do cookie, sempre
+  // revalidado no banco (meu_papel_na_empresa); cookie ausente/inválido cai
+  // numa empresa válida e é regravado. Só o dono tem o painel dos módulos —
+  // para os demais papéis, rota de módulo volta ao início. Rotas livres
+  // (acesso, home, vendedor, módulos...) nem chegam ao banco; as demais custam
+  // a validação da empresa mais UMA consulta de módulos. Quem só é vendedor, ou
+  // ainda não tem vínculo, já foi tratado acima.
   if (!onPublicRoute && !isRotaLivre(path)) {
-    const { habilitados } = await getEmpresaDoUsuario(supabase, user.id);
+    const ativa = await resolverEmpresaAtiva(
+      supabase,
+      request.cookies.get(EMPRESA_ATIVA_COOKIE)?.value
+    );
+    if (ativa?.corrigirCookie) {
+      response.cookies.set(EMPRESA_ATIVA_COOKIE, ativa.workspaceId, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: EMPRESA_ATIVA_COOKIE_MAX_AGE,
+      });
+    }
+    const habilitados =
+      ativa?.papel === "dono" ? await getModulosDaEmpresa(supabase, ativa.workspaceId) : [];
     if (!rotaPermitida(path, habilitados)) {
       const url = request.nextUrl.clone();
       url.pathname = primeiraRotaHabilitada(habilitados) ?? HOME_DONO;

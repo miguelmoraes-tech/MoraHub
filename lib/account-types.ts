@@ -107,7 +107,7 @@ export const SIGNUP_OPCOES: {
  * de /colaborador). Os demais continuam existindo em ACCOUNT_TYPES, só não
  * aparecem; para religar um, inclua o valor aqui.
  */
-export const SWITCHER_ACCOUNT_TYPES: AccountType[] = ["empresarial", "pessoal", "comercial"];
+export const SWITCHER_ACCOUNT_TYPES: AccountType[] = ["empresarial", "pessoal"];
 
 export const ACCOUNT_TYPE_STYLES: Record<
   AccountType,

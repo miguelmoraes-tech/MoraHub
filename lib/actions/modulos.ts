@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import type { ActionState } from "@/lib/actions/types";
 
 /**
@@ -21,7 +21,7 @@ export async function definirModulo(
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
 
   // A empresa vem do banco (a do próprio usuário), nunca do cliente.
-  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
+  const workspaceId = await getWorkspaceIdAtivo();
   if (!workspaceId) return { error: "Empresa não encontrada." };
 
   const { error } = await supabase.rpc("definir_modulo", {

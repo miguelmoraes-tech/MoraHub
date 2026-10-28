@@ -1,10 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { VENDEDOR_HOME, getVendedorAcesso } from "@/lib/vendedor-access";
-import { COMERCIAL_DONO_COOKIE, COMERCIAL_DONO_COOKIE_MAX_AGE } from "@/lib/comercial";
+import { gravarEmpresaAtiva } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
 
 export type ConviteResponseState = { error: string } | undefined;
@@ -42,13 +41,9 @@ export async function aceitarConvite(
   } = await supabase.auth.getUser();
   if (user) {
     const acesso = await getVendedorAcesso(supabase, user.id);
-    if (acesso.somenteVendedor && acesso.vinculos.some((v) => v.dono_id === donoId)) {
-      const cookieStore = await cookies();
-      cookieStore.set(COMERCIAL_DONO_COOKIE, donoId, {
-        path: "/",
-        maxAge: COMERCIAL_DONO_COOKIE_MAX_AGE,
-        sameSite: "lax",
-      });
+    const vinculo = acesso.vinculos.find((v) => v.dono_id === donoId);
+    if (acesso.somenteVendedor && vinculo) {
+      await gravarEmpresaAtiva(vinculo.workspace_id);
       redirect(VENDEDOR_HOME);
     }
   }

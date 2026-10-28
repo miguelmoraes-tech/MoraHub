@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import {
   uploadClienteArquivo,
   removeClienteArquivo,
@@ -33,7 +34,27 @@ async function requireUser() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return { supabase, user };
+  // Empresa ativa em que o usuário é dono (null = sem painel nela). Toda linha
+  // criada aqui grava o workspace_id dela — nunca só o user_id.
+  const workspaceId = await getWorkspaceIdAtivo();
+  return { supabase, user, workspaceId };
+}
+
+const SEM_EMPRESA = { error: "Selecione uma empresa em que você é o dono." } as const;
+
+/** O cliente precisa ser da empresa ativa antes de pendurar qualquer coisa nele. */
+async function clienteDaEmpresa(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  clienteId: string,
+  workspaceId: string
+) {
+  const { data } = await supabase
+    .from("clientes")
+    .select("id")
+    .eq("id", clienteId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  return !!data;
 }
 
 // ---------- Contratos ----------
@@ -54,8 +75,12 @@ export async function createContrato(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!workspaceId) return SEM_EMPRESA;
+  if (!(await clienteDaEmpresa(supabase, clienteId, workspaceId))) {
+    return { error: "Cliente não encontrado nesta empresa." };
+  }
 
   const arquivo = fileOrNull(formData.get("arquivo"));
   let arquivo_path: string | null = null;
@@ -70,6 +95,7 @@ export async function createContrato(
   const { error } = await supabase.from("contratos").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: workspaceId,
     descricao: parsed.data.descricao,
     valor: parsed.data.valor,
     data: parsed.data.data ?? null,
@@ -103,8 +129,9 @@ export async function updateContrato(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!workspaceId) return SEM_EMPRESA;
 
   const arquivo = fileOrNull(formData.get("arquivo"));
   const update: Record<string, unknown> = {
@@ -184,8 +211,12 @@ export async function createComprovante(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!workspaceId) return SEM_EMPRESA;
+  if (!(await clienteDaEmpresa(supabase, clienteId, workspaceId))) {
+    return { error: "Cliente não encontrado nesta empresa." };
+  }
 
   const arquivo = fileOrNull(formData.get("arquivo"));
   let arquivo_path: string | null = null;
@@ -200,6 +231,7 @@ export async function createComprovante(
   const { error } = await supabase.from("comprovantes").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: workspaceId,
     descricao: parsed.data.descricao,
     valor: parsed.data.valor,
     data: parsed.data.data ?? null,
@@ -231,8 +263,9 @@ export async function updateComprovante(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!workspaceId) return SEM_EMPRESA;
 
   const arquivo = fileOrNull(formData.get("arquivo"));
   const update: Record<string, unknown> = {
@@ -311,12 +344,17 @@ export async function createServico(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!workspaceId) return SEM_EMPRESA;
+  if (!(await clienteDaEmpresa(supabase, clienteId, workspaceId))) {
+    return { error: "Cliente não encontrado nesta empresa." };
+  }
 
   const { error } = await supabase.from("servicos").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: workspaceId,
     nome: parsed.data.nome,
   });
   if (error) return { error: "Não foi possível salvar o serviço." };
@@ -374,12 +412,17 @@ export async function createAssinatura(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!workspaceId) return SEM_EMPRESA;
+  if (!(await clienteDaEmpresa(supabase, clienteId, workspaceId))) {
+    return { error: "Cliente não encontrado nesta empresa." };
+  }
 
   const { error } = await supabase.from("assinaturas").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: workspaceId,
     plano: parsed.data.plano,
     valor: parsed.data.valor ?? null,
     recorrencia: parsed.data.recorrencia,
@@ -458,12 +501,17 @@ export async function createAcesso(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!workspaceId) return SEM_EMPRESA;
+  if (!(await clienteDaEmpresa(supabase, clienteId, workspaceId))) {
+    return { error: "Cliente não encontrado nesta empresa." };
+  }
 
   const { error } = await supabase.from("acessos").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: workspaceId,
     nome_servico: parsed.data.nome_servico,
     categoria: parsed.data.categoria ?? null,
     url_login: parsed.data.url_login ?? null,
@@ -545,12 +593,17 @@ export async function createInfraestrutura(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!workspaceId) return SEM_EMPRESA;
+  if (!(await clienteDaEmpresa(supabase, clienteId, workspaceId))) {
+    return { error: "Cliente não encontrado nesta empresa." };
+  }
 
   const { error } = await supabase.from("infraestrutura").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: workspaceId,
     dominio: parsed.data.dominio,
     hospedagem: parsed.data.hospedagem ?? null,
     servidor: parsed.data.servidor ?? null,
@@ -644,12 +697,17 @@ export async function createProjeto(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!workspaceId) return SEM_EMPRESA;
+  if (!(await clienteDaEmpresa(supabase, clienteId, workspaceId))) {
+    return { error: "Cliente não encontrado nesta empresa." };
+  }
 
   const { error } = await supabase.from("projetos").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: workspaceId,
     nome: parsed.data.nome,
     tipo: parsed.data.tipo ?? null,
     status: parsed.data.status,
@@ -736,12 +794,17 @@ export async function createManutencao(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!workspaceId) return SEM_EMPRESA;
+  if (!(await clienteDaEmpresa(supabase, clienteId, workspaceId))) {
+    return { error: "Cliente não encontrado nesta empresa." };
+  }
 
   const { error } = await supabase.from("manutencoes").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: workspaceId,
     projeto_id: parsed.data.projeto_id ?? null,
     data: parsed.data.data,
     responsavel: parsed.data.responsavel ?? null,
@@ -818,12 +881,17 @@ export async function createBackup(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
+  const { supabase, user, workspaceId } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  if (!workspaceId) return SEM_EMPRESA;
+  if (!(await clienteDaEmpresa(supabase, clienteId, workspaceId))) {
+    return { error: "Cliente não encontrado nesta empresa." };
+  }
 
   const { error } = await supabase.from("backups").insert({
     cliente_id: clienteId,
     user_id: user.id,
+    workspace_id: workspaceId,
     projeto_id: parsed.data.projeto_id ?? null,
     data: parsed.data.data,
     tipo: parsed.data.tipo ?? null,

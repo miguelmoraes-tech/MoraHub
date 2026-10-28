@@ -1,8 +1,7 @@
 import { Wallet, TrendingUp, Receipt, Scale, Handshake, ArrowLeftRight, ArrowUpRight, ArrowDownRight, Users2, Megaphone } from "lucide-react";
+import { getDonoIdAtivo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { getRHOverview } from "@/lib/rh/get-overview";
 import { getMarketingOverview } from "@/lib/marketing/get-overview";
 import { StatCard } from "@/components/stat-card";
@@ -38,8 +37,8 @@ type Movimentacao = {
 export default async function DashboardFinanceiroPage() {
   const supabase = await createClient();
   const mesAtual = todayISO().slice(0, 7);
-  const donoId = await getEffectiveDonoId();
-  const workspaceId = donoId ? await getWorkspaceIdPadrao(donoId, "empresarial") : null;
+  const donoId = await getDonoIdAtivo();
+  const workspaceId = donoId ? await getWorkspaceIdAtivo() : null;
 
   const [
     [{ data: comprovantes }, { data: gastos }, { data: propostas }, { data: clientes }],
@@ -50,6 +49,7 @@ export default async function DashboardFinanceiroPage() {
       supabase
         .from("comprovantes")
         .select("id, cliente_id, descricao, valor, data")
+        .eq("workspace_id", workspaceId ?? "")
         .order("data", { ascending: false }),
       supabase
         .from("gastos")

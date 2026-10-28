@@ -9,49 +9,25 @@ import { getModuloRegistro } from "@/lib/modulos/registry";
  * são descartadas: sem código para atendê-las, não têm rota nem menu.
  */
 export const getModulosHabilitados = cache(
-  async (workspaceId: string): Promise<string[]> => {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("workspace_modulos")
-      .select("modulo_chave")
-      .eq("workspace_id", workspaceId)
-      .eq("habilitado", true);
-    return (data ?? []).map((r) => r.modulo_chave).filter((c) => !!getModuloRegistro(c));
-  }
+  async (workspaceId: string): Promise<string[]> =>
+    getModulosDaEmpresa(await createClient(), workspaceId)
 );
 
-export interface EmpresaDoUsuario {
-  /** Empresa própria mais antiga (hoje a "ativa"); null se a conta não tem nenhuma. */
-  workspaceId: string | null;
-  habilitados: string[];
-}
-
 /**
- * Empresa própria do usuário + módulos ligados, numa única consulta (a FK
- * workspace_modulos -> perfis_tipos_ativos permite embutir). Recebe o client
- * como argumento porque o proxy monta o próprio a partir dos cookies da
- * requisição. Falha => sem empresa e sem módulos (nega o acesso, não abre).
+ * A mesma leitura com o client por argumento: o proxy monta o próprio client a
+ * partir dos cookies da requisição. É a ÚNICA consulta de módulos por request.
+ * Falha de leitura = nenhum módulo (nega o acesso, não abre).
  */
-export async function getEmpresaDoUsuario(
+export async function getModulosDaEmpresa(
   supabase: SupabaseClient,
-  userId: string
-): Promise<EmpresaDoUsuario> {
+  workspaceId: string
+): Promise<string[]> {
   const { data } = await supabase
-    .from("perfis_tipos_ativos")
-    .select("id, workspace_modulos(modulo_chave)")
-    .eq("user_id", userId)
-    .eq("tipo", "empresarial")
-    .eq("workspace_modulos.habilitado", true)
-    .order("ativado_em", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  const row = data as { id: string; workspace_modulos: { modulo_chave: string }[] | null } | null;
-  if (!row) return { workspaceId: null, habilitados: [] };
-  return {
-    workspaceId: row.id,
-    habilitados: (row.workspace_modulos ?? [])
-      .map((m) => m.modulo_chave)
-      .filter((c) => !!getModuloRegistro(c)),
-  };
+    .from("workspace_modulos")
+    .select("modulo_chave")
+    .eq("workspace_id", workspaceId)
+    .eq("habilitado", true);
+  return ((data ?? []) as { modulo_chave: string }[])
+    .map((r) => r.modulo_chave)
+    .filter((c) => !!getModuloRegistro(c));
 }

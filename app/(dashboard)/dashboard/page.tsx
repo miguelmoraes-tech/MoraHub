@@ -6,11 +6,17 @@ import { getDashboardHomeOverview } from "@/lib/dashboard-home/get-overview";
 import { DashboardHomeBoard } from "@/components/dashboard-home/dashboard-home-board";
 import { NOVA_EMPRESA } from "@/lib/empresa";
 import { tipoContaDaMetadata } from "@/lib/perfil";
+import { getEmpresaAtiva } from "@/lib/empresa-ativa";
+import { VENDEDOR_HOME } from "@/lib/vendedor-access";
 
-// Home do dono: só atalhos e resumos dos módulos ligados na empresa. O
+// Home do dono: só atalhos e resumos dos módulos ligados na empresa ativa. O
 // Dashboard Executivo completo (getDashboardExecutivoOverview +
 // DashboardExecutivoBoard) segue no repositório, sem uso, para ser religado.
 export default async function DashboardHomePage() {
+  // A interface depende do papel na empresa ativa: vendedor só tem /vendedor/*.
+  const ativa = await getEmpresaAtiva();
+  if (ativa?.papel === "comercial") redirect(VENDEDOR_HOME);
+
   const overview = await getDashboardHomeOverview();
 
   if (!overview.temEmpresa) {
@@ -20,7 +26,7 @@ export default async function DashboardHomePage() {
     } = await supabase.auth.getUser();
 
     // Empreendedor sem empresa (o cadastro não pede o nome): dá nome a ela.
-    if (user && tipoContaDaMetadata(user) === "empresarial") redirect(NOVA_EMPRESA);
+    if (user && !ativa && tipoContaDaMetadata(user) === "empresarial") redirect(NOVA_EMPRESA);
 
     return (
       <div className="mx-auto max-w-5xl px-6 py-8">

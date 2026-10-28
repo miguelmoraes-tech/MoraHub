@@ -1,5 +1,7 @@
 import { ShieldCheck, FileStack, Copyright, Gavel } from "lucide-react";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
+import { getColaboradoresDaEmpresa } from "@/lib/colaboradores";
 import { JuridicoBoard } from "@/components/juridico-board";
 import { ColaboradoresSection } from "@/components/colaboradores-section";
 import { VisaoGeralCards, type VisaoGeralCard } from "@/components/juridico/visao-geral-cards";
@@ -9,7 +11,6 @@ import {
   ProcessosReadonlyList,
 } from "@/components/juridico/juridico-readonly-lists";
 import { getConversasComoDono, getUnreadCountsByConversa } from "@/lib/chat";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { todayISO, diffInDays } from "@/lib/vencimentos/dates";
 import type {
   ColaboradorVinculado,
@@ -26,7 +27,7 @@ export default async function JuridicoPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const workspaceId = user ? await getWorkspaceIdPadrao(user.id, "empresarial") : null;
+  const workspaceId = user ? await getWorkspaceIdAtivo() : null;
 
   const [
     { data: items },
@@ -39,8 +40,12 @@ export default async function JuridicoPage() {
     { count: modelosCount },
   ] = (await Promise.all([
     supabase.from("juridico").select("*").order("prazo", { ascending: true }),
-    supabase.from("convites").select("*").order("created_at", { ascending: false }),
-    supabase.rpc("get_colaboradores_do_dono"),
+    supabase
+      .from("convites")
+      .select("*")
+      .eq("workspace_id", workspaceId ?? "")
+      .order("created_at", { ascending: false }),
+    getColaboradoresDaEmpresa(supabase, workspaceId).then((data) => ({ data })),
     supabase.from("compliance_juridico").select("*"),
     supabase
       .from("propriedade_intelectual")

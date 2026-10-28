@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForMarketing } from "@/lib/marketing";
 import { CalendarioConteudoSchema } from "@/lib/validations/calendario-conteudo";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -35,7 +35,7 @@ export async function createConteudo(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getEffectiveDonoIdForMarketing();
+  const donoId = await getDonoIdAtivo();
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const supabase = await createClient();

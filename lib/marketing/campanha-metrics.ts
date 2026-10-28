@@ -1,5 +1,5 @@
 import type { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import type { CampanhaMetrics } from "@/lib/marketing/campanha-metrics-shared";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -22,7 +22,7 @@ export async function getCampanhaMetricsMap(
   const result = new Map<string, CampanhaMetrics>();
   if (campanhaIds.length === 0) return result;
 
-  const workspaceId = await getWorkspaceIdPadrao(donoId, "empresarial");
+  const workspaceId = await getWorkspaceIdAtivo();
 
   const [{ data: leads }, { data: clientes }] = (await Promise.all([
     supabase
@@ -58,7 +58,7 @@ export async function getCampanhaMetricsMap(
       ? ((await supabase
           .from("comprovantes")
           .select("cliente_id, valor")
-          .eq("user_id", donoId)
+          .eq("workspace_id", workspaceId ?? "")
           .in("cliente_id", todosClienteIds)) as { data: ComprovanteRow[] | null })
       : { data: [] as ComprovanteRow[] };
 

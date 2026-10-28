@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import {
   OrcamentosBoard,
   type OrcamentoComRealizado,
@@ -7,7 +7,7 @@ import {
 import type { Gasto, Orcamento } from "@/lib/types";
 
 export default async function OrcamentosPage() {
-  const donoId = await getEffectiveDonoId();
+  const donoId = await getDonoIdAtivo();
   const supabase = await createClient();
 
   const [{ data: orcamentos }, { data: gastos }] = donoId

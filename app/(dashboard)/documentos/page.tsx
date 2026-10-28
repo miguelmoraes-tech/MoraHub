@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { getClienteArquivoSignedUrls } from "@/lib/supabase/storage";
-import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
 import {
   DocumentosBoard,
   type DocumentoComArquivo,
@@ -9,7 +9,7 @@ import type { Cliente, Documento, ModeloContrato } from "@/lib/types";
 
 export default async function DocumentosPage() {
   const supabase = await createClient();
-  const workspaceId = await getEffectiveWorkspaceIdGeral();
+  const workspaceId = await getWorkspaceIdAtivo();
 
   const [{ data: documentos }, { data: clientes }, { data: modelos }] =
     (await Promise.all([

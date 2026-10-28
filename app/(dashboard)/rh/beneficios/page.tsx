@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForRH } from "@/lib/rh";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { BeneficiosBoard } from "@/components/rh/beneficios-board";
 import type { Beneficio, Funcionario } from "@/lib/types";
 
 export default async function BeneficiosPage() {
-  const donoId = await getEffectiveDonoIdForRH();
+  const donoId = await getDonoIdAtivo();
   const supabase = await createClient();
 
   const [{ data: beneficios }, { data: funcionarios }] = donoId

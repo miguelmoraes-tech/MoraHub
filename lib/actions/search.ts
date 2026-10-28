@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { getModulosHabilitados } from "@/lib/modulos/habilitados";
 import { rotaPermitida } from "@/lib/modulos/registry";
 
@@ -50,7 +50,7 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
   if (termo.length < 2) return vazio();
 
   const supabase = await createClient();
-  const workspaceId = await getEffectiveWorkspaceIdGeral();
+  const workspaceId = await getWorkspaceIdAtivo();
   // Só busca nas tabelas de módulos ligados na empresa.
   const habilitados = workspaceId ? await getModulosHabilitados(workspaceId) : [];
   const comClientes = rotaPermitida("/clientes", habilitados);
@@ -84,6 +84,7 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
       ? supabase
       .from("acessos")
       .select("id, cliente_id, nome_servico, categoria, usuario, url_login")
+      .eq("workspace_id", workspaceId ?? "")
       .or(
         `nome_servico.ilike.${pattern},categoria.ilike.${pattern},usuario.ilike.${pattern},url_login.ilike.${pattern}`
       )
@@ -93,6 +94,7 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
       ? supabase
       .from("infraestrutura")
       .select("id, cliente_id, dominio, hospedagem, tecnologias")
+      .eq("workspace_id", workspaceId ?? "")
       .or(
         `dominio.ilike.${pattern},hospedagem.ilike.${pattern},tecnologias.ilike.${pattern}`
       )
@@ -102,6 +104,7 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
       ? supabase
       .from("projetos")
       .select("id, cliente_id, nome, tecnologias, repositorio_git")
+      .eq("workspace_id", workspaceId ?? "")
       .or(
         `nome.ilike.${pattern},tecnologias.ilike.${pattern},repositorio_git.ilike.${pattern}`
       )
@@ -111,6 +114,7 @@ export async function buscarGlobal(termoBruto: string): Promise<BuscaResposta> {
       ? supabase
       .from("servicos")
       .select("id, cliente_id, nome, categoria")
+      .eq("workspace_id", workspaceId ?? "")
       .or(`nome.ilike.${pattern},categoria.ilike.${pattern}`)
       .limit(ate)
       : nada,

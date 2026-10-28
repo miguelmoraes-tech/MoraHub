@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForFolha } from "@/lib/rh";
 import {
   gerarFolhaDoMes,
   syncContaPagarFromFolha,
@@ -37,7 +37,7 @@ export async function gerarFolhaMes(
     return { error: "Informe um dia de vencimento válido (1 a 28)." };
   }
 
-  const donoId = await getEffectiveDonoIdForFolha();
+  const donoId = await getDonoIdAtivo();
   if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
 
   const supabase = await createClient();
