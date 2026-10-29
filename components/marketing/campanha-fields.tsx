@@ -1,7 +1,14 @@
 import type { Campanha } from "@/lib/types";
 import { CAMPANHA_CANAL_LABEL, CAMPANHA_STATUS_LABEL } from "@/components/marketing/campanha-labels";
 
-export function CampanhaFields({ item }: { item?: Campanha }) {
+export function CampanhaFields({
+  item,
+  semInvestimento = false,
+}: {
+  item?: Campanha;
+  /** Sem o extra "investimento": orçamento e gasto não aparecem (nem são enviados). */
+  semInvestimento?: boolean;
+}) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <div className="col-span-2 space-y-1 sm:col-span-2">
@@ -59,6 +66,8 @@ export function CampanhaFields({ item }: { item?: Campanha }) {
           className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
+      {!semInvestimento && (
+        <>
       <div className="space-y-1">
         <label className="text-xs font-medium text-zinc-400">Orçamento planejado</label>
         <input
@@ -81,6 +90,8 @@ export function CampanhaFields({ item }: { item?: Campanha }) {
           className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
         />
       </div>
+        </>
+      )}
       <div className="space-y-1">
         <label className="text-xs font-medium text-zinc-400">Cliques</label>
         <input

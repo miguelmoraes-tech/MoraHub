@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveWorkspaceIdGeral } from "@/lib/dono-efetivo";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { todayISO, diffInDays, nextOccurrence } from "@/lib/vencimentos/dates";
 import type { VencimentoAlerta } from "@/lib/vencimentos/types";
 
@@ -71,7 +71,7 @@ type LeadFollowupRow = {
 export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
   const supabase = await createClient();
   const hoje = todayISO();
-  const workspaceId = await getEffectiveWorkspaceIdGeral();
+  const workspaceId = await getWorkspaceIdAtivo();
 
   const [
     { data: assinaturas },
@@ -88,34 +88,40 @@ export async function getVencimentoAlertas(): Promise<VencimentoAlerta[]> {
     supabase
       .from("assinaturas")
       .select("id, cliente_id, plano, proxima_cobranca")
+      .eq("workspace_id", workspaceId ?? "")
       .eq("status", "ativa")
       .not("proxima_cobranca", "is", null),
     supabase
       .from("gastos")
       .select("id, nome, data, recorrencia")
+      .eq("workspace_id", workspaceId ?? "")
       .eq("tipo", "fixo")
       .in("recorrencia", ["Mensal", "Anual"]),
     supabase.from("vencimentos").select("id, titulo, data"),
     supabase
       .from("contratos")
       .select("id, cliente_id, descricao, vencimento")
+      .eq("workspace_id", workspaceId ?? "")
       .not("vencimento", "is", null),
     supabase
       .from("juridico")
       .select("id, titulo, prazo")
+      .eq("workspace_id", workspaceId ?? "")
       .eq("status", "pendente")
       .not("prazo", "is", null),
     supabase.from("clientes").select("id, nome").eq("workspace_id", workspaceId ?? ""),
     supabase
       .from("propriedade_intelectual")
       .select("id, cliente_id, nome, data_renovacao")
+      .eq("workspace_id", workspaceId ?? "")
       .not("data_renovacao", "is", null),
     supabase
       .from("ferias")
       .select("id, funcionario_id, periodo_aquisitivo_fim")
+      .eq("workspace_id", workspaceId ?? "")
       .eq("status", "pendente")
       .not("periodo_aquisitivo_fim", "is", null),
-    supabase.from("funcionarios").select("id, nome"),
+    supabase.from("funcionarios").select("id, nome").eq("workspace_id", workspaceId ?? ""),
     supabase
       .from("leads")
       .select("id, nome, status, resultado, proximo_followup")

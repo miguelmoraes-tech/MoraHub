@@ -1,9 +1,8 @@
 import type { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getAcessoFinanceiro } from "@/lib/financeiro/acesso";
 import { buildXlsxResponse, type ExportColumn } from "@/lib/export/xlsx";
 import { computeDre } from "@/lib/dre/compute";
-import { getEffectiveDonoId } from "@/lib/financeiro";
-import { filtrarContasPorPapel, getContasVinculadas } from "@/lib/colaborador";
 import type { Comprovante, Gasto } from "@/lib/types";
 
 type DreRow = { label: string; valor: number };
@@ -13,18 +12,7 @@ const COLUMNS: ExportColumn<DreRow>[] = [
   { header: "Valor", value: (r) => r.valor },
 ];
 
-async function resolveDonoId(donoIdParam: string | null) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  if (!donoIdParam) return getEffectiveDonoId();
-  if (donoIdParam === user.id) return user.id;
-
-  const contas = filtrarContasPorPapel(await getContasVinculadas(), "contador");
-  return contas.some((c) => c.dono_id === donoIdParam) ? donoIdParam : null;
-}
+const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -35,17 +23,26 @@ export async function GET(request: NextRequest) {
 
   const start = request.nextUrl.searchParams.get("start");
   const end = request.nextUrl.searchParams.get("end");
-  if (!start || !end) return new Response("Período inválido.", { status: 400 });
+  if (!start || !end || !DATA_ISO.test(start) || !DATA_ISO.test(end)) {
+    return new Response("Período inválido.", { status: 400 });
+  }
 
-  const donoId = await resolveDonoId(request.nextUrl.searchParams.get("donoId"));
-  if (!donoId) return new Response("Conta inválida.", { status: 403 });
+  // A empresa é a ativa, validada no servidor (nunca vem da URL). A exportação
+  // é só de valores: exige o Financeiro ligado, liberado e o extra "valores".
+  const fin = await getAcessoFinanceiro();
+  if (!fin || !fin.valores) return new Response("Sem permissão.", { status: 403 });
 
   const [{ data: gastos }, { data: comprovantes }] = await Promise.all([
-    supabase.from("gastos").select("*").eq("user_id", donoId).gte("data", start).lte("data", end),
+    supabase
+      .from("gastos")
+      .select("*")
+      .eq("workspace_id", fin.workspaceId)
+      .gte("data", start)
+      .lte("data", end),
     supabase
       .from("comprovantes")
       .select("*")
-      .eq("user_id", donoId)
+      .eq("workspace_id", fin.workspaceId)
       .gte("data", start)
       .lte("data", end),
   ]);

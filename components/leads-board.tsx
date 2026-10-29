@@ -12,6 +12,7 @@ import { ExportButton } from "@/components/export-button";
 import { SegmentFilter } from "@/components/segment-filter";
 import { todayISO } from "@/lib/vencimentos/dates";
 import { isFollowupPendente } from "@/lib/leads";
+import { useRotulos } from "@/components/rotulos-provider";
 
 const PREVIA_OPTIONS = ["Prévia enviada", "Prévia pendente"];
 
@@ -21,6 +22,9 @@ export function LeadsBoard({
   followups = [],
   campanhas = [],
   readOnly = false,
+  somenteLeitura = false,
+  semExportar = false,
+  ocultarContato = false,
 }: {
   leads: Lead[];
   propostas?: Proposta[];
@@ -28,7 +32,14 @@ export function LeadsBoard({
   campanhas?: CampanhaOption[];
   /** Vendedor view: same list, but no create/edit/delete/export/status changes. */
   readOnly?: boolean;
+  /** Sócio/funcionário com permissão de leitura: lista e detalhe, sem criar/editar/excluir. */
+  somenteLeitura?: boolean;
+  /** Só o painel completo exporta (a rota recusa os demais). */
+  semExportar?: boolean;
+  /** Sem o extra "contato": o contato não aparece nem nos formulários. */
+  ocultarContato?: boolean;
 }) {
+  const rotulos = useRotulos();
   const searchParams = useSearchParams();
   const highlightLeadId = searchParams.get("lead");
   const highlightedLead = highlightLeadId
@@ -104,15 +115,21 @@ export function LeadsBoard({
     <div className="mx-auto max-w-6xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-zinc-100">Leads</h1>
+          <h1 className="text-lg font-semibold text-zinc-100">{rotulos.plural("leads")}</h1>
           <p className="text-sm text-zinc-500">
-            {porNicho.length} lead(s) no total
+            {rotulos.texto(
+              "leads",
+              `${porNicho.length} lead(s) no total`,
+              ({ plural }) => `Total de ${plural}: ${porNicho.length}`
+            )}
           </p>
         </div>
         {!readOnly && (
           <div className="flex items-center gap-2">
-            <ExportButton href={exportHref} />
-            <NewLeadDialog campanhas={campanhas} />
+            {!semExportar && <ExportButton href={exportHref} />}
+            {!somenteLeitura && (
+              <NewLeadDialog campanhas={campanhas} ocultarContato={ocultarContato} />
+            )}
           </div>
         )}
       </div>
@@ -210,6 +227,8 @@ export function LeadsBoard({
               followups={followupsPorLead.get(lead.id) ?? []}
               campanhas={campanhas}
               readOnly={readOnly}
+              somenteLeitura={somenteLeitura}
+              ocultarContato={ocultarContato}
               autoOpenDetail={lead.id === highlightLeadId}
             />
           ))}
@@ -218,13 +237,17 @@ export function LeadsBoard({
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-zinc-800 py-20 text-center">
           <Target className="h-8 w-8 text-zinc-700" />
           <p className="text-sm text-zinc-500">
-            {somenteAtrasados
-              ? "Nenhum lead com follow-up atrasado."
-              : tab === "abordar"
-                ? "Nenhum lead para abordar."
-                : tab === "abordado"
-                  ? "Nenhum lead abordado ainda."
-                  : "Nenhum lead convertido ainda."}
+            {rotulos.texto(
+              "leads",
+              somenteAtrasados
+                ? "Nenhum lead com follow-up atrasado."
+                : tab === "abordar"
+                  ? "Nenhum lead para abordar."
+                  : tab === "abordado"
+                    ? "Nenhum lead abordado ainda."
+                    : "Nenhum lead convertido ainda.",
+              ({ plural }) => `Nenhum registro em ${plural} nesta lista.`
+            )}
           </p>
         </div>
       )}

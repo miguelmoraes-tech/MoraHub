@@ -51,7 +51,7 @@ const CANDIDATO_STATUS_VAZIO: Record<CandidatoStatus, number> = {
   contratado: 0,
 };
 
-export async function getRHOverview(donoId: string | null): Promise<RHOverview> {
+export async function getRHOverview(workspaceId: string | null): Promise<RHOverview> {
   const vazio: RHOverview = {
     funcionariosAtivos: 0,
     funcionariosPorDepartamento: [],
@@ -70,7 +70,7 @@ export async function getRHOverview(donoId: string | null): Promise<RHOverview> 
     candidatosEmProcessoCount: 0,
     avaliacoesPendentesCount: 0,
   };
-  if (!donoId) return vazio;
+  if (!workspaceId) return vazio;
 
   const supabase = await createClient();
   const hoje = todayISO();
@@ -88,24 +88,24 @@ export async function getRHOverview(donoId: string | null): Promise<RHOverview> 
     supabase
       .from("funcionarios")
       .select("id, nome, status, departamento_id")
-      .eq("user_id", donoId),
-    supabase.from("departamentos").select("id, nome").eq("user_id", donoId),
+      .eq("workspace_id", workspaceId),
+    supabase.from("departamentos").select("id, nome").eq("workspace_id", workspaceId),
     supabase
       .from("folha_pagamento")
       .select("status, salario_liquido")
-      .eq("user_id", donoId)
+      .eq("workspace_id", workspaceId)
       .eq("mes_referencia", mesAtualInicio),
     supabase
       .from("ferias")
       .select("id, funcionario_id, status, periodo_aquisitivo_fim")
-      .eq("user_id", donoId)
+      .eq("workspace_id", workspaceId)
       .neq("status", "concluida"),
-    supabase.from("vagas").select("status").eq("user_id", donoId),
-    supabase.from("candidatos").select("status").eq("user_id", donoId),
+    supabase.from("vagas").select("status").eq("workspace_id", workspaceId),
+    supabase.from("candidatos").select("status").eq("workspace_id", workspaceId),
     supabase
       .from("avaliacoes_desempenho")
       .select("funcionario_id, periodo_referencia")
-      .eq("user_id", donoId),
+      .eq("workspace_id", workspaceId),
   ])) as [
     { data: FuncionarioRow[] | null },
     { data: DepartamentoRow[] | null },

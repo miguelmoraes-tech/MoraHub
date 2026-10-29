@@ -6,23 +6,29 @@ import { AceitarConviteForm } from "@/components/aceitar-convite-form";
 import { RecusarConviteForm } from "@/components/recusar-convite-form";
 import type { ColaboradorPapel, ConviteStatus } from "@/lib/types";
 
+/** Papéis de convite: os legados de colaborador mais os de equipe da empresa. */
+type ConvitePapel = ColaboradorPapel | "socio" | "cofundador" | "funcionario";
+
 type ConvitePublico = {
   email_convidado: string;
-  papel: ColaboradorPapel;
+  papel: ConvitePapel;
   status: ConviteStatus;
   dono_nome: string | null;
 };
 
-const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
+const PAPEL_LABEL: Record<ConvitePapel, string> = {
   contador: "Contador",
   advogado: "Advogado",
   financeiro: "Financeiro",
   rh: "RH",
   comercial: "Comercial",
   marketing: "Marketing",
+  socio: "Sócio",
+  cofundador: "Cofundador",
+  funcionario: "Funcionário",
 };
 
-const PAPEL_ACESSO_DESCRICAO: Record<ColaboradorPapel, string> = {
+const PAPEL_ACESSO_DESCRICAO: Record<ConvitePapel, string> = {
   contador: "com acesso à aba Jurídico & Contábil",
   advogado: "com acesso à aba Jurídico & Contábil",
   financeiro:
@@ -31,6 +37,9 @@ const PAPEL_ACESSO_DESCRICAO: Record<ColaboradorPapel, string> = {
   comercial:
     "com acesso à lista de leads da empresa (somente leitura), para marcar reuniões e converter leads em clientes",
   marketing: "com acesso ao calendário de conteúdo e às campanhas de marketing da empresa",
+  socio: "com acesso aos módulos da empresa que o fundador liberar para você",
+  cofundador: "com o mesmo nível de acesso do fundador",
+  funcionario: "com acesso aos módulos da empresa que o fundador liberar para você",
 };
 
 export default async function ConvitePage({
@@ -90,13 +99,13 @@ export default async function ConvitePage({
                 </strong>{" "}
                 convidou você para colaborar como{" "}
                 <strong className="text-zinc-100">
-                  {PAPEL_LABEL[convite.papel]}
+                  {PAPEL_LABEL[convite.papel] ?? convite.papel}
                 </strong>{" "}
-                no Mora HUB, {PAPEL_ACESSO_DESCRICAO[convite.papel]}.
+                no Mora HUB, {PAPEL_ACESSO_DESCRICAO[convite.papel] ?? "na empresa"}.
               </p>
 
               {user ? (
-                user.email === convite.email_convidado ? (
+                user.email?.toLowerCase() === convite.email_convidado.toLowerCase() ? (
                   <div className="flex gap-2 pt-2">
                     <AceitarConviteForm token={token} />
                     <RecusarConviteForm

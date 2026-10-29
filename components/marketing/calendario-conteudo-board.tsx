@@ -77,9 +77,11 @@ function NewConteudoForm({ responsaveis }: { responsaveis: Responsavel[] }) {
 function ConteudoRow({
   item,
   responsaveis,
+  somenteLeitura,
 }: {
   item: CalendarioConteudo;
   responsaveis: Responsavel[];
+  somenteLeitura: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const action = updateConteudo.bind(null, item.id);
@@ -145,21 +147,25 @@ function ConteudoRow({
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
         )}
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteConteudo.bind(null, item.id)}>
-          <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </form>
+        {!somenteLeitura && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <form action={deleteConteudo.bind(null, item.id)}>
+              <button
+                type="submit"
+                className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
@@ -168,9 +174,11 @@ function ConteudoRow({
 export function CalendarioConteudoBoard({
   itens,
   responsaveis,
+  somenteLeitura = false,
 }: {
   itens: CalendarioConteudo[];
   responsaveis: Responsavel[];
+  somenteLeitura?: boolean;
 }) {
   const [view, setView] = useState<"lista" | "calendario">("lista");
   const [canal, setCanal] = useState("");
@@ -201,7 +209,7 @@ export function CalendarioConteudoBoard({
           <h1 className="text-lg font-semibold text-zinc-100">Calendário de Conteúdo</h1>
           <p className="text-sm text-zinc-500">{ordenados.length} item(ns)</p>
         </div>
-        <NewConteudoForm responsaveis={responsaveis} />
+        {!somenteLeitura && <NewConteudoForm responsaveis={responsaveis} />}
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -256,7 +264,12 @@ export function CalendarioConteudoBoard({
           {ordenados.length > 0 ? (
             <div className="space-y-2">
               {ordenados.map((item) => (
-                <ConteudoRow key={item.id} item={item} responsaveis={responsaveis} />
+                <ConteudoRow
+                  key={item.id}
+                  item={item}
+                  responsaveis={responsaveis}
+                  somenteLeitura={somenteLeitura}
+                />
               ))}
             </div>
           ) : (
@@ -264,7 +277,11 @@ export function CalendarioConteudoBoard({
           )}
         </div>
       ) : (
-        <ConteudoCalendarioGrid itens={filtrados} responsaveis={responsaveis} />
+        <ConteudoCalendarioGrid
+          itens={filtrados}
+          responsaveis={responsaveis}
+          somenteLeitura={somenteLeitura}
+        />
       )}
     </div>
   );

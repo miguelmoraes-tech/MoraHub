@@ -1,21 +1,27 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getVendedorAcesso, isComercialSemVinculo } from "@/lib/vendedor-access";
+import { getModulosDaEmpresa } from "@/lib/modulos/habilitados";
+import { getModulosPermiteMembrosDoCatalogo } from "@/lib/modulos/catalogo";
+import { lerPermissoesProprias, modulosDasPermissoes } from "@/lib/modulos/permissoes";
 import {
-  ACESSO_VENDEDOR_CODIGO,
-  VENDEDOR_HOME,
-  getVendedorAcesso,
-  isComercialSemVinculo,
-  isRotaDeAcessoVendedor,
-  isRotaDoVendedor,
-} from "@/lib/vendedor-access";
-import { ROTA_PADRAO_DONO, isRotaHabilitada } from "@/lib/modulos-habilitados";
+  EMPRESA_ATIVA_COOKIE,
+  EMPRESA_ATIVA_COOKIE_MAX_AGE,
+  UUID_RE,
+  resolverEmpresaAtiva,
+} from "@/lib/empresas";
+import {
+  ROTAS_DE_ENTRADA,
+  decidirAcesso,
+  isRotaIsenta,
+  precisaDeModulos,
+} from "@/lib/acesso";
 
 // Exact-path routes usable without a session. Also the set a logged-in user
-// gets bounced away from (see the `user && PUBLIC_ROUTES.includes(path)`
-// check below) — that bounce must NOT apply to /convite/*, since an
-// already-authenticated collaborator still needs to land on that page to
-// accept/decline.
-const PUBLIC_ROUTES = ["/login", "/signup"];
+// gets bounced away from (see lib/acesso.ts) — that bounce must NOT apply to
+// /convite/*, since an already-authenticated collaborator still needs to land
+// on that page to accept/decline.
+const PUBLIC_ROUTES = ROTAS_DE_ENTRADA;
 // Path prefixes usable without a session, but that a logged-in user may
 // still need to visit (e.g. accepting an invite while already signed in).
 const PUBLIC_ROUTE_PREFIXES = ["/convite/"];
@@ -30,8 +36,9 @@ function isPublicPath(path: string) {
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  // Redirects must carry the cookies Supabase may have just refreshed,
-  // otherwise the user is bounced with a stale session.
+  // Redirects must carry the cookies Supabase may have just refreshed (and the
+  // empresa-ativa cookie, when regravado), otherwise the user is bounced with a
+  // stale session.
   const redirectTo = (url: URL) => {
     const redirect = NextResponse.redirect(url);
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
@@ -73,50 +80,88 @@ export async function updateSession(request: NextRequest) {
 
   if (!user) return response;
 
-  // A vendedor (active 'comercial' link, no company of their own) may only
-  // use /vendedor/* — blocked here, in the proxy, so a typed URL or a stale
-  // link can't reach another screen. RLS already stops them from writing
-  // leads; this stops them from *reading* the owner-only screens.
-  // A comercial account with no link yet is held even tighter: only the
-  // screens to type the gestor's code and wait for approval.
-  // /convite/* is exempt from both: accepting an invite is how a link starts.
-  // The two access screens are also open to a linked vendedor: the "aguardando"
-  // screen's server action is what notices the approval, and its POST reaches
-  // the proxy after the link already exists — redirecting it here would
-  // swallow the action's own redirect. Those pages send a linked vendedor on.
-  const onPublicRoute = PUBLIC_ROUTES.includes(path);
-  if (onPublicRoute || !isPublicPath(path)) {
-    const acesso = await getVendedorAcesso(supabase, user.id);
-    if (acesso.somenteVendedor) {
-      if (onPublicRoute || !(isRotaDoVendedor(path) || isRotaDeAcessoVendedor(path))) {
-        const url = request.nextUrl.clone();
-        url.pathname = VENDEDOR_HOME;
-        url.search = "";
-        return redirectTo(url);
-      }
-    } else if (await isComercialSemVinculo(supabase, user, acesso)) {
-      if (!isRotaDeAcessoVendedor(path)) {
-        const url = request.nextUrl.clone();
-        url.pathname = ACESSO_VENDEDOR_CODIGO;
-        url.search = "";
-        return redirectTo(url);
-      }
+  // Aceitar convite e a tela "Sem acesso" não dependem da empresa ativa.
+  if (isRotaIsenta(path)) return response;
+
+  // O que o usuário vê depende do PAPEL NA EMPRESA ATIVA (lib/acesso.ts): o
+  // cookie guarda só o workspace_id e é sempre revalidado no banco
+  // (meu_papel_na_empresa). Cookie ausente, forjado ou de vínculo encerrado cai
+  // numa empresa válida e é regravado. Qualquer falha de consulta NEGA.
+  const cookie = request.cookies.get(EMPRESA_ATIVA_COOKIE)?.value;
+  const cookieValido = cookie && UUID_RE.test(cookie) ? cookie : undefined;
+  const lerModulos = precisaDeModulos(path);
+
+  // Papel e módulos do cookie saem em paralelo (uma ida ao banco de latência);
+  // os módulos só valem se o papel confirmado for o de dono daquela empresa.
+  const modulosDoCookie =
+    cookieValido && lerModulos
+      ? getModulosDaEmpresa(supabase, cookieValido).catch(() => [] as string[])
+      : null;
+  const resolucao = await resolverEmpresaAtiva(supabase, cookieValido);
+
+  let habilitados: string[] = [];
+  let permissoes: string[] = [];
+  let permiteMembros: string[] = [];
+  if (resolucao.status === "ok") {
+    if (resolucao.corrigirCookie) {
+      response.cookies.set(EMPRESA_ATIVA_COOKIE, resolucao.workspaceId, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: EMPRESA_ATIVA_COOKIE_MAX_AGE,
+      });
+    }
+    const painel = resolucao.papel === "dono" || resolucao.papel === "cofundador";
+    const restrito = resolucao.papel === "socio" || resolucao.papel === "funcionario";
+    if ((painel || restrito) && lerModulos) {
+      // Sócio/funcionário: módulos da empresa ∩ as próprias permissões ∩ o que o
+      // catálogo deixa para a equipe, lidos em paralelo. Falha em qualquer um =
+      // lista vazia = nega.
+      const [modulos, permitidos, catalogo] = await Promise.all([
+        modulosDoCookie && resolucao.workspaceId === cookieValido
+          ? modulosDoCookie
+          : getModulosDaEmpresa(supabase, resolucao.workspaceId).catch(() => [] as string[]),
+        restrito
+          ? lerPermissoesProprias(supabase, resolucao.workspaceId, user.id)
+          : Promise.resolve([]),
+        restrito ? getModulosPermiteMembrosDoCatalogo(supabase) : Promise.resolve([] as string[]),
+      ]);
+      habilitados = modulos;
+      permissoes = modulosDasPermissoes(permitidos);
+      permiteMembros = catalogo;
     }
   }
 
-  // Módulos desligados (lib/modulos-habilitados.ts) ficam inalcançáveis: o
-  // código continua no repo, mas a rota volta para o início. Quem só é
-  // vendedor já foi mandado para /vendedor/leads acima.
-  if (!onPublicRoute && !isRotaHabilitada(path)) {
-    const url = request.nextUrl.clone();
-    url.pathname = ROTA_PADRAO_DONO;
-    url.search = "";
-    return redirectTo(url);
+  // Funcionário que ainda não entrou em nenhuma empresa nem criou a sua: fica
+  // nas telas do código. Só consulta quando a conta não tem empresa alguma.
+  let funcionarioSemVinculo = false;
+  if (
+    resolucao.status === "sem_empresa" &&
+    user.user_metadata?.tipo_conta_padrao === "comercial"
+  ) {
+    try {
+      const acesso = await getVendedorAcesso(supabase, user.id);
+      funcionarioSemVinculo = await isComercialSemVinculo(supabase, user, acesso);
+    } catch {
+      // Sem conseguir confirmar, o mais restrito: só as telas do código.
+      funcionarioSemVinculo = true;
+    }
   }
 
-  if (onPublicRoute) {
+  const decisao = decidirAcesso({
+    path,
+    resolucao,
+    habilitados,
+    permissoes,
+    permiteMembros,
+    funcionarioSemVinculo,
+  });
+  if (decisao.tipo === "redirecionar") {
     const url = request.nextUrl.clone();
-    url.pathname = "/clientes";
+    const [pathname, search] = decisao.para.split("?");
+    url.pathname = pathname;
+    url.search = search ? `?${search}` : "";
     return redirectTo(url);
   }
 

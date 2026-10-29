@@ -5,15 +5,22 @@ import { VencimentosBanner } from "@/components/vencimentos-banner";
 import { WelcomeBanner } from "@/components/welcome-banner";
 import { PageTransition } from "@/components/page-transition";
 import { getVencimentoAlertas } from "@/lib/vencimentos/get-alerts";
-import { getFinanceiroDonoId } from "@/lib/financeiro";
-import { getRHDonoId } from "@/lib/rh";
-import { getComercialDonoId } from "@/lib/comercial";
-import { getMarketingDonoId } from "@/lib/marketing";
 import { getUnreadTotal } from "@/lib/chat";
 import type { AccountType } from "@/lib/hub-mode";
-import { isRotaHabilitada } from "@/lib/modulos-habilitados";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
+import { CHAT_HABILITADO, VENCIMENTOS_HABILITADO } from "@/lib/modulos/registry";
+import { getModulosHabilitados, getModulosPermiteMembros } from "@/lib/modulos/habilitados";
+import { ehPapelRestrito, temPainelCompleto } from "@/lib/empresas";
+import {
+  lerPermissoesProprias,
+  modulosDasPermissoes,
+  modulosVisiveis,
+} from "@/lib/modulos/permissoes";
+import { getEmpresaAtiva, getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 import { ToastProvider } from "@/components/toast";
+import { RotulosProvider } from "@/components/rotulos-provider";
+import { getConfigEmpresa } from "@/lib/rotulos";
+import { getAprovacoes } from "@/lib/aprovacoes";
+import { AprovacoesProvider } from "@/components/aprovacoes/aprovacoes-provider";
 import {
   SolicitacoesVendedorProvider,
   type SolicitacaoPendente,
@@ -33,31 +40,37 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  // Vencimentos e Chat são módulos desligados (lib/modulos-habilitados.ts):
-  // sem banner, sem contador de não lidas e sem as consultas deles.
-  const vencimentosAtivo = isRotaHabilitada("/calendario");
-  const alertas = vencimentosAtivo ? await getVencimentoAlertas() : [];
-  const financeiroDonoId = await getFinanceiroDonoId();
-  const restritoFinanceiro = !!financeiroDonoId;
-  const rhDonoId = await getRHDonoId();
-  // A person could in principle hold both an active financeiro and an
-  // active rh link (different companies, or even the same one) — Financeiro
-  // wins the restricted-sidebar view in that edge case, same as before RH
-  // existed; nothing about their actual data access depends on this choice.
-  const restritoRH = !!rhDonoId && !restritoFinanceiro;
-  const comercialDonoId = await getComercialDonoId();
-  const restritoComercial = !!comercialDonoId && !restritoFinanceiro && !restritoRH;
-  const marketingDonoId = await getMarketingDonoId();
-  const restritoMarketing =
-    !!marketingDonoId && !restritoFinanceiro && !restritoRH && !restritoComercial;
+  // Empresa ativa (cookie revalidado no banco) e o papel nela: fundador e
+  // cofundador = painel completo; sócio e funcionário = só os módulos da
+  // empresa que as permissões deles liberam. Vendedor tem interface própria
+  // em /vendedor/*.
+  const [ativa, empresas, configEmpresa] = await Promise.all([
+    getEmpresaAtiva(),
+    getEmpresasDoUsuario(),
+    getConfigEmpresa(),
+  ]);
+  const painel = ativa && temPainelCompleto(ativa.papel) ? ativa : null;
+  const restrito = !!ativa && ehPapelRestrito(ativa.papel);
+  let modulosHabilitados: string[] = [];
+  if (painel) {
+    modulosHabilitados = await getModulosHabilitados(painel.workspaceId);
+  } else if (restrito && ativa) {
+    const [habilitados, permissoes, permiteMembros] = await Promise.all([
+      getModulosHabilitados(ativa.workspaceId),
+      lerPermissoesProprias(supabase, ativa.workspaceId, user.id),
+      getModulosPermiteMembros(),
+    ]);
+    modulosHabilitados = modulosVisiveis(
+      habilitados,
+      modulosDasPermissoes(permissoes),
+      permiteMembros
+    );
+  }
 
-  const { data: colaboracao } = await supabase
-    .from("membros")
-    .select("id")
-    .eq("membro_id", user.id)
-    .eq("status", "ativo")
-    .limit(1)
-    .maybeSingle();
+  // Vencimentos e Chat não são módulos do catálogo (lib/modulos/registry.ts):
+  // sem banner, sem contador de não lidas e sem as consultas deles.
+  const alertas = VENCIMENTOS_HABILITADO ? await getVencimentoAlertas() : [];
+  const unreadTotal = CHAT_HABILITADO ? await getUnreadTotal() : 0;
 
   const { data: tiposAtivosRows } = await supabase
     .from("perfis_tipos_ativos")
@@ -65,90 +78,47 @@ export default async function DashboardLayout({
     .eq("user_id", user.id);
   const tiposAtivos = (tiposAtivosRows ?? []).map((r) => r.tipo as AccountType);
 
-  let chatHref = "/juridico";
-  if (restritoFinanceiro && financeiroDonoId) {
-    const { data: conversaFinanceiro } = await supabase
-      .from("conversas")
-      .select("id")
-      .eq("dono_id", financeiroDonoId)
-      .eq("membro_id", user.id)
-      .eq("papel", "financeiro")
-      .maybeSingle();
-    if (conversaFinanceiro) chatHref = `/chat/${conversaFinanceiro.id}`;
-  } else if (restritoRH && rhDonoId) {
-    const { data: conversaRH } = await supabase
-      .from("conversas")
-      .select("id")
-      .eq("dono_id", rhDonoId)
-      .eq("membro_id", user.id)
-      .eq("papel", "rh")
-      .maybeSingle();
-    if (conversaRH) chatHref = `/chat/${conversaRH.id}`;
-  } else if (restritoComercial && comercialDonoId) {
-    const { data: conversaComercial } = await supabase
-      .from("conversas")
-      .select("id")
-      .eq("dono_id", comercialDonoId)
-      .eq("membro_id", user.id)
-      .eq("papel", "comercial")
-      .maybeSingle();
-    if (conversaComercial) chatHref = `/chat/${conversaComercial.id}`;
-  } else if (restritoMarketing && marketingDonoId) {
-    const { data: conversaMarketing } = await supabase
-      .from("conversas")
-      .select("id")
-      .eq("dono_id", marketingDonoId)
-      .eq("membro_id", user.id)
-      .eq("papel", "marketing")
-      .maybeSingle();
-    if (conversaMarketing) chatHref = `/chat/${conversaMarketing.id}`;
-  }
-  const unreadTotal = isRotaHabilitada("/chat") ? await getUnreadTotal() : 0;
-
-  // Pedidos de acesso de vendedor: só o dono do workspace empresarial os vê
-  // (RLS) — quem está numa visão restrita de colaborador não tem sino.
-  const donoEmpresarial =
-    tiposAtivos.includes("empresarial") &&
-    !restritoFinanceiro &&
-    !restritoRH &&
-    !restritoComercial &&
-    !restritoMarketing;
-  const workspaceEmpresarialId = donoEmpresarial
-    ? await getWorkspaceIdPadrao(user.id, "empresarial")
-    : null;
+  // Pedidos de acesso (vendedor ou setor): só o painel completo da empresa
+  // ativa os vê (RLS). Os de setor chegam com o id do setor, cujo nome vem de
+  // perfis_acesso (select do dono/cofundador).
+  const workspacePedidosId = painel ? painel.workspaceId : null;
   let solicitacoesPendentes: SolicitacaoPendente[] = [];
-  if (workspaceEmpresarialId) {
-    const { data } = await supabase
-      .from("solicitacoes_vendedor")
-      .select("id, email, created_at")
-      .eq("workspace_id", workspaceEmpresarialId)
-      .eq("status", "pendente")
-      .order("created_at", { ascending: true });
+  let setoresNomes: Record<string, string> = {};
+  if (workspacePedidosId) {
+    const [{ data }, { data: setores }] = await Promise.all([
+      supabase
+        .from("solicitacoes_vendedor")
+        .select("id, email, created_at, perfil_acesso_id")
+        .eq("workspace_id", workspacePedidosId)
+        .eq("status", "pendente")
+        .order("created_at", { ascending: true }),
+      supabase.from("perfis_acesso").select("id, nome").eq("workspace_id", workspacePedidosId),
+    ]);
     solicitacoesPendentes = (data ?? []) as SolicitacaoPendente[];
+    setoresNomes = Object.fromEntries(
+      ((setores ?? []) as { id: string; nome: string }[]).map((s) => [s.id, s.nome])
+    );
   }
+
+  // Aprovações entre fundadores: só o painel completo lê (a tabela é de fundadores).
+  const aprovacoesIniciais = workspacePedidosId ? await getAprovacoes(workspacePedidosId) : [];
 
   const conteudo = (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
         userEmail={user.email ?? ""}
         userId={user.id}
-        temColaboracoes={
-          !!colaboracao &&
-          !restritoFinanceiro &&
-          !restritoRH &&
-          !restritoComercial &&
-          !restritoMarketing
-        }
         tiposAtivos={tiposAtivos}
-        restritoFinanceiro={restritoFinanceiro}
-        restritoRH={restritoRH}
-        restritoComercial={restritoComercial}
-        restritoMarketing={restritoMarketing}
-        chatHref={chatHref}
+        chatHref="/juridico"
         unreadTotal={unreadTotal}
+        modulosHabilitados={modulosHabilitados}
+        painelCompleto={!!painel}
+        restrito={restrito}
+        empresas={empresas}
+        empresaAtivaId={ativa?.workspaceId ?? null}
       />
       <main className="flex flex-1 flex-col overflow-y-auto">
-        {vencimentosAtivo && <VencimentosBanner alertas={alertas} />}
+        {VENCIMENTOS_HABILITADO && <VencimentosBanner alertas={alertas} />}
         <WelcomeBanner />
         <PageTransition>{children}</PageTransition>
       </main>
@@ -157,16 +127,21 @@ export default async function DashboardLayout({
 
   return (
     <ToastProvider>
-      {workspaceEmpresarialId ? (
-        <SolicitacoesVendedorProvider
-          workspaceId={workspaceEmpresarialId}
-          initialPendentes={solicitacoesPendentes}
-        >
-          {conteudo}
-        </SolicitacoesVendedorProvider>
+      <RotulosProvider mapa={configEmpresa.mapa}>
+      {workspacePedidosId ? (
+        <AprovacoesProvider workspaceId={workspacePedidosId} inicial={aprovacoesIniciais}>
+          <SolicitacoesVendedorProvider
+            workspaceId={workspacePedidosId}
+            initialPendentes={solicitacoesPendentes}
+            initialSetores={setoresNomes}
+          >
+            {conteudo}
+          </SolicitacoesVendedorProvider>
+        </AprovacoesProvider>
       ) : (
         conteudo
       )}
+      </RotulosProvider>
     </ToastProvider>
   );
 }

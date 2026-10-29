@@ -1,15 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForComercial, getEffectiveWorkspaceIdForComercial } from "@/lib/comercial";
+import { getAcessoModulo, temExtra } from "@/lib/empresa-ativa";
 import { LeadsBoard } from "@/components/leads-board";
 import { todayISO, subtractDaysISO } from "@/lib/vencimentos/dates";
 import type { Lead, Proposta, FollowupLead, Campanha } from "@/lib/types";
 
 export default async function LeadsPage() {
   const supabase = await createClient();
-  const [donoId, workspaceId] = await Promise.all([
-    getEffectiveDonoIdForComercial(),
-    getEffectiveWorkspaceIdForComercial(),
-  ]);
+  // Fundador/cofundador: tudo. Sócio/funcionário: o que a permissão de leads libera.
+  const acesso = await getAcessoModulo("leads");
+  const workspaceId = acesso?.workspaceId ?? null;
+  const ocultarContato = !acesso || !temExtra(acesso, "contato");
+  // O seletor de campanha dos leads só existe para quem tem o módulo Marketing
+  // (ligado na empresa e liberado para a pessoa); sem ele, a lista vem vazia.
+  const acessoMarketing = await getAcessoModulo("marketing");
   const noventaDiasAtras = subtractDaysISO(todayISO(), 90);
 
   const [{ data: leads }, { data: propostas }, { data: followups }, { data: campanhas }] =
@@ -29,15 +32,15 @@ export default async function LeadsPage() {
         .select("*")
         .eq("workspace_id", workspaceId ?? "")
         .order("data_contato", { ascending: false }),
-      // Campanhas ativas/recentes — só resolve para dono ou colaborador de
-      // marketing vinculado (RLS "dono ou marketing vinculado"); um
-      // colaborador comercial vê a lista vazia, o que é esperado.
-      supabase
-        .from("campanhas")
-        .select("id, nome, status, canal")
-        .eq("user_id", donoId ?? "")
-        .or(`status.eq.ativa,created_at.gte.${noventaDiasAtras}`)
-        .order("created_at", { ascending: false }),
+      // Campanhas ativas/recentes: só com acesso ao módulo Marketing.
+      acessoMarketing
+        ? supabase
+            .from("campanhas")
+            .select("id, nome, status, canal")
+            .eq("workspace_id", acessoMarketing.workspaceId)
+            .or(`status.eq.ativa,created_at.gte.${noventaDiasAtras}`)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [] }),
     ])) as [
       { data: Lead[] | null },
       { data: Proposta[] | null },
@@ -47,10 +50,14 @@ export default async function LeadsPage() {
 
   return (
     <LeadsBoard
-      leads={leads ?? []}
+      // Sem o extra "contato" o valor nem vai para a tela (só interface; não é barreira).
+      leads={(leads ?? []).map((l) => (ocultarContato ? { ...l, contato: null } : l))}
       propostas={propostas ?? []}
       followups={followups ?? []}
       campanhas={campanhas ?? []}
+      somenteLeitura={acesso?.nivel !== "edicao"}
+      semExportar={!acesso?.ehDono}
+      ocultarContato={ocultarContato}
     />
   );
 }

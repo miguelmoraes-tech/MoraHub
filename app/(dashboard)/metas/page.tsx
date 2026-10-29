@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdGeral } from "@/lib/dono-efetivo";
+import { getDonoIdAtivo } from "@/lib/empresa-ativa";
 import { getColaboradoresParaResponsavel } from "@/lib/tickets";
 import { MetasBoard } from "@/components/metas/metas-board";
 import type { MetaOkr } from "@/lib/types";
 
 export default async function MetasPage() {
-  const donoId = await getEffectiveDonoIdGeral();
+  const donoId = await getDonoIdAtivo();
   const supabase = await createClient();
 
   const [{ data: itens }, responsaveis] = donoId

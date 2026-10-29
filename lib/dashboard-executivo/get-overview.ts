@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
+import { getAcessoModulo, getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { todayISO, diffInDays, recurringMonthKeysInWindow, subtractDaysISO } from "@/lib/vencimentos/dates";
 import { getRHOverview, type RHOverview } from "@/lib/rh/get-overview";
 import { getMarketingOverview, type MarketingOverview } from "@/lib/marketing/get-overview";
@@ -66,7 +66,7 @@ export async function getDashboardExecutivoOverview(
   const [anoAtual, mesNum] = mesAtual.split("-").map(Number);
   const proximoMesKey =
     mesNum === 12 ? `${anoAtual + 1}-01` : `${anoAtual}-${String(mesNum + 1).padStart(2, "0")}`;
-  const workspaceId = donoId ? await getWorkspaceIdPadrao(donoId, "empresarial") : null;
+  const workspaceId = donoId ? await getWorkspaceIdAtivo() : null;
 
   if (!donoId) {
     const [rh, marketing, metas] = await Promise.all([
@@ -116,31 +116,43 @@ export async function getDashboardExecutivoOverview(
     { tickets: ticketsSuporte },
   ] = await Promise.all([
     Promise.all([
-      supabase.from("comprovantes").select("valor").eq("user_id", donoId),
-      supabase.from("gastos").select("valor, recorrencia, data, tipo").eq("user_id", donoId),
-      supabase.from("contas_pagar").select("valor, data_vencimento, status").eq("user_id", donoId),
+      supabase.from("comprovantes").select("valor").eq("workspace_id", workspaceId ?? ""),
+      supabase
+        .from("gastos")
+        .select("valor, recorrencia, data, tipo")
+        .eq("workspace_id", workspaceId ?? ""),
+      supabase
+        .from("contas_pagar")
+        .select("valor, data_vencimento, status")
+        .eq("workspace_id", workspaceId ?? ""),
       supabase
         .from("contas_receber")
         .select("valor, data_vencimento, status")
-        .eq("user_id", donoId),
+        .eq("workspace_id", workspaceId ?? ""),
       supabase
         .from("assinaturas")
         .select("valor, recorrencia, proxima_cobranca, status")
-        .eq("user_id", donoId)
+        .eq("workspace_id", workspaceId ?? "")
         .eq("status", "ativa"),
       supabase.from("leads").select("status").eq("workspace_id", workspaceId ?? ""),
-      supabase.from("compliance_juridico").select("status").eq("user_id", donoId),
-      supabase.from("processos").select("fase, proximo_prazo").eq("user_id", donoId),
+      supabase
+        .from("compliance_juridico")
+        .select("status")
+        .eq("workspace_id", workspaceId ?? ""),
+      supabase
+        .from("processos")
+        .select("fase, proximo_prazo")
+        .eq("workspace_id", workspaceId ?? ""),
       supabase
         .from("fechamentos_mensais")
         .select("status")
         .eq("user_id", donoId)
         .eq("mes_referencia", mesAtualInicio),
-      supabase.from("projetos").select("status").eq("user_id", donoId),
+      supabase.from("projetos").select("status").eq("workspace_id", workspaceId ?? ""),
       supabase
         .from("manutencoes")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", donoId)
+        .eq("workspace_id", workspaceId ?? "")
         .gte("data", subtractDaysISO(hoje, JANELA_MANUTENCOES_DIAS)),
     ]) as unknown as Promise<
       [
@@ -157,8 +169,8 @@ export async function getDashboardExecutivoOverview(
         { count: number | null },
       ]
     >,
-    getRHOverview(donoId),
-    getMarketingOverview(donoId),
+    getRHOverview(workspaceId),
+    getMarketingOverview(await getAcessoModulo("marketing")),
     getMetasOverview(donoId),
     getMetaResumoPorSetor(donoId, "comercial"),
     getSuporteData([donoId]),

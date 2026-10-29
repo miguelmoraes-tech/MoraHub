@@ -7,8 +7,20 @@ import { ClienteCard } from "@/components/cliente-card";
 import { NewClienteDialog } from "@/components/new-cliente-dialog";
 import { ExportButton } from "@/components/export-button";
 import { SegmentFilter } from "@/components/segment-filter";
+import { useRotulos } from "@/components/rotulos-provider";
 
-export function ClientesBoard({ clientes }: { clientes: Cliente[] }) {
+export function ClientesBoard({
+  clientes,
+  somenteLeitura = false,
+  listaApenas = false,
+}: {
+  clientes: Cliente[];
+  /** Sócio/funcionário com leitura: sem criar. */
+  somenteLeitura?: boolean;
+  /** Sócio/funcionário: só a lista (sem detalhe do cliente nem exportação). */
+  listaApenas?: boolean;
+}) {
+  const rotulos = useRotulos();
   const [segmento, setSegmento] = useState("");
 
   const segmentos = useMemo(
@@ -31,14 +43,18 @@ export function ClientesBoard({ clientes }: { clientes: Cliente[] }) {
     <div className="mx-auto max-w-6xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-zinc-100">Clientes</h1>
+          <h1 className="text-lg font-semibold text-zinc-100">{rotulos.plural("clientes")}</h1>
           <p className="text-sm text-zinc-500">
-            {filtrados.length} cliente(s) na carteira
+            {rotulos.texto(
+              "clientes",
+              `${filtrados.length} cliente(s) na carteira`,
+              ({ plural }) => `Total de ${plural}: ${filtrados.length}`
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButton href={exportHref} />
-          <NewClienteDialog />
+          {!listaApenas && <ExportButton href={exportHref} />}
+          {!somenteLeitura && <NewClienteDialog />}
         </div>
       </div>
 
@@ -56,16 +72,21 @@ export function ClientesBoard({ clientes }: { clientes: Cliente[] }) {
       {filtrados.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtrados.map((cliente) => (
-            <ClienteCard key={cliente.id} cliente={cliente} />
+            <ClienteCard key={cliente.id} cliente={cliente} semDetalhe={listaApenas} />
           ))}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-zinc-800 py-20 text-center">
           <Users className="h-8 w-8 text-zinc-700" />
           <p className="text-sm text-zinc-500">
-            {segmento
-              ? "Nenhum cliente neste segmento."
-              : "Nenhum cliente cadastrado ainda."}
+            {rotulos.texto(
+              "clientes",
+              segmento ? "Nenhum cliente neste segmento." : "Nenhum cliente cadastrado ainda.",
+              ({ plural }) =>
+                segmento
+                  ? `Nenhum registro em ${plural} neste segmento.`
+                  : `Nenhum cadastro em ${plural} ainda.`
+            )}
           </p>
         </div>
       )}

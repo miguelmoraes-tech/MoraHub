@@ -202,10 +202,16 @@ function GastoRow({
   gasto,
   clientes,
   projetos,
+  somenteLeitura,
+  semValores,
+  auxiliarIndisponivel,
 }: {
   gasto: Gasto;
   clientes: Cliente[];
   projetos: Projeto[];
+  somenteLeitura: boolean;
+  semValores: boolean;
+  auxiliarIndisponivel: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const action = updateGasto.bind(null, gasto.id);
@@ -260,27 +266,30 @@ function GastoRow({
       <div className="min-w-0">
         <p className="truncate text-sm text-zinc-200">{gasto.nome}</p>
         <p className="text-xs text-zinc-500">
-          {formatCurrency(gasto.valor)} · {formatDate(gasto.data)}
+          {semValores ? "—" : formatCurrency(gasto.valor)} · {formatDate(gasto.data)}
           {detalhes && ` · ${detalhes}`}
+          {auxiliarIndisponivel && (gasto.cliente_id || gasto.projeto_id) && " · cliente/projeto: —"}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteGasto.bind(null, gasto.id)}>
+      {!somenteLeitura && (
+        <div className="flex shrink-0 items-center gap-1">
           <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+            type="button"
+            onClick={() => setEditing(true)}
+            className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Pencil className="h-3.5 w-3.5" />
           </button>
-        </form>
-      </div>
+          <form action={deleteGasto.bind(null, gasto.id)}>
+            <button
+              type="submit"
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
@@ -289,10 +298,17 @@ export function GastosSection({
   gastos,
   clientes,
   projetos,
+  somenteLeitura = false,
+  semValores = false,
+  auxiliarIndisponivel = false,
 }: {
   gastos: Gasto[];
   clientes: Cliente[];
   projetos: Projeto[];
+  somenteLeitura?: boolean;
+  semValores?: boolean;
+  /** Sem permissão em Clientes: cliente/projeto aparecem como "—". */
+  auxiliarIndisponivel?: boolean;
 }) {
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
@@ -303,7 +319,7 @@ export function GastosSection({
             {gastos.length} gasto(s) registrado(s)
           </p>
         </div>
-        <NewGastoForm clientes={clientes} projetos={projetos} />
+        {!somenteLeitura && <NewGastoForm clientes={clientes} projetos={projetos} />}
       </div>
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
@@ -320,6 +336,9 @@ export function GastosSection({
                 gasto={gasto}
                 clientes={clientes}
                 projetos={projetos}
+                somenteLeitura={somenteLeitura}
+                semValores={semValores}
+                auxiliarIndisponivel={auxiliarIndisponivel}
               />
             ))}
           </div>

@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Bell, Volume2, VolumeX } from "lucide-react";
-import { responderSolicitacaoVendedor } from "@/lib/actions/vendedor-codigo";
+import { responderSolicitacaoAcesso } from "@/lib/actions/vendedor-codigo";
 import { formatDate } from "@/lib/format";
 import { useToast } from "@/components/toast";
+import Link from "next/link";
 import { useSolicitacoes } from "@/components/vendedor/solicitacoes-provider";
+import { useAprovacoes } from "@/components/aprovacoes/aprovacoes-provider";
 
 /**
  * Bell with the pending vendedor access requests (dono). Hidden when there is
@@ -14,6 +16,7 @@ import { useSolicitacoes } from "@/components/vendedor/solicitacoes-provider";
  */
 export function SolicitacoesBell() {
   const solicitacoes = useSolicitacoes();
+  const aprovacoes = useAprovacoes();
   const toast = useToast();
   const [aberto, setAberto] = useState(false);
   const [respondendoId, setRespondendoId] = useState<string | null>(null);
@@ -37,20 +40,27 @@ export function SolicitacoesBell() {
   }, [aberto]);
 
   if (!solicitacoes) return null;
-  const { pendentes, remover, somAtivo, setSomAtivo } = solicitacoes;
-  const total = pendentes.length;
+  const { pendentes, setores, remover, somAtivo, setSomAtivo } = solicitacoes;
+  // Pedidos de acesso + aprovações entre fundadores esperando o MEU voto.
+  const aprovacoesMinhas = aprovacoes?.minhas ?? 0;
+  const total = pendentes.length + aprovacoesMinhas;
 
   function responder(id: string, aprovar: boolean) {
     setRespondendoId(id);
     startResponder(async () => {
-      const resultado = await responderSolicitacaoVendedor(id, aprovar);
+      const resultado = await responderSolicitacaoAcesso(id, aprovar);
       setRespondendoId(null);
       if ("error" in resultado) {
         toast.error(resultado.error);
         return;
       }
+      // Pendente (2+ fundadores): nada mudou ainda, então o pedido segue na lista.
+      if (resultado.pendente) {
+        toast.aprovacao();
+        return;
+      }
       remover(id);
-      toast.success(aprovar ? "Vendedor aprovado." : "Solicitação recusada.");
+      toast.success(aprovar ? "Acesso aprovado." : "Solicitação recusada.");
     });
   }
 
@@ -61,7 +71,7 @@ export function SolicitacoesBell() {
         onClick={() => setAberto((v) => !v)}
         aria-label={
           total > 0
-            ? `Notificações: ${total} pedido${total > 1 ? "s" : ""} de acesso pendente${total > 1 ? "s" : ""}`
+            ? `Notificações: ${total} pendência${total > 1 ? "s" : ""}`
             : "Notificações"
         }
         aria-expanded={aberto}
@@ -78,7 +88,7 @@ export function SolicitacoesBell() {
       {aberto && (
         <div
           role="dialog"
-          aria-label="Pedidos de acesso de vendedores"
+          aria-label="Pedidos de acesso"
           className="absolute left-3 top-full z-50 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-zinc-800 bg-zinc-950 shadow-xl shadow-black/40"
         >
           <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
@@ -102,7 +112,19 @@ export function SolicitacoesBell() {
           </div>
 
           <div className="max-h-80 space-y-2 overflow-y-auto p-3">
-            {total === 0 ? (
+            {aprovacoesMinhas > 0 && (
+              <Link
+                href="/aprovacoes"
+                onClick={() => setAberto(false)}
+                className="block rounded-lg border border-copper-600/40 bg-copper-600/10 px-3 py-2.5 text-sm text-copper-200 hover:bg-copper-600/20"
+              >
+                {aprovacoesMinhas === 1
+                  ? "1 aprovação esperando seu voto"
+                  : `${aprovacoesMinhas} aprovações esperando seu voto`}
+                <span className="ml-1 text-xs text-copper-300">Ver →</span>
+              </Link>
+            )}
+            {pendentes.length === 0 && aprovacoesMinhas === 0 ? (
               <p className="px-1 py-3 text-center text-xs text-zinc-600">
                 Nenhum pedido pendente.
               </p>
@@ -116,7 +138,8 @@ export function SolicitacoesBell() {
                     {s.email ?? "Sem e-mail"}
                   </p>
                   <p className="text-xs text-zinc-500">
-                    Pediu acesso em {formatDate(s.created_at.slice(0, 10))}
+                    {s.perfil_acesso_id ? (setores[s.perfil_acesso_id] ?? "Setor") : "Vendedor"}
+                    {" · "}pediu acesso em {formatDate(s.created_at.slice(0, 10))}
                   </p>
                   <div className="mt-2 flex items-center gap-2">
                     <button

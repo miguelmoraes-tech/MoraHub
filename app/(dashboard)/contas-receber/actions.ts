@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getAcessoFinanceiroEdicao } from "@/lib/financeiro/acesso";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
 import { ContaReceberSchema } from "@/lib/validations/conta-receber";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
@@ -34,12 +36,13 @@ export async function createContaReceber(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getEffectiveDonoId();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
   const { error } = await supabase.from("contas_receber").insert({
-    user_id: donoId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     cliente_id: parsed.data.cliente_id ?? null,
     proposta_id: parsed.data.proposta_id ?? null,
     descricao: parsed.data.descricao,
@@ -65,6 +68,9 @@ export async function updateContaReceber(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("contas_receber")
@@ -78,7 +84,8 @@ export async function updateContaReceber(
       status: parsed.data.status,
       observacoes: parsed.data.observacoes ?? null,
     })
-    .eq("id", contaId);
+    .eq("id", contaId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar a conta." };
 
   revalidatePath("/contas-receber");
@@ -86,7 +93,14 @@ export async function updateContaReceber(
 }
 
 export async function deleteContaReceber(contaId: string) {
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return;
+
   const supabase = await createClient();
-  await supabase.from("contas_receber").delete().eq("id", contaId);
+  await supabase
+    .from("contas_receber")
+    .delete()
+    .eq("id", contaId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidatePath("/contas-receber");
 }

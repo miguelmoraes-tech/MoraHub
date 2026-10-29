@@ -166,7 +166,17 @@ function NewForm() {
   );
 }
 
-function Row({ item, hoje }: { item: ContaPagar; hoje: string }) {
+function Row({
+  item,
+  hoje,
+  somenteLeitura,
+  semValores,
+}: {
+  item: ContaPagar;
+  hoje: string;
+  somenteLeitura: boolean;
+  semValores: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const action = updateContaPagar.bind(null, item.id);
   const [state, formAction, pending] = useActionState(action, undefined);
@@ -226,35 +236,45 @@ function Row({ item, hoje }: { item: ContaPagar; hoje: string }) {
           </StatusChip>
         </p>
         <p className="text-xs text-zinc-500">
-          {formatCurrency(item.valor)} · vencimento {formatDate(item.data_vencimento)}
+          {semValores ? "—" : formatCurrency(item.valor)} · vencimento {formatDate(item.data_vencimento)}
           {atrasado && " (atrasado)"}
           {proximo && " (em breve)"}
           {item.fornecedor && ` · ${item.fornecedor}`}
           {item.categoria && ` · ${item.categoria}`}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteContaPagar.bind(null, item.id)}>
+      {!somenteLeitura && (
+        <div className="flex shrink-0 items-center gap-1">
           <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+            type="button"
+            onClick={() => setEditing(true)}
+            className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Pencil className="h-3.5 w-3.5" />
           </button>
-        </form>
-      </div>
+          <form action={deleteContaPagar.bind(null, item.id)}>
+            <button
+              type="submit"
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
 
-export function ContasPagarBoard({ contas }: { contas: ContaPagar[] }) {
+export function ContasPagarBoard({
+  contas,
+  somenteLeitura = false,
+  semValores = false,
+}: {
+  contas: ContaPagar[];
+  somenteLeitura?: boolean;
+  semValores?: boolean;
+}) {
   const hoje = todayISO();
   const ordenadas = [...contas].sort((a, b) =>
     a.data_vencimento.localeCompare(b.data_vencimento)
@@ -269,10 +289,11 @@ export function ContasPagarBoard({ contas }: { contas: ContaPagar[] }) {
         <div>
           <h1 className="text-lg font-semibold text-zinc-100">Contas a Pagar</h1>
           <p className="text-sm text-zinc-500">
-            {ordenadas.length} conta(s) · {formatCurrency(total)} em aberto
+            {ordenadas.length} conta(s)
+            {semValores ? "" : ` · ${formatCurrency(total)} em aberto`}
           </p>
         </div>
-        <NewForm />
+        {!somenteLeitura && <NewForm />}
       </div>
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
@@ -284,7 +305,13 @@ export function ContasPagarBoard({ contas }: { contas: ContaPagar[] }) {
         {ordenadas.length > 0 ? (
           <div className="space-y-2">
             {ordenadas.map((item) => (
-              <Row key={item.id} item={item} hoje={hoje} />
+              <Row
+                key={item.id}
+                item={item}
+                hoje={hoje}
+                somenteLeitura={somenteLeitura}
+                semValores={semValores}
+              />
             ))}
           </div>
         ) : (

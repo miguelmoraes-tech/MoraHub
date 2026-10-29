@@ -1,15 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getAcessoEdicao, getEmpresaPainel } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { PropostaSchema } from "@/lib/validations/proposta";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import type { ActionState } from "@/lib/actions/types";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
   const str = value.toString().trim();
   return str === "" ? null : str;
+}
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
+
+/**
+ * Proposta de lead: quem edita leads. Proposta de cliente vive no detalhe do
+ * cliente, que é só do painel completo (fundador/cofundador).
+ */
+async function podeEditarProposta(clienteId: string | null) {
+  if (clienteId) return await getEmpresaPainel();
+  return await getAcessoEdicao("leads");
 }
 
 async function requireUser() {
@@ -51,11 +62,12 @@ export async function createProposta(
 
   const { supabase, user } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
-  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
+  const acesso = await podeEditarProposta(clienteId);
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const { error } = await supabase.from("propostas").insert({
     user_id: user.id,
-    workspace_id: workspaceId,
+    workspace_id: acesso.workspaceId,
     lead_id: leadId,
     cliente_id: clienteId,
     titulo: parsed.data.titulo,
@@ -86,6 +98,7 @@ export async function updateProposta(
   }
 
   const { supabase } = await requireUser();
+  if (!(await podeEditarProposta(clienteId))) return { error: SEM_PERMISSAO };
   const { error } = await supabase
     .from("propostas")
     .update({
@@ -111,6 +124,7 @@ export async function deleteProposta(
   clienteId: string | null
 ) {
   const { supabase } = await requireUser();
+  if (!(await podeEditarProposta(clienteId))) return;
   await supabase.from("propostas").delete().eq("id", propostaId);
   revalidateParent(leadId, clienteId);
 }

@@ -1,23 +1,25 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForRH } from "@/lib/rh";
+import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { PontoBoard } from "@/components/rh/ponto-board";
 import type { ControlePonto, Funcionario } from "@/lib/types";
 
 export default async function PontoPage() {
-  const donoId = await getEffectiveDonoIdForRH();
+  // RH por pessoa: fundador/cofundador ou quem tem permissão de leitura (o proxy já barra o resto).
+  const acesso = await getAcessoModulo("rh");
+  const workspaceId = acesso?.workspaceId ?? null;
   const supabase = await createClient();
 
-  const [{ data: registros }, { data: funcionarios }] = donoId
+  const [{ data: registros }, { data: funcionarios }] = workspaceId
     ? ((await Promise.all([
         supabase
           .from("controle_ponto")
           .select("*")
-          .eq("user_id", donoId)
+          .eq("workspace_id", workspaceId)
           .order("data", { ascending: true }),
         supabase
           .from("funcionarios")
           .select("*")
-          .eq("user_id", donoId)
+          .eq("workspace_id", workspaceId)
           .eq("status", "ativo")
           .order("nome", { ascending: true }),
       ])) as [{ data: ControlePonto[] | null }, { data: Funcionario[] | null }])

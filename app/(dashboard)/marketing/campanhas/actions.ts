@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getAcessoEdicao, temExtra } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForMarketing } from "@/lib/marketing";
 import { CampanhaSchema } from "@/lib/validations/campanha";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
@@ -36,19 +38,22 @@ export async function createCampanha(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const donoId = await getEffectiveDonoIdForMarketing();
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  const acesso = await getAcessoEdicao("marketing");
+  if (!acesso) return { error: SEM_PERMISSAO };
+  // Sem o extra "investimento" a pessoa não informa orçamento nem gasto.
+  const comInvestimento = temExtra(acesso, "investimento");
 
   const supabase = await createClient();
   const { error } = await supabase.from("campanhas").insert({
-    user_id: donoId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     nome: parsed.data.nome,
     canal: parsed.data.canal,
     status: parsed.data.status,
     data_inicio: parsed.data.data_inicio ?? null,
     data_fim: parsed.data.data_fim ?? null,
-    orcamento_planejado: parsed.data.orcamento_planejado ?? null,
-    valor_gasto: parsed.data.valor_gasto ?? 0,
+    orcamento_planejado: comInvestimento ? (parsed.data.orcamento_planejado ?? null) : null,
+    valor_gasto: comInvestimento ? (parsed.data.valor_gasto ?? 0) : 0,
     cliques: parsed.data.cliques ?? 0,
     impressoes: parsed.data.impressoes ?? 0,
     observacoes: parsed.data.observacoes ?? null,
@@ -70,6 +75,17 @@ export async function updateCampanha(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
+  const acesso = await getAcessoEdicao("marketing");
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  // Sem o extra "investimento" orçamento e gasto ficam como estão (a tela nem os mostra).
+  const investimento = temExtra(acesso, "investimento")
+    ? {
+        orcamento_planejado: parsed.data.orcamento_planejado ?? null,
+        valor_gasto: parsed.data.valor_gasto ?? 0,
+      }
+    : {};
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("campanhas")
@@ -79,13 +95,13 @@ export async function updateCampanha(
       status: parsed.data.status,
       data_inicio: parsed.data.data_inicio ?? null,
       data_fim: parsed.data.data_fim ?? null,
-      orcamento_planejado: parsed.data.orcamento_planejado ?? null,
-      valor_gasto: parsed.data.valor_gasto ?? 0,
+      ...investimento,
       cliques: parsed.data.cliques ?? 0,
       impressoes: parsed.data.impressoes ?? 0,
       observacoes: parsed.data.observacoes ?? null,
     })
-    .eq("id", campanhaId);
+    .eq("id", campanhaId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar a campanha." };
 
   revalidatePath("/marketing/campanhas");
@@ -94,8 +110,15 @@ export async function updateCampanha(
 }
 
 export async function deleteCampanha(campanhaId: string) {
+  const acesso = await getAcessoEdicao("marketing");
+  if (!acesso) return;
+
   const supabase = await createClient();
-  await supabase.from("campanhas").delete().eq("id", campanhaId);
+  await supabase
+    .from("campanhas")
+    .delete()
+    .eq("id", campanhaId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidatePath("/marketing/campanhas");
   revalidatePath("/marketing");
 }

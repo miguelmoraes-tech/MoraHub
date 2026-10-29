@@ -1,8 +1,9 @@
 import { Wallet, TrendingUp, Receipt, Scale, Handshake, ArrowLeftRight, ArrowUpRight, ArrowDownRight, Users2, Megaphone } from "lucide-react";
 import Link from "next/link";
+import { getAcessoModulo } from "@/lib/empresa-ativa";
+import { getAcessoFinanceiro, getAuxiliaresFinanceiro } from "@/lib/financeiro/acesso";
+import { SemAcessoAviso, SemValoresAviso } from "@/components/financeiro/sem-valores";
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoId } from "@/lib/financeiro";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { getRHOverview } from "@/lib/rh/get-overview";
 import { getMarketingOverview } from "@/lib/marketing/get-overview";
 import { StatCard } from "@/components/stat-card";
@@ -38,8 +39,19 @@ type Movimentacao = {
 export default async function DashboardFinanceiroPage() {
   const supabase = await createClient();
   const mesAtual = todayISO().slice(0, 7);
-  const donoId = await getEffectiveDonoId();
-  const workspaceId = donoId ? await getWorkspaceIdPadrao(donoId, "empresarial") : null;
+  const fin = await getAcessoFinanceiro();
+  if (!fin) return <SemAcessoAviso titulo="Dashboard Financeiro" />;
+  // O painel é feito de valores e saldos.
+  if (!fin.valores) return <SemValoresAviso titulo="Dashboard Financeiro" />;
+  const workspaceId = fin.workspaceId;
+
+  // Blocos de outros módulos: só com o módulo ligado e liberado (RH é só do
+  // fundador/cofundador). Leituras auxiliares sem permissão aparecem como "—".
+  const [aux, acessoRh, acessoMarketing] = await Promise.all([
+    getAuxiliaresFinanceiro(),
+    getAcessoModulo("rh"),
+    getAcessoModulo("marketing"),
+  ]);
 
   const [
     [{ data: comprovantes }, { data: gastos }, { data: propostas }, { data: clientes }],
@@ -50,17 +62,23 @@ export default async function DashboardFinanceiroPage() {
       supabase
         .from("comprovantes")
         .select("id, cliente_id, descricao, valor, data")
+        .eq("workspace_id", workspaceId)
         .order("data", { ascending: false }),
       supabase
         .from("gastos")
         .select("id, nome, valor, data, cliente_id")
+        .eq("workspace_id", workspaceId)
         .order("data", { ascending: false }),
-      supabase
-        .from("propostas")
-        .select("valor")
-        .eq("workspace_id", workspaceId ?? "")
-        .in("status", ["enviada", "em_negociacao"]),
-      supabase.from("clientes").select("id, nome").eq("workspace_id", workspaceId ?? ""),
+      aux.leads
+        ? supabase
+            .from("propostas")
+            .select("valor")
+            .eq("workspace_id", aux.leads.workspaceId)
+            .in("status", ["enviada", "em_negociacao"])
+        : Promise.resolve({ data: null }),
+      aux.clientes
+        ? supabase.from("clientes").select("id, nome").eq("workspace_id", aux.clientes.workspaceId)
+        : Promise.resolve({ data: null }),
     ]) as Promise<
       [
         { data: ComprovanteRow[] | null },
@@ -69,8 +87,8 @@ export default async function DashboardFinanceiroPage() {
         { data: ClienteRow[] | null },
       ]
     >,
-    getRHOverview(donoId),
-    getMarketingOverview(donoId),
+    acessoRh?.ehDono ? getRHOverview(acessoRh.workspaceId) : Promise.resolve(null),
+    acessoMarketing ? getMarketingOverview(acessoMarketing) : Promise.resolve(null),
   ]);
 
   const comprovantesList = comprovantes ?? [];
@@ -149,93 +167,97 @@ export default async function DashboardFinanceiroPage() {
         />
       </div>
 
-      <Link
-        href="/rh"
-        className="block rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
-      >
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-          <Users2 className="h-4 w-4 text-zinc-500" />
-          RH
-        </h2>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div>
-            <p className="text-xl font-semibold text-zinc-100">{rhOverview.funcionariosAtivos}</p>
-            <p className="text-xs text-zinc-500">funcionários ativos</p>
+      {rhOverview && (
+        <Link
+          href="/rh"
+          className="block rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
+        >
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+            <Users2 className="h-4 w-4 text-zinc-500" />
+            RH
+          </h2>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <p className="text-xl font-semibold text-zinc-100">{rhOverview.funcionariosAtivos}</p>
+              <p className="text-xs text-zinc-500">funcionários ativos</p>
+            </div>
+            <div>
+              <p
+                className={`text-xl font-semibold ${
+                  rhOverview.folhaMes.totalFuncionarios === 0
+                    ? "text-zinc-100"
+                    : rhOverview.folhaMes.pagos === rhOverview.folhaMes.totalFuncionarios
+                      ? "text-emerald-400"
+                      : "text-amber-400"
+                }`}
+              >
+                {rhOverview.folhaMes.totalFuncionarios > 0
+                  ? `${rhOverview.folhaMes.pagos}/${rhOverview.folhaMes.totalFuncionarios}`
+                  : "—"}
+              </p>
+              <p className="text-xs text-zinc-500">
+                folha do mês · {formatCurrency(rhOverview.folhaMes.valorTotal)}
+              </p>
+            </div>
+            <div>
+              <p
+                className={`text-xl font-semibold ${
+                  rhOverview.feriasVencendoCount > 0 ? "text-amber-400" : "text-zinc-100"
+                }`}
+              >
+                {rhOverview.feriasVencendoCount}
+              </p>
+              <p className="text-xs text-zinc-500">férias vencendo (30d)</p>
+            </div>
+            <div>
+              <p className="text-xl font-semibold text-zinc-100">{rhOverview.vagasAbertasCount}</p>
+              <p className="text-xs text-zinc-500">vagas abertas</p>
+            </div>
           </div>
-          <div>
-            <p
-              className={`text-xl font-semibold ${
-                rhOverview.folhaMes.totalFuncionarios === 0
-                  ? "text-zinc-100"
-                  : rhOverview.folhaMes.pagos === rhOverview.folhaMes.totalFuncionarios
-                    ? "text-emerald-400"
-                    : "text-amber-400"
-              }`}
-            >
-              {rhOverview.folhaMes.totalFuncionarios > 0
-                ? `${rhOverview.folhaMes.pagos}/${rhOverview.folhaMes.totalFuncionarios}`
-                : "—"}
-            </p>
-            <p className="text-xs text-zinc-500">
-              folha do mês · {formatCurrency(rhOverview.folhaMes.valorTotal)}
-            </p>
-          </div>
-          <div>
-            <p
-              className={`text-xl font-semibold ${
-                rhOverview.feriasVencendoCount > 0 ? "text-amber-400" : "text-zinc-100"
-              }`}
-            >
-              {rhOverview.feriasVencendoCount}
-            </p>
-            <p className="text-xs text-zinc-500">férias vencendo (30d)</p>
-          </div>
-          <div>
-            <p className="text-xl font-semibold text-zinc-100">{rhOverview.vagasAbertasCount}</p>
-            <p className="text-xs text-zinc-500">vagas abertas</p>
-          </div>
-        </div>
-      </Link>
+        </Link>
+      )}
 
-      <Link
-        href="/marketing"
-        className="block rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
-      >
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-          <Megaphone className="h-4 w-4 text-zinc-500" />
-          Marketing
-        </h2>
-        <div className="mt-3 grid grid-cols-3 gap-3">
-          <div>
-            <p className="text-xl font-semibold text-zinc-100">
-              {marketingOverview.conteudoPublicadoSemana}
-            </p>
-            <p className="text-xs text-zinc-500">conteúdo publicado essa semana</p>
+      {marketingOverview && (
+        <Link
+          href="/marketing"
+          className="block rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
+        >
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+            <Megaphone className="h-4 w-4 text-zinc-500" />
+            Marketing
+          </h2>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            <div>
+              <p className="text-xl font-semibold text-zinc-100">
+                {marketingOverview.conteudoPublicadoSemana}
+              </p>
+              <p className="text-xs text-zinc-500">conteúdo publicado essa semana</p>
+            </div>
+            <div>
+              <p className="text-xl font-semibold text-zinc-100">
+                {marketingOverview.campanhasAtivasCount}
+              </p>
+              <p className="text-xs text-zinc-500">campanhas ativas</p>
+            </div>
+            <div>
+              <p
+                className={`text-xl font-semibold ${
+                  marketingOverview.roiMedioAtivas === null
+                    ? "text-zinc-100"
+                    : marketingOverview.roiMedioAtivas >= 0
+                      ? "text-emerald-400"
+                      : "text-rose-400"
+                }`}
+              >
+                {marketingOverview.roiMedioAtivas !== null
+                  ? `${marketingOverview.roiMedioAtivas.toFixed(1)}%`
+                  : "—"}
+              </p>
+              <p className="text-xs text-zinc-500">ROI médio</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xl font-semibold text-zinc-100">
-              {marketingOverview.campanhasAtivasCount}
-            </p>
-            <p className="text-xs text-zinc-500">campanhas ativas</p>
-          </div>
-          <div>
-            <p
-              className={`text-xl font-semibold ${
-                marketingOverview.roiMedioAtivas === null
-                  ? "text-zinc-100"
-                  : marketingOverview.roiMedioAtivas >= 0
-                    ? "text-emerald-400"
-                    : "text-rose-400"
-              }`}
-            >
-              {marketingOverview.roiMedioAtivas !== null
-                ? `${marketingOverview.roiMedioAtivas.toFixed(1)}%`
-                : "—"}
-            </p>
-            <p className="text-xs text-zinc-500">ROI médio</p>
-          </div>
-        </div>
-      </Link>
+        </Link>
+      )}
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
@@ -243,10 +265,12 @@ export default async function DashboardFinanceiroPage() {
           Propostas em aberto
         </h2>
         <p className="mt-2 text-2xl font-semibold text-copper-400">
-          {formatCurrency(propostasAbertoTotal)}
+          {aux.leads ? formatCurrency(propostasAbertoTotal) : "—"}
         </p>
         <p className="mt-1 text-xs text-zinc-500">
-          {propostasList.length} proposta(s) enviada(s) ou em negociação
+          {aux.leads
+            ? `${propostasList.length} proposta(s) enviada(s) ou em negociação`
+            : "Sem acesso às propostas (módulo Leads)"}
         </p>
       </div>
 
@@ -284,6 +308,7 @@ export default async function DashboardFinanceiroPage() {
                     <p className="text-xs text-zinc-500">
                       {formatDate(mov.data)}
                       {mov.clienteNome && ` · ${mov.clienteNome}`}
+                      {!aux.clientes && " · cliente: —"}
                     </p>
                   </div>
                 </div>

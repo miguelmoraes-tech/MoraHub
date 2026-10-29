@@ -4,9 +4,9 @@ import { logout } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
 
 /**
- * Shell of the two screens a comercial account without a link can open
- * (type the gestor's code / wait for approval). Deliberately no sidebar: the
- * proxy blocks everything else for this account.
+ * Shell of the two screens to ask for access with a code (type it / wait for
+ * approval). Open to any logged-in account. Deliberately no sidebar: a
+ * funcionário without a company can open nothing else.
  */
 export default function AcessoVendedorLayout({
   children,
@@ -28,9 +28,6 @@ export default function AcessoVendedorLayout({
             />
             <span className="text-sm font-semibold tracking-tight text-zinc-50">
               Mora <span className="text-copper-400">HUB</span>
-            </span>
-            <span className="rounded-full border border-teal-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-teal-400">
-              Vendedor
             </span>
           </div>
           <form action={logout}>

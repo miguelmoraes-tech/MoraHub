@@ -12,6 +12,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { todayISO } from "@/lib/vencimentos/dates";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
+import { usePodeEditarRh } from "@/components/rh/salarios-context";
 
 const STATUS_LABEL: Record<FolhaPagamentoStatus, string> = {
   pendente: "Pendente",
@@ -30,12 +31,14 @@ function mesLabel(mesReferencia: string) {
 
 function GerarFolhaForm() {
   const [open, setOpen] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(gerarFolhaMes, undefined);
 
   useActionSuccess(state, () => setOpen(false));
 
   if (!open) {
+    if (!podeEditar) return null;
     return (
       <button
         type="button"
@@ -193,6 +196,7 @@ function Fields({ item }: { item: FolhaPagamento }) {
 
 function Row({ item, funcionarios }: { item: FolhaPagamento; funcionarios: Funcionario[] }) {
   const [editing, setEditing] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const action = updateFolhaPagamento.bind(null, item.id, item.conta_pagar_id);
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -244,21 +248,25 @@ function Row({ item, funcionarios }: { item: FolhaPagamento; funcionarios: Funci
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteFolhaPagamento.bind(null, item.id, item.conta_pagar_id)}>
-          <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </form>
+        {podeEditar && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <form action={deleteFolhaPagamento.bind(null, item.id, item.conta_pagar_id)}>
+              <button
+                type="submit"
+                className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
@@ -267,9 +275,15 @@ function Row({ item, funcionarios }: { item: FolhaPagamento; funcionarios: Funci
 export function FolhaPagamentoBoard({
   folhas,
   funcionarios,
+  avisoGerar = null,
 }: {
   folhas: FolhaPagamento[];
   funcionarios: Funcionario[];
+  /**
+   * A folha vira contas a pagar: exige edição no RH e no Financeiro (ligado).
+   * Se faltar algo, a mensagem aparece no lugar do botão e nada é gerado.
+   */
+  avisoGerar?: string | null;
 }) {
   const grupos = useMemo(() => {
     const map = new Map<string, FolhaPagamento[]>();
@@ -288,8 +302,14 @@ export function FolhaPagamentoBoard({
           <h1 className="text-lg font-semibold text-zinc-100">Folha de Pagamento</h1>
           <p className="text-sm text-zinc-500">{folhas.length} registro(s)</p>
         </div>
-        <GerarFolhaForm />
+        {!avisoGerar && <GerarFolhaForm />}
       </div>
+
+      {avisoGerar && (
+        <p className="mb-5 rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-300">
+          {avisoGerar}
+        </p>
+      )}
 
       {grupos.length > 0 ? (
         <div className="space-y-5">

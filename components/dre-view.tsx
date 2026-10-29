@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileBarChart, Filter } from "lucide-react";
+import { FileBarChart } from "lucide-react";
 import type { Comprovante, Gasto } from "@/lib/types";
 import { formatCurrency } from "@/lib/format";
 import { computeDre } from "@/lib/dre/compute";
@@ -9,32 +9,21 @@ import { monthRange } from "@/lib/pessoal/period";
 import { todayISO } from "@/lib/vencimentos/dates";
 import { ExportButton } from "@/components/export-button";
 
-export interface DreConta {
-  donoId: string;
-  nome: string;
-}
-
-export type GastoComConta = Gasto & { donoId: string; donoNome?: string };
-export type ComprovanteComConta = Comprovante & { donoId: string; donoNome?: string };
-
 const inputClass =
   "w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500";
 
 export function DreView({
   gastos,
   comprovantes,
-  contas,
   exportBasePath,
 }: {
-  gastos: GastoComConta[];
-  comprovantes: ComprovanteComConta[];
-  contas?: DreConta[];
+  gastos: Gasto[];
+  comprovantes: Comprovante[];
   exportBasePath: string;
 }) {
   const mesAtual = todayISO().slice(0, 7);
   const [inicio, setInicio] = useState(mesAtual);
   const [fim, setFim] = useState(mesAtual);
-  const [contaId, setContaId] = useState("");
 
   const { start, end } = useMemo(() => {
     const [anoInicio, mesInicio] = inicio.split("-").map(Number);
@@ -47,17 +36,13 @@ export function DreView({
 
   const gastosFiltrados = useMemo(
     () =>
-      gastos.filter(
-        (g) => g.data >= start && g.data <= end && (!contaId || g.donoId === contaId)
-      ),
-    [gastos, start, end, contaId]
+      gastos.filter((g) => g.data >= start && g.data <= end),
+    [gastos, start, end]
   );
   const comprovantesFiltrados = useMemo(
     () =>
-      comprovantes.filter(
-        (c) => c.data && c.data >= start && c.data <= end && (!contaId || c.donoId === contaId)
-      ),
-    [comprovantes, start, end, contaId]
+      comprovantes.filter((c) => c.data && c.data >= start && c.data <= end),
+    [comprovantes, start, end]
   );
 
   const dre = useMemo(
@@ -65,9 +50,8 @@ export function DreView({
     [gastosFiltrados, comprovantesFiltrados]
   );
 
-  const exportHref = `${exportBasePath}?start=${start}&end=${end}${
-    contaId ? `&donoId=${contaId}` : ""
-  }`;
+  // A empresa vem do servidor (empresa ativa validada): nada de conta na URL.
+  const exportHref = `${exportBasePath}?start=${start}&end=${end}`;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">
@@ -102,25 +86,6 @@ export function DreView({
             className={inputClass}
           />
         </div>
-        {contas && contas.length > 1 && (
-          <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2">
-            <Filter className="h-3.5 w-3.5 text-zinc-500" />
-            <select
-              value={contaId}
-              onChange={(e) => setContaId(e.target.value)}
-              className="bg-transparent text-sm text-zinc-300 outline-none"
-            >
-              <option value="" className="bg-zinc-900">
-                Todas as contas
-              </option>
-              {contas.map((c) => (
-                <option key={c.donoId} value={c.donoId} className="bg-zinc-900">
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">

@@ -2,11 +2,20 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { Plus, X } from "lucide-react";
+import { useRotulos } from "@/components/rotulos-provider";
 import { createLead } from "@/app/(dashboard)/leads/actions";
 import { LeadFields } from "@/components/lead-fields";
 import type { CampanhaOption } from "@/components/leads-board";
 
-export function NewLeadDialog({ campanhas = [] }: { campanhas?: CampanhaOption[] }) {
+export function NewLeadDialog({
+  campanhas = [],
+  ocultarContato = false,
+}: {
+  campanhas?: CampanhaOption[];
+  ocultarContato?: boolean;
+}) {
+  const rotulos = useRotulos();
+  const tituloNovo = rotulos.texto("leads", "Novo lead", ({ singular }) => `Adicionar ${singular}`);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(createLead, undefined);
@@ -26,7 +35,7 @@ export function NewLeadDialog({ campanhas = [] }: { campanhas?: CampanhaOption[]
         className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
       >
         <Plus className="h-4 w-4" />
-        Novo lead
+        {tituloNovo}
       </button>
 
       <dialog
@@ -36,7 +45,7 @@ export function NewLeadDialog({ campanhas = [] }: { campanhas?: CampanhaOption[]
       >
         <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-950">
           <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-            <h2 className="text-sm font-semibold">Novo lead</h2>
+            <h2 className="text-sm font-semibold">{tituloNovo}</h2>
             <button
               type="button"
               onClick={() => dialogRef.current?.close()}
@@ -51,7 +60,7 @@ export function NewLeadDialog({ campanhas = [] }: { campanhas?: CampanhaOption[]
             action={formAction}
             className="max-h-[calc(100vh-8rem)] space-y-4 overflow-y-auto px-5 py-4"
           >
-            <LeadFields campanhas={campanhas} />
+            <LeadFields campanhas={campanhas} ocultarContato={ocultarContato} />
 
             {state && "error" in state && (
               <p className="rounded-lg border border-rose-900/50 bg-rose-950/40 px-3 py-2 text-sm text-rose-300">
@@ -72,7 +81,7 @@ export function NewLeadDialog({ campanhas = [] }: { campanhas?: CampanhaOption[]
                 disabled={pending}
                 className="rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-copper-500 disabled:opacity-60"
               >
-                {pending ? "Salvando..." : "Criar lead"}
+                {pending ? "Salvando..." : rotulos.texto("leads", "Criar lead", ({ singular }) => `Adicionar ${singular}`)}
               </button>
             </div>
           </form>

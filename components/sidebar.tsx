@@ -4,18 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  Wallet,
-  Target,
-  Users,
-  UserX,
-  BadgeCheck,
-  CalendarClock,
-  Receipt,
-  Scale,
-  FileText,
-  LogOut,
   LayoutGrid,
+  Blocks,
+  Settings,
   Landmark,
   ArrowLeftRight,
   Tags,
@@ -25,158 +16,95 @@ import {
   FolderKanban,
   ListChecks,
   Inbox,
-  Users2,
-  CreditCard,
-  HandCoins,
-  PieChart,
-  LineChart,
-  Building2,
-  Palmtree,
-  Gift,
-  Banknote,
-  Briefcase,
-  ClipboardCheck,
-  Clock,
-  FileBarChart,
-  LifeBuoy,
-  Megaphone,
-  CalendarDays,
-  Flag,
-  Activity,
-  UserCheck,
+  FileText,
+  Scale,
+  UsersRound,
+  ShieldCheck,
+  LogOut,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
+import { EmpresaSwitcher } from "@/components/empresa/empresa-switcher";
 import { GlobalSearch } from "@/components/global-search";
 import { GlobalChatBadge } from "@/components/chat/global-chat-badge";
 import { SolicitacoesBell } from "@/components/vendedor/solicitacoes-bell";
 import { useSolicitacoes } from "@/components/vendedor/solicitacoes-provider";
+import { useAprovacoes } from "@/components/aprovacoes/aprovacoes-provider";
 import type { AccountType } from "@/lib/hub-mode";
-import { isRotaHabilitada } from "@/lib/modulos-habilitados";
+import type { EmpresaVinculo } from "@/lib/empresas";
+import { iconeDe } from "@/components/modulos/icones";
+import { CHAT_HABILITADO, menuDoDono, rotaPermitida, type ItemMenu } from "@/lib/modulos/registry";
+import { useRotulos } from "@/components/rotulos-provider";
+import { labelDoItemMenu, type Rotulos } from "@/lib/rotulos-shared";
 
 type NavItem = {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  enabled?: boolean;
   /** Counter shown at the end of the item (live, from a provider). */
-  badge?: "solicitacoes";
+  badge?: "solicitacoes" | "aprovacoes";
 };
 
 type Accent = "copper" | "petrol";
 
-const DASHBOARD_ITEMS: NavItem[] = [
-  { label: "Visão Geral", href: "/dashboard", icon: LayoutGrid, enabled: true },
-  { label: "Financeiro", href: "/dashboard/financeiro", icon: Wallet, enabled: true },
-  { label: "Clientes", href: "/dashboard/clientes", icon: LayoutDashboard, enabled: true },
-  { label: "Leads", href: "/dashboard/leads", icon: Target, enabled: true },
+// O menu do dono sai do registro de módulos (lib/modulos/registry.ts) ∩ os
+// módulos ligados da empresa ativa. As listas abaixo são só do bloco fixo do
+// painel e da Conta Pessoal.
+const VISAO_GERAL: NavItem = { label: "Visão Geral", href: "/dashboard", icon: LayoutGrid };
+
+const EMPRESA_ITEMS: NavItem[] = [
+  { label: "Módulos", href: "/modulos", icon: Blocks },
+  { label: "Sócios", href: "/socios", icon: UsersRound },
+  { label: "Aprovações", href: "/aprovacoes", icon: ShieldCheck, badge: "aprovacoes" },
+  { label: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
-const GESTAO_ITEMS: NavItem[] = [
-  { label: "Metas / OKRs", href: "/metas", icon: Flag, enabled: true },
-  { label: "Clientes", href: "/clientes", icon: Users, enabled: true },
-  { label: "Leads", href: "/leads", icon: Target, enabled: true },
-  { label: "Renegados", href: "/renegados", icon: UserX, enabled: true },
-  { label: "Assinantes", href: "/assinantes", icon: BadgeCheck, enabled: true },
-  { label: "Calendário", href: "/calendario", icon: CalendarClock, enabled: true },
-  { label: "Gastos", href: "/gastos", icon: Receipt, enabled: true },
-  { label: "Jurídico & Contábil", href: "/juridico", icon: Scale, enabled: true },
-  { label: "Documentos", href: "/documentos", icon: FileText, enabled: true },
-  { label: "Contas a Pagar", href: "/contas-pagar", icon: CreditCard, enabled: true },
-  { label: "Contas a Receber", href: "/contas-receber", icon: HandCoins, enabled: true },
-  { label: "Orçamento", href: "/orcamentos", icon: PieChart, enabled: true },
-  { label: "Fluxo de Caixa", href: "/fluxo-caixa", icon: LineChart, enabled: true },
-  { label: "Rentabilidade", href: "/rentabilidade", icon: TrendingUp, enabled: true },
-  { label: "Conciliação Bancária", href: "/conciliacao", icon: Landmark, enabled: true },
-  { label: "DRE", href: "/dre", icon: FileBarChart, enabled: true },
-];
+function itemDeMenu(item: ItemMenu, rotulos: Rotulos): NavItem {
+  return {
+    // Rótulo da empresa (nicho/modelo) quando houver; senão o nome do registro.
+    label: labelDoItemMenu(rotulos, item.href, item.label),
+    href: item.href,
+    icon: iconeDe(item.icone),
+    badge: item.badge,
+  };
+}
 
-const FINANCEIRO_ITEMS: NavItem[] = [
-  { label: "Contas a Pagar", href: "/contas-pagar", icon: CreditCard, enabled: true },
-  { label: "Contas a Receber", href: "/contas-receber", icon: HandCoins, enabled: true },
-  { label: "Orçamento", href: "/orcamentos", icon: PieChart, enabled: true },
-  { label: "Fluxo de Caixa", href: "/fluxo-caixa", icon: LineChart, enabled: true },
-  { label: "Rentabilidade", href: "/rentabilidade", icon: TrendingUp, enabled: true },
-  // The one RH screen Financeiro keeps — it's also where contas_pagar sync
-  // lives. The rest of RH_ITEMS below is exclusive to the rh papel.
-  { label: "Folha de Pagamento", href: "/rh/folha", icon: Banknote, enabled: true },
-  { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
-];
-
-const COMERCIAL_ITEMS: NavItem[] = [
-  { label: "Visão Geral", href: "/comercial", icon: LayoutGrid, enabled: true },
-  { label: "Funil de Vendas", href: "/leads", icon: Target, enabled: true },
-  { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
-];
-
-// Owner-only entries for the vendedor feature (the vendedor's own menu lives
-// in components/vendedor/vendedor-sidebar.tsx).
-const VENDEDORES_ITEMS: NavItem[] = [
-  { label: "Agenda", href: "/agenda", icon: CalendarClock, enabled: true },
-  { label: "Atividade dos vendedores", href: "/atividade-vendedores", icon: Activity, enabled: true },
-  { label: "Vendedores", href: "/vendedores", icon: UserCheck, enabled: true, badge: "solicitacoes" },
-];
-
-const RH_ITEMS: NavItem[] = [
-  { label: "Visão Geral", href: "/rh", icon: LayoutGrid, enabled: true },
-  { label: "Departamentos", href: "/rh/departamentos", icon: Building2, enabled: true },
-  { label: "Funcionários", href: "/rh/funcionarios", icon: Users, enabled: true },
-  { label: "Férias", href: "/rh/ferias", icon: Palmtree, enabled: true },
-  { label: "Benefícios", href: "/rh/beneficios", icon: Gift, enabled: true },
-  { label: "Folha de Pagamento", href: "/rh/folha", icon: Banknote, enabled: true },
-  { label: "Recrutamento", href: "/rh/recrutamento", icon: Briefcase, enabled: true },
-  { label: "Avaliações", href: "/rh/avaliacoes", icon: ClipboardCheck, enabled: true },
-  { label: "Ponto", href: "/rh/ponto", icon: Clock, enabled: true },
-  { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
-];
-
-const MARKETING_ITEMS: NavItem[] = [
-  { label: "Visão Geral", href: "/marketing", icon: LayoutGrid, enabled: true },
-  { label: "Calendário de Conteúdo", href: "/marketing/calendario", icon: CalendarDays, enabled: true },
-  { label: "Campanhas", href: "/marketing/campanhas", icon: Megaphone, enabled: true },
-  { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
-];
-
-const SUPORTE_ITEMS: NavItem[] = [
-  { label: "Suporte", href: "/suporte", icon: LifeBuoy, enabled: true },
-];
-
-const PAINEL_ITEMS: NavItem[] = [
-  { label: "Visão Geral", href: "/pessoal", icon: LayoutGrid, enabled: true },
-];
+const PAINEL_ITEMS: NavItem[] = [{ label: "Visão Geral", href: "/pessoal", icon: LayoutGrid }];
 
 const FINANCAS_ITEMS: NavItem[] = [
-  { label: "Contas", href: "/pessoal/contas", icon: Landmark, enabled: true },
-  { label: "Transações", href: "/pessoal/transacoes", icon: ArrowLeftRight, enabled: true },
-  { label: "Categorias", href: "/pessoal/categorias", icon: Tags, enabled: true },
-  { label: "Gastos Recorrentes", href: "/pessoal/recorrentes", icon: Repeat, enabled: true },
-  { label: "Investimentos", href: "/pessoal/investimentos", icon: TrendingUp, enabled: true },
+  { label: "Contas", href: "/pessoal/contas", icon: Landmark },
+  { label: "Transações", href: "/pessoal/transacoes", icon: ArrowLeftRight },
+  { label: "Categorias", href: "/pessoal/categorias", icon: Tags },
+  { label: "Gastos Recorrentes", href: "/pessoal/recorrentes", icon: Repeat },
+  { label: "Investimentos", href: "/pessoal/investimentos", icon: TrendingUp },
 ];
 
 const ORGANIZACAO_ITEMS: NavItem[] = [
-  { label: "Documentos", href: "/pessoal/documentos", icon: FileText, enabled: true },
-  { label: "Biblioteca", href: "/pessoal/biblioteca", icon: Library, enabled: true },
-  { label: "Projetos", href: "/pessoal/projetos", icon: FolderKanban, enabled: true },
-  { label: "Tarefas", href: "/pessoal/tarefas", icon: ListChecks, enabled: true },
-  { label: "Inbox", href: "/pessoal/inbox", icon: Inbox, enabled: true },
-  { label: "Jurídico", href: "/pessoal/juridico", icon: Scale, enabled: true },
+  { label: "Documentos", href: "/pessoal/documentos", icon: FileText },
+  { label: "Biblioteca", href: "/pessoal/biblioteca", icon: Library },
+  { label: "Projetos", href: "/pessoal/projetos", icon: FolderKanban },
+  { label: "Tarefas", href: "/pessoal/tarefas", icon: ListChecks },
+  { label: "Inbox", href: "/pessoal/inbox", icon: Inbox },
+  { label: "Jurídico", href: "/pessoal/juridico", icon: Scale },
 ];
 
 function NavGroup({
   title,
   items,
   accent,
+  habilitados,
 }: {
   title: string;
   items: NavItem[];
   accent: Accent;
+  /** Módulos ligados da empresa; item de rota de módulo desligado não aparece. */
+  habilitados: string[];
 }) {
   const pathname = usePathname();
   const solicitacoes = useSolicitacoes();
+  const aprovacoes = useAprovacoes();
 
-  // Módulos desligados (lib/modulos-habilitados.ts) não aparecem no menu; as
-  // listas acima ficam intactas para quando forem religados.
-  const visiveis = items.filter((item) => isRotaHabilitada(item.href));
+  const visiveis = items.filter((item) => rotaPermitida(item.href, habilitados));
   if (visiveis.length === 0) return null;
 
   return (
@@ -187,31 +115,10 @@ function NavGroup({
       <ul className="mt-2 space-y-0.5">
         {visiveis.map((item) => {
           const isActive =
-            item.enabled &&
-            (item.href === "/pessoal" ||
-            item.href === "/rh" ||
-            item.href === "/comercial" ||
-            item.href === "/marketing" ||
-            item.href === "/dashboard"
+            item.href === "/pessoal" || item.href === "/rh" || item.href === "/marketing" || item.href === "/juridico" || item.href === "/dashboard"
               ? pathname === item.href
-              : pathname.startsWith(item.href));
+              : pathname.startsWith(item.href);
           const Icon = item.icon;
-
-          if (!item.enabled) {
-            return (
-              <li key={item.href}>
-                <span className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2 text-sm text-zinc-600">
-                  <span className="flex items-center gap-2.5">
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </span>
-                  <span className="rounded-full bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">
-                    em breve
-                  </span>
-                </span>
-              </li>
-            );
-          }
 
           return (
             <li key={item.href}>
@@ -236,6 +143,14 @@ function NavGroup({
                         : solicitacoes.pendentes.length}
                     </span>
                   )}
+                {item.badge === "aprovacoes" && aprovacoes && aprovacoes.minhas > 0 && (
+                  <span
+                    className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-copper-600 px-1 text-[10px] font-semibold text-white"
+                    aria-label={`${aprovacoes.minhas} aprovação(ões) esperando seu voto`}
+                  >
+                    {aprovacoes.minhas > 99 ? "99+" : aprovacoes.minhas}
+                  </span>
+                )}
               </Link>
             </li>
           );
@@ -248,30 +163,34 @@ function NavGroup({
 export function Sidebar({
   userEmail,
   userId,
-  temColaboracoes,
   tiposAtivos,
-  restritoFinanceiro,
-  restritoRH,
-  restritoComercial,
-  restritoMarketing,
   chatHref,
   unreadTotal,
+  modulosHabilitados,
+  painelCompleto,
+  restrito,
+  empresas,
+  empresaAtivaId,
 }: {
   userEmail: string;
   userId: string;
-  temColaboracoes?: boolean;
   tiposAtivos: AccountType[];
-  restritoFinanceiro?: boolean;
-  restritoRH?: boolean;
-  restritoComercial?: boolean;
-  restritoMarketing?: boolean;
   chatHref: string;
   unreadTotal: number;
+  /** Módulos ligados da empresa ativa (workspace_modulos). */
+  modulosHabilitados: string[];
+  /** Fundador/cofundador da empresa ativa (vê Módulos, Sócios e Configurações). */
+  painelCompleto: boolean;
+  /** Sócio/funcionário: menu só com os módulos que as permissões liberam (já em modulosHabilitados). */
+  restrito: boolean;
+  /** Empresas com vínculo ativo da conta, para o seletor. */
+  empresas: EmpresaVinculo[];
+  empresaAtivaId: string | null;
 }) {
   const pathname = usePathname();
+  const rotulos = useRotulos();
   const isPessoal = pathname.startsWith("/pessoal");
   const accent: Accent = isPessoal ? "petrol" : "copper";
-  const restrito = restritoFinanceiro || restritoRH || restritoComercial || restritoMarketing;
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
@@ -292,87 +211,69 @@ export function Sidebar({
             HUB
           </span>
         </span>
-        {restritoFinanceiro && (
-          <span className="rounded-full border border-emerald-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-400">
-            Financeiro
-          </span>
-        )}
-        {restritoRH && (
-          <span className="rounded-full border border-amber-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-400">
-            RH
-          </span>
-        )}
-        {restritoComercial && (
-          <span className="rounded-full border border-teal-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-teal-400">
-            Comercial
-          </span>
-        )}
-        {restritoMarketing && (
-          <span className="rounded-full border border-pink-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-pink-400">
-            Marketing
-          </span>
-        )}
-        {!restrito && !isPessoal && <SolicitacoesBell />}
+        {!isPessoal && <SolicitacoesBell />}
       </div>
 
-      {!restrito && (
-        <div className="space-y-3 border-b border-zinc-900 px-3 pb-4">
-          <GlobalSearch />
-          <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} tiposAtivos={tiposAtivos} />
-        </div>
-      )}
+      <div className="space-y-3 border-b border-zinc-900 px-3 pb-4">
+        {!restrito && (
+          <GlobalSearch incluirDocumentos={rotaPermitida("/documentos", modulosHabilitados)} />
+        )}
+        {!isPessoal && <EmpresaSwitcher empresas={empresas} ativaId={empresaAtivaId} />}
+        <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} tiposAtivos={tiposAtivos} />
+      </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <div key={accent} className="hub-mode-fade-in space-y-6">
-          {restritoFinanceiro ? (
-            <NavGroup title="Financeiro" items={FINANCEIRO_ITEMS} accent="copper" />
-          ) : restritoRH ? (
-            <NavGroup title="RH" items={RH_ITEMS} accent="copper" />
-          ) : restritoComercial ? (
-            <NavGroup title="Comercial" items={COMERCIAL_ITEMS} accent="copper" />
-          ) : restritoMarketing ? (
-            <NavGroup title="Marketing" items={MARKETING_ITEMS} accent="copper" />
-          ) : isPessoal ? (
+          {isPessoal ? (
             <>
-              <NavGroup title="Painel" items={PAINEL_ITEMS} accent={accent} />
-              <NavGroup title="Finanças" items={FINANCAS_ITEMS} accent={accent} />
+              <NavGroup title="Painel" items={PAINEL_ITEMS} accent={accent} habilitados={modulosHabilitados} />
+              <NavGroup title="Finanças" items={FINANCAS_ITEMS} accent={accent} habilitados={modulosHabilitados} />
               <NavGroup
                 title="Organização"
                 items={ORGANIZACAO_ITEMS}
                 accent={accent}
+                habilitados={modulosHabilitados}
               />
             </>
           ) : (
             <>
-              <NavGroup title="Dashboards" items={DASHBOARD_ITEMS} accent={accent} />
-              <NavGroup title="Gestão" items={GESTAO_ITEMS} accent={accent} />
-              {/* "Comercial" fica de fora: Visão Geral e Suporte estão desligados e
-                  o Funil de Vendas é o mesmo /leads de Gestão. */}
-              <NavGroup title="Vendedores" items={VENDEDORES_ITEMS} accent={accent} />
-              <NavGroup title="RH" items={RH_ITEMS} accent={accent} />
-              <NavGroup title="Marketing" items={MARKETING_ITEMS} accent={accent} />
-              <NavGroup title="Suporte" items={SUPORTE_ITEMS} accent={accent} />
+              {!restrito && (
+                <NavGroup
+                  title="Dashboards"
+                  items={[VISAO_GERAL]}
+                  accent={accent}
+                  habilitados={modulosHabilitados}
+                />
+              )}
+              {menuDoDono(modulosHabilitados).map((grupo) => (
+                <NavGroup
+                  key={grupo.titulo}
+                  title={grupo.titulo}
+                  items={grupo.itens.map((item) => itemDeMenu(item, rotulos))}
+                  accent={accent}
+                  habilitados={modulosHabilitados}
+                />
+              ))}
+              {painelCompleto && (
+                <NavGroup
+                  title="Empresa"
+                  items={EMPRESA_ITEMS}
+                  accent={accent}
+                  habilitados={modulosHabilitados}
+                />
+              )}
             </>
           )}
         </div>
       </nav>
 
       <div className="border-t border-zinc-900 p-3">
-        {isRotaHabilitada("/chat") && (
+        {CHAT_HABILITADO && (
           <GlobalChatBadge
             href={chatHref}
             currentUserId={userId}
             initialCount={unreadTotal}
           />
-        )}
-        {temColaboracoes && isRotaHabilitada("/colaborador") && (
-          <Link
-            href="/colaborador"
-            className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
-          >
-            <Users2 className="h-4 w-4" />
-            Colaborações
-          </Link>
         )}
         <div className="mb-2 truncate px-2 text-xs text-zinc-500">
           {userEmail}

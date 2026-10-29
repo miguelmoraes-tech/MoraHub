@@ -9,6 +9,7 @@ import {
   deleteDepartamento,
 } from "@/app/(dashboard)/rh/departamentos/actions";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
+import { usePodeEditarRh } from "@/components/rh/salarios-context";
 
 function Fields({
   item,
@@ -58,6 +59,7 @@ function Fields({
 
 function NewForm({ funcionarios }: { funcionarios: Funcionario[] }) {
   const [open, setOpen] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(createDepartamento, undefined);
 
@@ -68,6 +70,7 @@ function NewForm({ funcionarios }: { funcionarios: Funcionario[] }) {
   }, [open]);
 
   if (!open) {
+    if (!podeEditar) return null;
     return (
       <button
         type="button"
@@ -118,6 +121,7 @@ function Row({
   funcionariosCount: number;
 }) {
   const [editing, setEditing] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const action = updateDepartamento.bind(null, item.id);
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -164,21 +168,25 @@ function Row({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteDepartamento.bind(null, item.id)}>
-          <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </form>
+        {podeEditar && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <form action={deleteDepartamento.bind(null, item.id)}>
+              <button
+                type="submit"
+                className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

@@ -53,7 +53,6 @@ export default async function ContadorConciliacaoPage() {
       gastos={gastosComContexto}
       comprovantes={comprovantesComContexto}
       sugestoes={sugestoes}
-      contas={contas.map((c) => ({ donoId: c.dono_id, nome: nomeConta(c) }))}
     />
   );
 }

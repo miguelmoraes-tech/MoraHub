@@ -28,7 +28,7 @@ function mesLabel(mesReferenciaISO: string) {
 
 export async function gerarFolhaDoMes(
   supabase: SupabaseClient,
-  donoId: string,
+  { workspaceId, donoId }: { workspaceId: string; donoId: string },
   mesReferenciaISO: string,
   diaVencimento: number
 ): Promise<{ criados: number; jaExistentes: number }> {
@@ -36,12 +36,12 @@ export async function gerarFolhaDoMes(
     supabase
       .from("funcionarios")
       .select("id, nome, salario")
-      .eq("user_id", donoId)
+      .eq("workspace_id", workspaceId)
       .eq("status", "ativo"),
     supabase
       .from("folha_pagamento")
       .select("funcionario_id")
-      .eq("user_id", donoId)
+      .eq("workspace_id", workspaceId)
       .eq("mes_referencia", mesReferenciaISO),
   ])) as [{ data: FuncionarioAtivoRow[] | null }, { data: FolhaExistenteRow[] | null }];
 
@@ -58,6 +58,7 @@ export async function gerarFolhaDoMes(
       .from("contas_pagar")
       .insert({
         user_id: donoId,
+        workspace_id: workspaceId,
         descricao: `Folha de pagamento — ${funcionario.nome} — ${mes}`,
         valor: salarioBruto,
         categoria: "Folha de pagamento",
@@ -70,6 +71,7 @@ export async function gerarFolhaDoMes(
 
     const { error: folhaError } = await supabase.from("folha_pagamento").insert({
       user_id: donoId,
+      workspace_id: workspaceId,
       funcionario_id: funcionario.id,
       mes_referencia: mesReferenciaISO,
       salario_bruto: salarioBruto,
@@ -79,7 +81,11 @@ export async function gerarFolhaDoMes(
       conta_pagar_id: (contaPagar as { id: string }).id,
     });
     if (folhaError) {
-      await supabase.from("contas_pagar").delete().eq("id", (contaPagar as { id: string }).id);
+      await supabase
+        .from("contas_pagar")
+        .delete()
+        .eq("id", (contaPagar as { id: string }).id)
+        .eq("workspace_id", workspaceId);
       continue;
     }
 
@@ -92,6 +98,7 @@ export async function gerarFolhaDoMes(
 /** Pushes a folha_pagamento status change into its linked contas_pagar row, if any. */
 export async function syncContaPagarFromFolha(
   supabase: SupabaseClient,
+  workspaceId: string,
   contaPagarId: string | null,
   status: "pendente" | "pago",
   dataPagamento: string | null
@@ -103,12 +110,14 @@ export async function syncContaPagarFromFolha(
       status,
       data_pagamento: status === "pago" ? (dataPagamento ?? todayISO()) : null,
     })
-    .eq("id", contaPagarId);
+    .eq("id", contaPagarId)
+    .eq("workspace_id", workspaceId);
 }
 
 /** Pushes a contas_pagar status change into any folha_pagamento row linked to it. */
 export async function syncFolhaFromContaPagar(
   supabase: SupabaseClient,
+  workspaceId: string,
   contaPagarId: string,
   contaPagarStatus: "pendente" | "pago" | "atrasado",
   dataPagamento: string | null
@@ -120,5 +129,6 @@ export async function syncFolhaFromContaPagar(
       status: folhaStatus,
       data_pagamento: folhaStatus === "pago" ? (dataPagamento ?? todayISO()) : null,
     })
-    .eq("conta_pagar_id", contaPagarId);
+    .eq("conta_pagar_id", contaPagarId)
+    .eq("workspace_id", workspaceId);
 }

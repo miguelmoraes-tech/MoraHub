@@ -15,12 +15,6 @@ export interface VendedorVinculo {
 export interface VendedorAcesso {
   /** Active 'comercial' links that point at a concrete workspace. */
   vinculos: VendedorVinculo[];
-  /**
-   * True when the account's only role is vendedor: it has an active
-   * 'comercial' link, no other collaborator link and no 'empresarial'
-   * workspace of its own. Only these accounts are locked into /vendedor/*.
-   */
-  somenteVendedor: boolean;
   /** True when the account has any active `membros` link, whatever the papel. */
   temMembroAtivo: boolean;
 }
@@ -28,6 +22,10 @@ export interface VendedorAcesso {
 type MembroRow = { dono_id: string; papel: string; workspace_id: string | null };
 
 /**
+ * Finds the vendedor links of an account. It does NOT decide what the account
+ * may see: the interface depends on the papel in the ACTIVE company
+ * (lib/acesso.ts), not on the user.
+ *
  * RLS ("dono e membro veem o vinculo") lets the caller read their own membros
  * rows, so this runs with the user's session — no service key involved.
  */
@@ -46,22 +44,7 @@ export async function getVendedorAcesso(
     .filter((m) => m.papel === "comercial" && m.workspace_id)
     .map((m) => ({ dono_id: m.dono_id, workspace_id: m.workspace_id as string }));
 
-  if (vinculos.length === 0 || membros.some((m) => m.papel !== "comercial")) {
-    return { vinculos, somenteVendedor: false, temMembroAtivo: membros.length > 0 };
-  }
-
-  const { data: proprios } = await supabase
-    .from("perfis_tipos_ativos")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("tipo", "empresarial")
-    .limit(1);
-
-  return {
-    vinculos,
-    somenteVendedor: (proprios ?? []).length === 0,
-    temMembroAtivo: true,
-  };
+  return { vinculos, temMembroAtivo: membros.length > 0 };
 }
 
 /**
@@ -100,7 +83,7 @@ export const VENDEDOR_PREFIX = "/vendedor";
 export const ACESSO_VENDEDOR_CODIGO = "/acesso-vendedor";
 export const ACESSO_VENDEDOR_AGUARDANDO = "/acesso-vendedor/aguardando";
 
-/** Paths a somenteVendedor session may open; everything else is bounced to VENDEDOR_HOME. */
+/** Paths of the vendedor area (an active comercial company may open only these). */
 export function isRotaDoVendedor(path: string): boolean {
   return path === VENDEDOR_PREFIX || path.startsWith(`${VENDEDOR_PREFIX}/`);
 }

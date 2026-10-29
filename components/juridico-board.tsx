@@ -144,7 +144,15 @@ function NewJuridicoForm() {
   );
 }
 
-function JuridicoRow({ item, hoje }: { item: Juridico; hoje: string }) {
+function JuridicoRow({
+  item,
+  hoje,
+  somenteLeitura,
+}: {
+  item: Juridico;
+  hoje: string;
+  somenteLeitura: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const action = updateJuridico.bind(null, item.id);
   const [state, formAction, pending] = useActionState(action, undefined);
@@ -210,28 +218,36 @@ function JuridicoRow({ item, hoje }: { item: Juridico; hoje: string }) {
           {item.nota && ` · ${item.nota}`}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteJuridico.bind(null, item.id)}>
+      {!somenteLeitura && (
+        <div className="flex shrink-0 items-center gap-1">
           <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+            type="button"
+            onClick={() => setEditing(true)}
+            className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Pencil className="h-3.5 w-3.5" />
           </button>
-        </form>
-      </div>
+          <form action={deleteJuridico.bind(null, item.id)}>
+            <button
+              type="submit"
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
 
-export function JuridicoBoard({ items }: { items: Juridico[] }) {
+export function JuridicoBoard({
+  items,
+  somenteLeitura = false,
+}: {
+  items: Juridico[];
+  somenteLeitura?: boolean;
+}) {
   const [tab, setTab] = useState<JuridicoTipo | "todos">("todos");
   const hoje = useMemo(() => todayISO(), []);
 
@@ -254,7 +270,7 @@ export function JuridicoBoard({ items }: { items: Juridico[] }) {
             {filtrados.length} pendência(s)
           </p>
         </div>
-        <NewJuridicoForm />
+        {!somenteLeitura && <NewJuridicoForm />}
       </div>
 
       <div className="mb-6 inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
@@ -283,7 +299,12 @@ export function JuridicoBoard({ items }: { items: Juridico[] }) {
         {ordenados.length > 0 ? (
           <div className="space-y-2">
             {ordenados.map((item) => (
-              <JuridicoRow key={item.id} item={item} hoje={hoje} />
+              <JuridicoRow
+                key={item.id}
+                item={item}
+                hoje={hoje}
+                somenteLeitura={somenteLeitura}
+              />
             ))}
           </div>
         ) : (

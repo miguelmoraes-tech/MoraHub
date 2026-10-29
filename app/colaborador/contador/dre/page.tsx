@@ -28,7 +28,6 @@ export default async function ContadorDrePage() {
         donoId: c.user_id,
         donoNome: nomeConta(contasByDono.get(c.user_id)),
       }))}
-      contas={contas.map((c) => ({ donoId: c.dono_id, nome: nomeConta(c) }))}
       exportBasePath="/api/export/dre"
     />
   );

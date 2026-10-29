@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { filtrarContasPorPapel, getContasVinculadas } from "@/lib/colaborador";
+import { getAcessoFinanceiroEdicao } from "@/lib/financeiro/acesso";
 import { parseOfx } from "@/lib/ofx/parse";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
@@ -14,40 +16,26 @@ function textOrNull(value: FormDataEntryValue | null) {
 
 function revalidateConciliacao() {
   revalidatePath("/conciliacao");
-  revalidatePath("/colaborador/contador/conciliacao");
 }
 
 /**
- * Confere que o usuário logado pode agir sobre `donoId`: é o próprio dono,
- * ou um contador vinculado e ativo. Redundante com a RLS da tabela (que já
- * bloqueia no banco), mas permite retornar um erro claro em vez de um
- * update silenciosamente vazio.
+ * A empresa é SEMPRE a ativa, validada no servidor (getAcessoFinanceiroEdicao):
+ * nada de conta vinda do formulário. A RLS segue como barreira real; isto evita
+ * tentar e devolve uma mensagem clara.
  */
-async function assertAcesso(donoId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  if (user.id === donoId) return supabase;
-
-  const contas = filtrarContasPorPapel(await getContasVinculadas(), "contador");
-  if (contas.some((c) => c.dono_id === donoId)) return supabase;
-  return null;
-}
 
 export async function importarOfx(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const donoId = textOrNull(formData.get("dono_id"));
   const arquivo = formData.get("arquivo");
-  if (!donoId || !(arquivo instanceof File) || arquivo.size === 0) {
+  if (!(arquivo instanceof File) || arquivo.size === 0) {
     return { error: "Selecione um arquivo OFX." };
   }
 
-  const supabase = await assertAcesso(donoId);
-  if (!supabase) return { error: "Conta inválida." };
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
+  const supabase = await createClient();
 
   let texto: string;
   try {
@@ -64,7 +52,7 @@ export async function importarOfx(
   const { data: existentes } = await supabase
     .from("lancamentos_extrato")
     .select("data, descricao, valor, tipo")
-    .eq("user_id", donoId);
+    .eq("workspace_id", acesso.workspaceId);
   const chavesExistentes = new Set(
     ((existentes ?? []) as { data: string; descricao: string; valor: number; tipo: string }[]).map(
       (l) => `${l.data}|${l.valor}|${l.tipo}|${l.descricao}`
@@ -74,7 +62,7 @@ export async function importarOfx(
   const novos = transacoes
     .filter((t) => !chavesExistentes.has(`${t.data}|${t.valor}|${t.tipo}|${t.descricao}`))
     .map((t) => ({
-      user_id: donoId,
+      user_id: acesso.donoId,
       data: t.data,
       descricao: t.descricao,
       valor: t.valor,
@@ -87,7 +75,9 @@ export async function importarOfx(
     return { error: "Todos os lançamentos desse arquivo já foram importados." };
   }
 
-  const { error } = await supabase.from("lancamentos_extrato").insert(novos);
+  const { error } = await supabase
+    .from("lancamentos_extrato")
+    .insert(novos.map((n) => ({ ...n, workspace_id: acesso.workspaceId })));
   if (error) return { error: "Não foi possível importar o extrato." };
 
   revalidateConciliacao();
@@ -99,22 +89,22 @@ export async function vincularLancamento(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const donoId = textOrNull(formData.get("dono_id"));
   const gastoId = textOrNull(formData.get("gasto_id"));
   const comprovanteId = textOrNull(formData.get("comprovante_id"));
-  if (!donoId || (!gastoId && !comprovanteId)) {
+  if (!gastoId && !comprovanteId) {
     return { error: "Selecione um lançamento para vincular." };
   }
 
-  const supabase = await assertAcesso(donoId);
-  if (!supabase) return { error: "Conta inválida." };
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
+  const supabase = await createClient();
 
   if (gastoId) {
     const { data } = await supabase
       .from("gastos")
       .select("id")
       .eq("id", gastoId)
-      .eq("user_id", donoId)
+      .eq("workspace_id", acesso.workspaceId)
       .maybeSingle();
     if (!data) return { error: "Gasto inválido." };
   }
@@ -123,7 +113,7 @@ export async function vincularLancamento(
       .from("comprovantes")
       .select("id")
       .eq("id", comprovanteId)
-      .eq("user_id", donoId)
+      .eq("workspace_id", acesso.workspaceId)
       .maybeSingle();
     if (!data) return { error: "Comprovante inválido." };
   }
@@ -136,7 +126,7 @@ export async function vincularLancamento(
       status_conciliacao: "conciliado",
     })
     .eq("id", lancamentoId)
-    .eq("user_id", donoId);
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível conciliar o lançamento." };
 
   revalidateConciliacao();
@@ -146,19 +136,17 @@ export async function vincularLancamento(
 export async function marcarIgnorado(
   lancamentoId: string,
   _prevState: ActionState,
-  formData: FormData
+  _formData: FormData
 ): Promise<ActionState> {
-  const donoId = textOrNull(formData.get("dono_id"));
-  if (!donoId) return { error: "Conta inválida." };
-
-  const supabase = await assertAcesso(donoId);
-  if (!supabase) return { error: "Conta inválida." };
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
+  const supabase = await createClient();
 
   const { error } = await supabase
     .from("lancamentos_extrato")
     .update({ status_conciliacao: "ignorado" })
     .eq("id", lancamentoId)
-    .eq("user_id", donoId);
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível ignorar o lançamento." };
 
   revalidateConciliacao();
@@ -168,19 +156,17 @@ export async function marcarIgnorado(
 export async function desfazerConciliacao(
   lancamentoId: string,
   _prevState: ActionState,
-  formData: FormData
+  _formData: FormData
 ): Promise<ActionState> {
-  const donoId = textOrNull(formData.get("dono_id"));
-  if (!donoId) return { error: "Conta inválida." };
-
-  const supabase = await assertAcesso(donoId);
-  if (!supabase) return { error: "Conta inválida." };
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
+  const supabase = await createClient();
 
   const { error } = await supabase
     .from("lancamentos_extrato")
     .update({ status_conciliacao: "pendente", gasto_id: null, comprovante_id: null })
     .eq("id", lancamentoId)
-    .eq("user_id", donoId);
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível desfazer a conciliação." };
 
   revalidateConciliacao();

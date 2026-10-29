@@ -1,10 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { VENDEDOR_HOME, getVendedorAcesso } from "@/lib/vendedor-access";
-import { COMERCIAL_DONO_COOKIE, COMERCIAL_DONO_COOKIE_MAX_AGE } from "@/lib/comercial";
+import { VENDEDOR_HOME } from "@/lib/vendedor-access";
+import { listarEmpresas } from "@/lib/empresas";
+import { gravarEmpresaAtiva } from "@/lib/empresa-ativa";
+import { HOME_DONO } from "@/lib/modulos/registry";
 
 export type ConviteResponseState = { error: string } | undefined;
 
@@ -14,6 +15,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   convite_ja_respondido: "Este convite já foi respondido.",
   convite_expirado: "Este convite expirou.",
   email_nao_confere: "Este convite foi enviado para outro e-mail.",
+  convite_sem_empresa: "Este convite não está ligado a nenhuma empresa.",
+  convite_proprio: "Você não pode aceitar um convite da sua própria empresa.",
 };
 
 function friendlyError(message: string | undefined) {
@@ -28,31 +31,20 @@ export async function aceitarConvite(
   _formData: FormData
 ): Promise<ConviteResponseState> {
   const supabase = await createClient();
-  const { data: donoId, error } = await supabase.rpc("aceitar_convite", {
+  const { data: workspaceId, error } = await supabase.rpc("aceitar_convite_workspace", {
     p_token: token,
   });
 
-  if (error || !donoId) return { error: friendlyError(error?.message) };
-
-  // Someone whose only role is the 'comercial' they just accepted goes
-  // straight to the vendedor area instead of the colaborador picker.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user) {
-    const acesso = await getVendedorAcesso(supabase, user.id);
-    if (acesso.somenteVendedor && acesso.vinculos.some((v) => v.dono_id === donoId)) {
-      const cookieStore = await cookies();
-      cookieStore.set(COMERCIAL_DONO_COOKIE, donoId, {
-        path: "/",
-        maxAge: COMERCIAL_DONO_COOKIE_MAX_AGE,
-        sameSite: "lax",
-      });
-      redirect(VENDEDOR_HOME);
-    }
+  if (error || typeof workspaceId !== "string" || !workspaceId) {
+    return { error: friendlyError(error?.message) };
   }
 
-  redirect("/colaborador");
+  // Vale para todos os papéis: a empresa devolvida passa a ser a ativa e o
+  // destino depende do papel NELA (vendedor: área dele; os demais: o painel, e
+  // o proxy leva sócio/funcionário à primeira tela que as permissões liberam).
+  await gravarEmpresaAtiva(workspaceId);
+  const nova = (await listarEmpresas(supabase)).find((e) => e.workspaceId === workspaceId);
+  redirect(nova?.papel === "comercial" ? VENDEDOR_HOME : HOME_DONO);
 }
 
 export async function recusarConvite(

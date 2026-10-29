@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getAcessoEdicao, temExtra } from "@/lib/empresa-ativa";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -10,7 +11,6 @@ import {
   FollowupLeadSchema,
 } from "@/lib/validations/lead";
 import { ClienteSchema } from "@/lib/validations/cliente";
-import { getEffectiveDonoIdForComercial, getEffectiveWorkspaceIdForComercial } from "@/lib/comercial";
 import { todayISO } from "@/lib/vencimentos/dates";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -19,6 +19,8 @@ function textOrNull(value: FormDataEntryValue | null) {
   const str = value.toString().trim();
   return str === "" ? null : str;
 }
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -54,17 +56,14 @@ export async function createLead(
   }
 
   const { supabase } = await requireUser();
-  const [donoId, workspaceId] = await Promise.all([
-    getEffectiveDonoIdForComercial(),
-    getEffectiveWorkspaceIdForComercial(),
-  ]);
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  const acesso = await getAcessoEdicao("leads");
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const { error } = await supabase.from("leads").insert({
-    user_id: donoId,
-    workspace_id: workspaceId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     nome: parsed.data.nome,
-    contato: parsed.data.contato ?? null,
+    contato: temExtra(acesso, "contato") ? (parsed.data.contato ?? null) : null,
     tem_site: parsed.data.tem_site,
     site_link: parsed.data.site_link ?? null,
     tem_insta: parsed.data.tem_insta,
@@ -146,6 +145,10 @@ export async function updateLead(
   }
 
   const { supabase } = await requireUser();
+  const acesso = await getAcessoEdicao("leads");
+  if (!acesso) return { error: SEM_PERMISSAO };
+  // Sem o extra "contato" o campo nem aparece no formulário: não o apaga.
+  if (!temExtra(acesso, "contato")) delete update.contato;
   const { error } = await supabase.from("leads").update(update).eq("id", leadId);
   if (error) return { error: "Não foi possível atualizar o lead." };
 
@@ -167,6 +170,7 @@ export async function marcarAbordado(
   }
 
   const { supabase } = await requireUser();
+  if (!(await getAcessoEdicao("leads"))) return { error: SEM_PERMISSAO };
   const { error } = await supabase
     .from("leads")
     .update({
@@ -200,15 +204,12 @@ export async function registrarFollowup(
 
   const { supabase, user } = await requireUser();
   if (!user) return { error: "Sessão expirada. Faça login novamente." };
-  const [donoId, workspaceId] = await Promise.all([
-    getEffectiveDonoIdForComercial(),
-    getEffectiveWorkspaceIdForComercial(),
-  ]);
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  const acesso = await getAcessoEdicao("leads");
+  if (!acesso) return { error: SEM_PERMISSAO };
 
   const { error: followupError } = await supabase.from("followups_lead").insert({
-    user_id: donoId,
-    workspace_id: workspaceId,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     lead_id: leadId,
     canal: parsed.data.canal,
     resumo: parsed.data.resumo,
@@ -236,6 +237,7 @@ export async function registrarFollowup(
 
 export async function deleteLead(leadId: string) {
   const { supabase } = await requireUser();
+  if (!(await getAcessoEdicao("leads"))) return;
   await supabase.from("leads").delete().eq("id", leadId);
   revalidatePath("/leads");
 }
@@ -260,17 +262,18 @@ export async function convertLeadToCliente(
   }
 
   const { supabase } = await requireUser();
-  const [donoId, workspaceId] = await Promise.all([
-    getEffectiveDonoIdForComercial(),
-    getEffectiveWorkspaceIdForComercial(),
+  // Converter grava em leads e em clientes: precisa de edição nos dois.
+  const [acesso, acessoClientes] = await Promise.all([
+    getAcessoEdicao("leads"),
+    getAcessoEdicao("clientes"),
   ]);
-  if (!donoId) return { error: "Sessão expirada. Faça login novamente." };
+  if (!acesso || !acessoClientes) return { error: SEM_PERMISSAO };
 
   const { data: cliente, error } = await supabase
     .from("clientes")
     .insert({
-      user_id: donoId,
-      workspace_id: workspaceId,
+      user_id: acesso.donoId,
+      workspace_id: acesso.workspaceId,
       nome: parsed.data.nome,
       telefone: parsed.data.telefone ?? null,
       email: parsed.data.email ?? null,
@@ -298,5 +301,6 @@ export async function convertLeadToCliente(
 
   revalidatePath("/leads");
   revalidatePath("/clientes");
-  redirect(`/clientes/${(cliente as { id: string }).id}`);
+  // O detalhe do cliente é só do painel completo; os demais caem na lista.
+  redirect(acesso.ehDono ? `/clientes/${(cliente as { id: string }).id}` : "/clientes");
 }

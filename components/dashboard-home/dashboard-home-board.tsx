@@ -1,95 +1,237 @@
-import { Target, UserX, Users, CalendarClock, UserCheck, Activity } from "lucide-react";
+import Link from "next/link";
+import {
+  Target,
+  UserX,
+  Users,
+  CalendarClock,
+  UserCheck,
+  Activity,
+  Blocks,
+  Megaphone,
+  Wallet,
+  Users2,
+  Scale,
+} from "lucide-react";
 import { SetorResumoCard } from "@/components/dashboard-executivo/setor-resumo-card";
 import type { DashboardHomeOverview } from "@/lib/dashboard-home/get-overview";
+import { getRotulos } from "@/lib/rotulos";
 
-export function DashboardHomeBoard({ overview }: { overview: DashboardHomeOverview }) {
-  const { leads, renegados, clientes, agenda, vendedores, atividade } = overview;
+export async function DashboardHomeBoard({ overview }: { overview: DashboardHomeOverview }) {
+  const {
+    leads,
+    renegados,
+    clientes,
+    agenda,
+    vendedores,
+    atividade,
+    marketing,
+    financeiro,
+    rh,
+    juridico,
+    habilitados,
+  } = overview;
+  const rotulos = await getRotulos();
+  const com = (chave: string) => habilitados.includes(chave);
+  const temResumo = [
+    "leads",
+    "renegados",
+    "clientes",
+    "agenda",
+    "vendedores",
+    "marketing",
+    "financeiro",
+    "rh",
+    "juridico",
+  ].some(com);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
       <div>
         <h1 className="text-lg font-semibold text-zinc-100">Visão Geral</h1>
         <p className="text-sm text-zinc-500">
-          Atalhos e resumo dos módulos ativos: leads, renegados, clientes, agenda e vendedores
+          Atalhos e resumo dos módulos que a sua empresa usa
         </p>
       </div>
 
+      {!temResumo && (
+        <div className="flex flex-col items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-zinc-300">
+            <Blocks className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-sm font-medium text-zinc-100">Nenhum módulo ligado</p>
+            <p className="text-sm text-zinc-500">
+              Escolha os módulos que a empresa vai usar. Dá para ligar e desligar quando quiser.
+            </p>
+          </div>
+          <Link
+            href="/modulos"
+            className="rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
+          >
+            Escolher módulos
+          </Link>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <SetorResumoCard
-          icon={Target}
-          titulo="Leads"
-          href="/leads"
-          stats={[
-            {
-              label: "a abordar",
-              value: String(leads.aAbordar),
-              tone: leads.aAbordar > 0 ? "copper" : "zinc",
-            },
-            { label: "abordados", value: String(leads.abordados) },
-            {
-              label: "follow-ups pendentes",
-              value: String(leads.followupsPendentes),
-              tone: leads.followupsPendentes > 0 ? "amber" : "emerald",
-            },
-          ]}
-        />
+        {com("leads") && (
+          <SetorResumoCard
+            icon={Target}
+            titulo={rotulos.plural("leads")}
+            href="/leads"
+            stats={[
+              {
+                label: "a abordar",
+                value: String(leads.aAbordar),
+                tone: leads.aAbordar > 0 ? "copper" : "zinc",
+              },
+              { label: "abordados", value: String(leads.abordados) },
+              {
+                label: "follow-ups pendentes",
+                value: String(leads.followupsPendentes),
+                tone: leads.followupsPendentes > 0 ? "amber" : "emerald",
+              },
+            ]}
+          />
+        )}
 
-        <SetorResumoCard
-          icon={UserX}
-          titulo="Renegados"
-          href="/renegados"
-          stats={[{ label: "cadastrados", value: String(renegados.total) }]}
-        />
+        {com("renegados") && (
+          <SetorResumoCard
+            icon={UserX}
+            titulo={rotulos.plural("renegados")}
+            href="/renegados"
+            stats={[
+              {
+                label: rotulos.texto("renegados", "cadastrados", () => "no total"),
+                value: String(renegados.total),
+              },
+            ]}
+          />
+        )}
 
-        <SetorResumoCard
-          icon={Users}
-          titulo="Clientes"
-          href="/clientes"
-          stats={[
-            { label: "ativos", value: String(clientes.ativos), tone: "emerald" },
-            { label: "no total", value: String(clientes.total) },
-            { label: "leads convertidos", value: String(leads.convertidos) },
-          ]}
-        />
+        {com("clientes") && (
+          <SetorResumoCard
+            icon={Users}
+            titulo={rotulos.plural("clientes")}
+            href="/clientes"
+            stats={[
+              { label: "ativos", value: String(clientes.ativos), tone: "emerald" },
+              { label: "no total", value: String(clientes.total) },
+              ...(com("leads")
+                ? [
+                    {
+                      label: rotulos.texto("leads", "leads convertidos", ({ pluralMin }) => `conversões de ${pluralMin}`),
+                      value: String(leads.convertidos),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        )}
 
-        <SetorResumoCard
-          icon={CalendarClock}
-          titulo="Agenda"
-          href="/agenda"
-          stats={[
-            {
-              label: "reuniões hoje",
-              value: String(agenda.hoje),
-              tone: agenda.hoje > 0 ? "copper" : "zinc",
-            },
-            { label: "próximos 7 dias", value: String(agenda.proximos7Dias) },
-          ]}
-        />
+        {com("agenda") && (
+          <SetorResumoCard
+            icon={CalendarClock}
+            titulo={rotulos.plural("agenda")}
+            href="/agenda"
+            stats={[
+              {
+                label: rotulos.texto("agenda", "reuniões hoje", ({ pluralMin }) => `${pluralMin} hoje`),
+                value: String(agenda.hoje),
+                tone: agenda.hoje > 0 ? "copper" : "zinc",
+              },
+              { label: "próximos 7 dias", value: String(agenda.proximos7Dias) },
+            ]}
+          />
+        )}
 
-        <SetorResumoCard
-          icon={UserCheck}
-          titulo="Vendedores"
-          href="/vendedores"
-          stats={[
-            { label: "ativos", value: String(vendedores.ativos) },
-            {
-              label: "solicitações pendentes",
-              value: String(vendedores.solicitacoesPendentes),
-              tone: vendedores.solicitacoesPendentes > 0 ? "amber" : "zinc",
-            },
-          ]}
-        />
+        {com("vendedores") && (
+          <>
+            <SetorResumoCard
+              icon={UserCheck}
+              titulo="Vendedores"
+              href="/vendedores"
+              stats={[
+                { label: "ativos", value: String(vendedores.ativos) },
+                {
+                  label: "solicitações pendentes",
+                  value: String(vendedores.solicitacoesPendentes),
+                  tone: vendedores.solicitacoesPendentes > 0 ? "amber" : "zinc",
+                },
+              ]}
+            />
 
-        <SetorResumoCard
-          icon={Activity}
-          titulo="Atividade dos vendedores (7 dias)"
-          href="/atividade-vendedores"
-          stats={[
-            { label: "vendedores ativos", value: String(atividade.vendedoresAtivos) },
-            { label: "leads abertos", value: String(atividade.leadsAbertos) },
-            { label: "aberturas", value: String(atividade.aberturas) },
-          ]}
-        />
+            <SetorResumoCard
+              icon={Activity}
+              titulo="Atividade dos vendedores (7 dias)"
+              href="/atividade-vendedores"
+              stats={[
+                { label: "vendedores ativos", value: String(atividade.vendedoresAtivos) },
+                { label: "leads abertos", value: String(atividade.leadsAbertos) },
+                { label: "aberturas", value: String(atividade.aberturas) },
+              ]}
+            />
+          </>
+        )}
+
+        {com("marketing") && (
+          <SetorResumoCard
+            icon={Megaphone}
+            titulo="Marketing"
+            href="/marketing"
+            stats={[
+              { label: "campanhas ativas", value: String(marketing.campanhasAtivas) },
+              { label: "conteúdos a publicar", value: String(marketing.conteudoPlanejado) },
+            ]}
+          />
+        )}
+
+        {com("financeiro") && (
+          <SetorResumoCard
+            icon={Wallet}
+            titulo="Financeiro"
+            href="/contas-pagar"
+            stats={[
+              {
+                label: "contas a pagar abertas",
+                value: String(financeiro.contasPagarAbertas),
+                tone: financeiro.contasPagarAbertas > 0 ? "amber" : "zinc",
+              },
+              {
+                label: "contas a receber abertas",
+                value: String(financeiro.contasReceberAbertas),
+              },
+            ]}
+          />
+        )}
+
+        {com("rh") && (
+          <SetorResumoCard
+            icon={Users2}
+            titulo="RH"
+            href="/rh"
+            stats={[
+              { label: "funcionários ativos", value: String(rh.funcionariosAtivos) },
+              { label: "vagas abertas", value: String(rh.vagasAbertas) },
+            ]}
+          />
+        )}
+
+        {com("juridico") && (
+          <SetorResumoCard
+            icon={Scale}
+            titulo="Jurídico & Contábil"
+            href="/juridico"
+            stats={[
+              { label: "processos abertos", value: String(juridico.processosAbertos) },
+              {
+                label: "compliance pendente",
+                value: String(juridico.compliancePendente),
+                tone: juridico.compliancePendente > 0 ? "amber" : "emerald",
+              },
+            ]}
+          />
+        )}
       </div>
     </div>
   );

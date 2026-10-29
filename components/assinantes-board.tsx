@@ -182,9 +182,17 @@ function NewAssinanteForm({ clientes }: { clientes: Cliente[] }) {
 function AssinanteRow({
   assinatura,
   clientes,
+  somenteLeitura,
+  semValores,
+  clientesIndisponiveis,
+  semLinkCliente,
 }: {
   assinatura: Assinatura;
   clientes: Cliente[];
+  somenteLeitura: boolean;
+  semValores: boolean;
+  clientesIndisponiveis: boolean;
+  semLinkCliente: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const action = updateAssinante.bind(null, assinatura.id);
@@ -229,12 +237,18 @@ function AssinanteRow({
       <div className="min-w-0">
         <p className="flex items-center gap-2 truncate text-sm text-zinc-200">
           {cliente ? (
-            <Link
-              href={`/clientes/${cliente.id}`}
-              className="hover:text-copper-400 hover:underline"
-            >
-              {cliente.nome}
-            </Link>
+            semLinkCliente ? (
+              cliente.nome
+            ) : (
+              <Link
+                href={`/clientes/${cliente.id}`}
+                className="hover:text-copper-400 hover:underline"
+              >
+                {cliente.nome}
+              </Link>
+            )
+          ) : clientesIndisponiveis ? (
+            "—"
           ) : (
             "Cliente removido"
           )}
@@ -243,29 +257,31 @@ function AssinanteRow({
           </StatusChip>
         </p>
         <p className="text-xs text-zinc-500">
-          {assinatura.valor != null && formatCurrency(assinatura.valor)}
+          {semValores ? "—" : assinatura.valor != null && formatCurrency(assinatura.valor)}
           {` · ${assinatura.recorrencia}`}
           {assinatura.proxima_cobranca &&
             ` · próxima cobrança ${formatDate(assinatura.proxima_cobranca)}`}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteAssinante.bind(null, assinatura.id)}>
+      {!somenteLeitura && (
+        <div className="flex shrink-0 items-center gap-1">
           <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+            type="button"
+            onClick={() => setEditing(true)}
+            className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Pencil className="h-3.5 w-3.5" />
           </button>
-        </form>
-      </div>
+          <form action={deleteAssinante.bind(null, assinatura.id)}>
+            <button
+              type="submit"
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
@@ -273,9 +289,18 @@ function AssinanteRow({
 export function AssinantesBoard({
   assinaturas,
   clientes,
+  somenteLeitura = false,
+  semValores = false,
+  clientesIndisponiveis = false,
+  semLinkCliente = false,
 }: {
   assinaturas: Assinatura[];
   clientes: Cliente[];
+  somenteLeitura?: boolean;
+  semValores?: boolean;
+  /** Sem permissão em Clientes: o nome do cliente aparece como "—". */
+  clientesIndisponiveis?: boolean;
+  semLinkCliente?: boolean;
 }) {
   const grupos = useMemo(() => {
     const porPlano = new Map<string, Assinatura[]>();
@@ -296,7 +321,7 @@ export function AssinantesBoard({
             {assinaturas.length} assinatura(s)
           </p>
         </div>
-        <NewAssinanteForm clientes={clientes} />
+        {!somenteLeitura && <NewAssinanteForm clientes={clientes} />}
       </div>
 
       {grupos.length > 0 ? (
@@ -319,6 +344,10 @@ export function AssinantesBoard({
                     key={assinatura.id}
                     assinatura={assinatura}
                     clientes={clientes}
+                    somenteLeitura={somenteLeitura}
+                    semValores={semValores}
+                    clientesIndisponiveis={clientesIndisponiveis}
+                    semLinkCliente={semLinkCliente}
                   />
                 ))}
               </div>

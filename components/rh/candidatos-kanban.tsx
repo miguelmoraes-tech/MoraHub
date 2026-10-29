@@ -12,6 +12,7 @@ import {
   contratarCandidato,
 } from "@/app/(dashboard)/rh/recrutamento/actions";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
+import { usePodeEditarRh } from "@/components/rh/salarios-context";
 
 const COLUNAS: { status: CandidatoStatus; label: string }[] = [
   { status: "triagem", label: "Triagem" },
@@ -87,6 +88,7 @@ function Fields({ item, vagaId }: { item?: Candidato; vagaId: string }) {
 
 function NewCandidatoForm({ vagaId }: { vagaId: string }) {
   const [open, setOpen] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(createCandidato, undefined);
 
@@ -97,6 +99,7 @@ function NewCandidatoForm({ vagaId }: { vagaId: string }) {
   }, [open]);
 
   if (!open) {
+    if (!podeEditar) return null;
     return (
       <button
         type="button"
@@ -146,6 +149,7 @@ function CandidatoCard({
   vagaId: string;
   curriculoUrl: string | null;
 }) {
+  const podeEditar = usePodeEditarRh();
   const [editing, setEditing] = useState(false);
   const [contratando, setContratando] = useState(false);
   const [contratado, setContratado] = useState(false);
@@ -195,10 +199,10 @@ function CandidatoCard({
 
   return (
     <div
-      draggable
+      draggable={podeEditar}
       onDragStart={handleDragStart}
-      onClick={() => setEditing(true)}
-      className="cursor-grab space-y-1.5 rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 active:cursor-grabbing"
+      onClick={() => podeEditar && setEditing(true)}
+      className={`${podeEditar ? "cursor-grab active:cursor-grabbing" : ""} space-y-1.5 rounded-lg border border-zinc-800 bg-zinc-950 p-2.5`}
     >
       <p className="text-sm text-zinc-200">{candidato.nome}</p>
       <p className="truncate text-xs text-zinc-500">
@@ -218,19 +222,21 @@ function CandidatoCard({
             Currículo
           </a>
         )}
-        <form
-          action={deleteCandidato.bind(null, candidato.id, vagaId)}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="submit"
-            className="flex items-center gap-1 text-xs text-zinc-500 hover:text-rose-400"
+        {podeEditar && (
+          <form
+            action={deleteCandidato.bind(null, candidato.id, vagaId)}
+            onClick={(e) => e.stopPropagation()}
           >
-            <Trash2 className="h-3 w-3" />
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="flex items-center gap-1 text-xs text-zinc-500 hover:text-rose-400"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </form>
+        )}
       </div>
-      {candidato.status === "contratado" && !contratado && (
+      {podeEditar && candidato.status === "contratado" && !contratado && (
         <button
           type="button"
           onClick={(e) => {

@@ -150,10 +150,13 @@ function DocumentoFields({
   documento,
   clientes,
   modelos = [],
+  clientesIndisponiveis = false,
 }: {
   documento?: Documento;
   clientes: Cliente[];
   modelos?: ModeloContrato[];
+  /** Sem permissão em Clientes: o vínculo com o cliente não é mostrado nem alterado. */
+  clientesIndisponiveis?: boolean;
 }) {
   const [tipo, setTipo] = useState<"link" | "nota">(documento?.tipo ?? "link");
   const [precisaAssinatura, setPrecisaAssinatura] = useState(
@@ -245,23 +248,25 @@ function DocumentoFields({
           ))}
         </select>
       </div>
-      <div className="col-span-2 space-y-1">
-        <label className="text-xs font-medium text-zinc-400">
-          Cliente (opcional)
-        </label>
-        <select
-          name="cliente_id"
-          defaultValue={documento?.cliente_id ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
-        >
-          <option value="">Documento geral (sem cliente)</option>
-          {clientes.map((cliente) => (
-            <option key={cliente.id} value={cliente.id}>
-              {cliente.nome}
-            </option>
-          ))}
-        </select>
-      </div>
+      {!clientesIndisponiveis && (
+        <div className="col-span-2 space-y-1">
+          <label className="text-xs font-medium text-zinc-400">
+            Cliente (opcional)
+          </label>
+          <select
+            name="cliente_id"
+            defaultValue={documento?.cliente_id ?? ""}
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+          >
+            <option value="">Documento geral (sem cliente)</option>
+            {clientes.map((cliente) => (
+              <option key={cliente.id} value={cliente.id}>
+                {cliente.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="space-y-1">
         <label className="text-xs font-medium text-zinc-400">Data</label>
         <input
@@ -400,9 +405,11 @@ function DocumentoFields({
 function NewDocumentoForm({
   clientes,
   modelos,
+  clientesIndisponiveis,
 }: {
   clientes: Cliente[];
   modelos: ModeloContrato[];
+  clientesIndisponiveis: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -436,7 +443,11 @@ function NewDocumentoForm({
       action={formAction}
       className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3"
     >
-      <DocumentoFields clientes={clientes} modelos={modelos} />
+      <DocumentoFields
+        clientes={clientes}
+        modelos={modelos}
+        clientesIndisponiveis={clientesIndisponiveis}
+      />
       {state && "error" in state && (
         <p className="text-xs text-rose-400">{state.error}</p>
       )}
@@ -463,9 +474,15 @@ function NewDocumentoForm({
 function DocumentoRow({
   documento,
   clientes,
+  somenteLeitura,
+  clientesIndisponiveis,
+  semLinkCliente,
 }: {
   documento: DocumentoComArquivo;
   clientes: Cliente[];
+  somenteLeitura: boolean;
+  clientesIndisponiveis: boolean;
+  semLinkCliente: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const action = updateDocumento.bind(null, documento.id);
@@ -479,7 +496,11 @@ function DocumentoRow({
         action={formAction}
         className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3"
       >
-        <DocumentoFields documento={documento} clientes={clientes} />
+        <DocumentoFields
+          documento={documento}
+          clientes={clientes}
+          clientesIndisponiveis={clientesIndisponiveis}
+        />
         {state && "error" in state && (
           <p className="text-xs text-rose-400">{state.error}</p>
         )}
@@ -524,12 +545,18 @@ function DocumentoRow({
         </p>
         <p className="truncate text-xs text-zinc-500">
           {cliente ? (
-            <Link
-              href={`/clientes/${cliente.id}`}
-              className="hover:text-copper-400 hover:underline"
-            >
-              {cliente.nome}
-            </Link>
+            semLinkCliente ? (
+              cliente.nome
+            ) : (
+              <Link
+                href={`/clientes/${cliente.id}`}
+                className="hover:text-copper-400 hover:underline"
+              >
+                {cliente.nome}
+              </Link>
+            )
+          ) : documento.cliente_id && clientesIndisponiveis ? (
+            "Cliente: —"
           ) : (
             "Documento geral"
           )}
@@ -558,21 +585,25 @@ function DocumentoRow({
             <Paperclip className="h-3.5 w-3.5" />
           </a>
         )}
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteDocumento.bind(null, documento.id)}>
-          <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </form>
+        {!somenteLeitura && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <form action={deleteDocumento.bind(null, documento.id)}>
+              <button
+                type="submit"
+                className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
@@ -582,10 +613,18 @@ export function DocumentosBoard({
   documentos,
   clientes,
   modelos,
+  somenteLeitura = false,
+  clientesIndisponiveis = false,
+  semLinkCliente = false,
 }: {
   documentos: DocumentoComArquivo[];
   clientes: Cliente[];
   modelos: ModeloContrato[];
+  somenteLeitura?: boolean;
+  /** Sem permissão em Clientes: o cliente aparece como "—" e o vínculo não é alterado. */
+  clientesIndisponiveis?: boolean;
+  /** O detalhe do cliente (/clientes/[id]) é só do fundador/cofundador. */
+  semLinkCliente?: boolean;
 }) {
   const [categoria, setCategoria] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState<"" | "link" | "nota">("");
@@ -606,7 +645,13 @@ export function DocumentosBoard({
             {filtrados.length} documento(s)
           </p>
         </div>
-        <NewDocumentoForm clientes={clientes} modelos={modelos} />
+        {!somenteLeitura && (
+          <NewDocumentoForm
+            clientes={clientes}
+            modelos={modelos}
+            clientesIndisponiveis={clientesIndisponiveis}
+          />
+        )}
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -639,6 +684,9 @@ export function DocumentosBoard({
                 key={documento.id}
                 documento={documento}
                 clientes={clientes}
+                somenteLeitura={somenteLeitura}
+                clientesIndisponiveis={clientesIndisponiveis}
+                semLinkCliente={semLinkCliente}
               />
             ))}
           </div>

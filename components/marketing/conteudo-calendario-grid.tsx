@@ -160,9 +160,11 @@ function AddConteudoForm({
 export function ConteudoCalendarioGrid({
   itens,
   responsaveis,
+  somenteLeitura = false,
 }: {
   itens: CalendarioConteudo[];
   responsaveis: Responsavel[];
+  somenteLeitura?: boolean;
 }) {
   const hoje = useMemo(() => todayISO(), []);
   const [cursor, setCursor] = useState(() => {
@@ -323,7 +325,7 @@ export function ConteudoCalendarioGrid({
               <p className="text-xs text-zinc-600">Nenhum conteúdo agendado nesta data.</p>
             )}
 
-            {selectedDate && (
+            {selectedDate && !somenteLeitura && (
               <div className="pt-1">
                 <AddConteudoForm
                   key={selectedDate}

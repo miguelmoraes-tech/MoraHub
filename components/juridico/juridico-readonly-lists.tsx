@@ -90,9 +90,12 @@ function SectionShell({
 export function ComplianceReadonlyList({
   registros,
   clienteNome,
+  clientesIndisponiveis = false,
 }: {
   registros: ComplianceJuridico[];
   clienteNome: Map<string, string>;
+  /** Sem permissão em Clientes: o nome do cliente aparece como "—". */
+  clientesIndisponiveis?: boolean;
 }) {
   return (
     <SectionShell
@@ -117,7 +120,7 @@ export function ComplianceReadonlyList({
                 </p>
                 <p className="truncate text-xs text-zinc-500">
                   {registro.cliente_id
-                    ? (clienteNome.get(registro.cliente_id) ?? "Cliente")
+                    ? (clienteNome.get(registro.cliente_id) ?? (clientesIndisponiveis ? "—" : "Cliente"))
                     : "Geral"}
                   {registro.proxima_revisao &&
                     ` · próxima revisão ${formatDate(registro.proxima_revisao)}`}
@@ -138,9 +141,11 @@ export function ComplianceReadonlyList({
 export function PropriedadeIntelectualReadonlyList({
   itens,
   clienteNome,
+  clientesIndisponiveis = false,
 }: {
   itens: PropriedadeIntelectual[];
   clienteNome: Map<string, string>;
+  clientesIndisponiveis?: boolean;
 }) {
   const hoje = todayISO();
 
@@ -174,7 +179,7 @@ export function PropriedadeIntelectualReadonlyList({
                   <p className="truncate text-xs text-zinc-500">
                     {item.tipo}
                     {item.cliente_id &&
-                      ` · ${clienteNome.get(item.cliente_id) ?? "Cliente"}`}
+                      ` · ${clienteNome.get(item.cliente_id) ?? (clientesIndisponiveis ? "—" : "Cliente")}`}
                     {item.data_renovacao &&
                       ` · renovação ${formatDate(item.data_renovacao)}${atrasado ? " (atrasado)" : proximo ? " (em breve)" : ""}`}
                   </p>
@@ -195,9 +200,11 @@ export function PropriedadeIntelectualReadonlyList({
 export function ProcessosReadonlyList({
   processos,
   clienteNome,
+  clientesIndisponiveis = false,
 }: {
   processos: Processo[];
   clienteNome: Map<string, string>;
+  clientesIndisponiveis?: boolean;
 }) {
   const hoje = todayISO();
 
@@ -225,7 +232,7 @@ export function ProcessosReadonlyList({
                     </StatusChip>
                   </p>
                   <p className="truncate text-xs text-zinc-500">
-                    {clienteNome.get(processo.cliente_id) ?? "Cliente"}
+                    {clienteNome.get(processo.cliente_id) ?? (clientesIndisponiveis ? "—" : "Cliente")}
                     {processo.parte_contraria && ` · vs ${processo.parte_contraria}`}
                     {processo.proximo_prazo &&
                       ` · prazo ${formatDate(processo.proximo_prazo)}${atrasado ? " (atrasado)" : proximo ? " (em breve)" : ""}`}

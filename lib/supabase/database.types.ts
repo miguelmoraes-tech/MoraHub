@@ -2213,6 +2213,48 @@ export type Database = {
           },
         ]
       }
+      modulos: {
+        Row: {
+          ativo: boolean
+          categoria: string | null
+          chave: string
+          created_at: string
+          depende_de: string[]
+          descricao: string | null
+          icone: string | null
+          nome: string
+          ordem: number
+          padrao: boolean
+          permissoes_extras: Json
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string | null
+          chave: string
+          created_at?: string
+          depende_de?: string[]
+          descricao?: string | null
+          icone?: string | null
+          nome: string
+          ordem?: number
+          padrao?: boolean
+          permissoes_extras?: Json
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string | null
+          chave?: string
+          created_at?: string
+          depende_de?: string[]
+          descricao?: string | null
+          icone?: string | null
+          nome?: string
+          ordem?: number
+          padrao?: boolean
+          permissoes_extras?: Json
+        }
+        Relationships: []
+      }
       orcamentos: {
         Row: {
           categoria: string
@@ -3531,6 +3573,44 @@ export type Database = {
           },
         ]
       }
+      solicitacoes_vendedor: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          respondido_em: string | null
+          status: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          respondido_em?: string | null
+          status?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          respondido_em?: string | null
+          status?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitacoes_vendedor_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_respostas: {
         Row: {
           autor_id: string
@@ -3743,6 +3823,71 @@ export type Database = {
           },
         ]
       }
+      workspace_codigos: {
+        Row: {
+          codigo: string
+          created_at: string
+          workspace_id: string
+        }
+        Insert: {
+          codigo: string
+          created_at?: string
+          workspace_id: string
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_codigos_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_modulos: {
+        Row: {
+          config: Json
+          habilitado: boolean
+          habilitado_em: string
+          modulo_chave: string
+          workspace_id: string
+        }
+        Insert: {
+          config?: Json
+          habilitado?: boolean
+          habilitado_em?: string
+          modulo_chave: string
+          workspace_id: string
+        }
+        Update: {
+          config?: Json
+          habilitado?: boolean
+          habilitado_em?: string
+          modulo_chave?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_modulos_modulo_chave_fkey"
+            columns: ["modulo_chave"]
+            isOneToOne: false
+            referencedRelation: "modulos"
+            referencedColumns: ["chave"]
+          },
+          {
+            foreignKeyName: "workspace_modulos_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -3773,9 +3918,19 @@ export type Database = {
         Args: { p_lead_id: string }
         Returns: string
       }
+      criar_empresa: {
+        Args: { p_nicho?: string; p_nome: string }
+        Returns: string
+      }
       current_user_email: { Args: never; Returns: string }
+      definir_modulo: {
+        Args: { p_chave: string; p_habilitado: boolean; p_workspace_id: string }
+        Returns: undefined
+      }
       eh_comercial_workspace: { Args: { p_ws: string }; Returns: boolean }
       eh_dono_workspace: { Args: { p_ws: string }; Returns: boolean }
+      eh_membro_workspace: { Args: { ws: string }; Returns: boolean }
+      gerar_codigo_vendedor: { Args: never; Returns: string }
       get_colaboradores_do_dono: {
         Args: never
         Returns: {
@@ -3828,7 +3983,29 @@ export type Database = {
       }
       lead_view_ping: { Args: { p_view_id: string }; Returns: undefined }
       lead_view_start: { Args: { p_lead_id: string }; Returns: string }
+      meu_codigo_vendedor: { Args: { p_workspace_id: string }; Returns: string }
+      meu_papel_na_empresa: {
+        Args: { p_workspace_id: string }
+        Returns: string
+      }
+      minhas_empresas: {
+        Args: never
+        Returns: {
+          dono_id: string
+          nome: string
+          papel: string
+          workspace_id: string
+        }[]
+      }
+      modulo_habilitado: {
+        Args: { p_chave: string; ws: string }
+        Returns: boolean
+      }
       recusar_convite: { Args: { p_token: string }; Returns: undefined }
+      regenerar_codigo_vendedor: {
+        Args: { p_workspace_id: string }
+        Returns: string
+      }
       relatorio_atividade_vendedores: {
         Args: { p_dias?: number; p_workspace_id: string }
         Returns: {
@@ -3845,6 +4022,15 @@ export type Database = {
           vendedor_id: string
         }[]
       }
+      renomear_empresa: {
+        Args: { p_nome: string; p_workspace_id: string }
+        Returns: undefined
+      }
+      responder_solicitacao_vendedor: {
+        Args: { p_aprovar: boolean; p_id: string }
+        Returns: undefined
+      }
+      solicitar_acesso_vendedor: { Args: { p_codigo: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

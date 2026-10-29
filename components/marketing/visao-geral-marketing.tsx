@@ -20,7 +20,8 @@ export function VisaoGeralMarketing({ overview }: { overview: MarketingOverview 
     {
       icon: Wallet,
       label: "Total investido no mês",
-      value: formatCurrency(overview.totalInvestidoMes),
+      value:
+        overview.totalInvestidoMes !== null ? formatCurrency(overview.totalInvestidoMes) : "—",
       href: "/marketing/campanhas",
     },
     {

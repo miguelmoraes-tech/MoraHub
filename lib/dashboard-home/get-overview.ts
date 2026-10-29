@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
+import { getColaboradoresDaEmpresa } from "@/lib/colaboradores";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
+import { getModulosHabilitados } from "@/lib/modulos/habilitados";
 import { isFollowupPendente } from "@/lib/leads";
 import { todayISO } from "@/lib/vencimentos/dates";
 import type {
@@ -9,12 +11,15 @@ import type {
 } from "@/lib/types";
 
 /**
- * Números da home do dono, só dos módulos ligados em
- * lib/modulos-habilitados.ts (Leads, Renegados, Clientes, Agenda, Vendedores,
- * Atividade dos vendedores). O Dashboard Executivo completo
+ * Números da home do dono, só dos módulos ligados na empresa (workspace_modulos):
+ * módulo desligado não gera consulta. O Dashboard Executivo completo
  * (lib/dashboard-executivo) continua no repositório, sem uso.
  */
 export interface DashboardHomeOverview {
+  /** A conta tem empresa própria? Sem ela não há módulos para resumir. */
+  temEmpresa: boolean;
+  /** Módulos ligados da empresa. */
+  habilitados: string[];
   leads: {
     total: number;
     aAbordar: number;
@@ -27,17 +32,28 @@ export interface DashboardHomeOverview {
   agenda: { proximos7Dias: number; hoje: number };
   vendedores: { ativos: number; solicitacoesPendentes: number };
   atividade: { vendedoresAtivos: number; leadsAbertos: number; aberturas: number };
+  // Módulos novos: só contagens (sem valores), só quando o módulo está ligado.
+  marketing: { campanhasAtivas: number; conteudoPlanejado: number };
+  financeiro: { contasPagarAbertas: number; contasReceberAbertas: number };
+  rh: { funcionariosAtivos: number; vagasAbertas: number };
+  juridico: { processosAbertos: number; compliancePendente: number };
 }
 
 const DIAS_ATIVIDADE = 7;
 
 const VAZIO: DashboardHomeOverview = {
+  temEmpresa: false,
+  habilitados: [],
   leads: { total: 0, aAbordar: 0, abordados: 0, convertidos: 0, followupsPendentes: 0 },
   renegados: { total: 0 },
   clientes: { total: 0, ativos: 0 },
   agenda: { proximos7Dias: 0, hoje: 0 },
   vendedores: { ativos: 0, solicitacoesPendentes: 0 },
   atividade: { vendedoresAtivos: 0, leadsAbertos: 0, aberturas: 0 },
+  marketing: { campanhasAtivas: 0, conteudoPlanejado: 0 },
+  financeiro: { contasPagarAbertas: 0, contasReceberAbertas: 0 },
+  rh: { funcionariosAtivos: 0, vagasAbertas: 0 },
+  juridico: { processosAbertos: 0, compliancePendente: 0 },
 };
 
 export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview> {
@@ -47,8 +63,12 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
   } = await supabase.auth.getUser();
   if (!user) return VAZIO;
 
-  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
+  const workspaceId = await getWorkspaceIdAtivo();
   if (!workspaceId) return VAZIO;
+
+  const habilitados = await getModulosHabilitados(workspaceId);
+  const com = (chave: string) => habilitados.includes(chave);
+  const nada = Promise.resolve({ data: null, count: 0 });
 
   const hoje = todayISO();
   const agora = new Date();
@@ -64,33 +84,111 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
     colaboradoresRes,
     solicitacoesRes,
     atividadeRes,
+    campanhasRes,
+    conteudoRes,
+    contasPagarRes,
+    contasReceberRes,
+    funcionariosRes,
+    vagasRes,
+    processosRes,
+    complianceRes,
   ] = await Promise.all([
-    supabase
-      .from("leads")
-      .select("status, resultado, proximo_followup")
-      .eq("workspace_id", workspaceId),
-    supabase
-      .from("renegados")
-      .select("id", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId),
-    supabase.from("clientes").select("status").eq("workspace_id", workspaceId),
-    supabase
-      .from("reunioes")
-      .select("data_hora")
-      .eq("workspace_id", workspaceId)
-      .eq("status", "agendada")
-      .gte("data_hora", agora.toISOString())
-      .lte("data_hora", fimJanela.toISOString()),
-    supabase.rpc("get_colaboradores_do_dono"),
-    supabase
-      .from("solicitacoes_vendedor")
-      .select("id", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId)
-      .eq("status", "pendente"),
-    supabase.rpc("relatorio_atividade_vendedores", {
-      p_workspace_id: workspaceId,
-      p_dias: DIAS_ATIVIDADE,
-    }),
+    com("leads")
+      ? supabase
+          .from("leads")
+          .select("status, resultado, proximo_followup")
+          .eq("workspace_id", workspaceId)
+      : nada,
+    com("renegados")
+      ? supabase
+          .from("renegados")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+      : nada,
+    com("clientes")
+      ? supabase.from("clientes").select("status").eq("workspace_id", workspaceId)
+      : nada,
+    com("agenda")
+      ? supabase
+          .from("reunioes")
+          .select("data_hora")
+          .eq("workspace_id", workspaceId)
+          .eq("status", "agendada")
+          .gte("data_hora", agora.toISOString())
+          .lte("data_hora", fimJanela.toISOString())
+      : nada,
+    com("vendedores")
+      ? getColaboradoresDaEmpresa(supabase, workspaceId).then((data) => ({ data }))
+      : nada,
+    com("vendedores")
+      ? supabase
+          .from("solicitacoes_vendedor")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .eq("status", "pendente")
+      : nada,
+    com("vendedores")
+      ? supabase.rpc("relatorio_atividade_vendedores", {
+          p_workspace_id: workspaceId,
+          p_dias: DIAS_ATIVIDADE,
+        })
+      : nada,
+    com("marketing")
+      ? supabase
+          .from("campanhas")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .eq("status", "ativa")
+      : nada,
+    com("marketing")
+      ? supabase
+          .from("calendario_conteudo")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .in("status", ["planejado", "em_producao", "agendado"])
+      : nada,
+    com("financeiro")
+      ? supabase
+          .from("contas_pagar")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .neq("status", "pago")
+      : nada,
+    com("financeiro")
+      ? supabase
+          .from("contas_receber")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .neq("status", "recebido")
+      : nada,
+    com("rh")
+      ? supabase
+          .from("funcionarios")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .eq("status", "ativo")
+      : nada,
+    com("rh")
+      ? supabase
+          .from("vagas")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .eq("status", "aberta")
+      : nada,
+    com("juridico")
+      ? supabase
+          .from("processos")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .neq("fase", "encerrado")
+      : nada,
+    com("juridico")
+      ? supabase
+          .from("compliance_juridico")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .neq("status", "conforme")
+      : nada,
   ]);
 
   const leads = (leadsRes.data ?? []) as Pick<
@@ -103,6 +201,8 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
   const atividade = (atividadeRes.data ?? []) as AtividadeVendedorRow[];
 
   return {
+    temEmpresa: true,
+    habilitados,
     leads: {
       total: leads.length,
       aAbordar: leads.filter((l) => l.status === "abordar").length,
@@ -127,6 +227,19 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
       vendedoresAtivos: new Set(atividade.map((a) => a.vendedor_id)).size,
       leadsAbertos: new Set(atividade.map((a) => a.lead_id)).size,
       aberturas: atividade.reduce((soma, a) => soma + a.aberturas, 0),
+    },
+    marketing: {
+      campanhasAtivas: campanhasRes.count ?? 0,
+      conteudoPlanejado: conteudoRes.count ?? 0,
+    },
+    financeiro: {
+      contasPagarAbertas: contasPagarRes.count ?? 0,
+      contasReceberAbertas: contasReceberRes.count ?? 0,
+    },
+    rh: { funcionariosAtivos: funcionariosRes.count ?? 0, vagasAbertas: vagasRes.count ?? 0 },
+    juridico: {
+      processosAbertos: processosRes.count ?? 0,
+      compliancePendente: complianceRes.count ?? 0,
     },
   };
 }

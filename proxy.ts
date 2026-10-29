@@ -6,5 +6,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Não roda em assets estáticos (_next/*, favicon e arquivos públicos por
+  // extensão): o proxy consulta o banco e só interessa a páginas e APIs.
+  matcher: [
+    "/((?!_next/|favicon\\.ico$|robots\\.txt$|sitemap\\.xml$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js|map|txt|xml|json|woff|woff2|ttf|otf|mp4|webm|pdf)$).*)",
+  ],
 };

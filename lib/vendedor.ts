@@ -1,13 +1,7 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { COMERCIAL_DONO_COOKIE } from "@/lib/comercial";
-import {
-  VENDEDOR_HOME,
-  getVendedorAcesso,
-  isComercialSemVinculo,
-} from "@/lib/vendedor-access";
+import { getEmpresaAtiva } from "@/lib/empresa-ativa";
 import type { SolicitacaoVendedor } from "@/lib/vendedor-shared";
 
 export {
@@ -22,42 +16,33 @@ export interface VendedorContext {
   /** Workspace whose leads/reuniões the vendedor is acting on. */
   workspaceId: string;
   donoId: string;
-  somenteVendedor: boolean;
 }
 
 /**
- * The vendedor session for the current request, or null when the caller is
- * not an active 'comercial' member. With several links, the company picked in
- * the colaborador screen (COMERCIAL_DONO_COOKIE) wins; the cookie is only a
- * hint — it must match a link that is still 'ativo' in `membros`.
+ * The vendedor session for the current request, or null when the ACTIVE
+ * company is not one where the caller is a 'comercial' member. The interface
+ * depends on the papel in the active company (lib/empresa-ativa.ts, always
+ * revalidated in the database), never on the user as a whole.
  */
 export const getVendedorContext = cache(
   async (): Promise<VendedorContext | null> => {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return null;
-
-    const acesso = await getVendedorAcesso(supabase, user.id);
-    if (acesso.vinculos.length === 0) return null;
-
-    const cookieStore = await cookies();
-    const preferido = cookieStore.get(COMERCIAL_DONO_COOKIE)?.value;
-    const vinculo =
-      acesso.vinculos.find((v) => v.dono_id === preferido) ?? acesso.vinculos[0];
+    const ativa = await getEmpresaAtiva();
+    if (!ativa || ativa.papel !== "comercial") return null;
 
     return {
-      userId: user.id,
-      email: user.email ?? "",
-      workspaceId: vinculo.workspace_id,
-      donoId: vinculo.dono_id,
-      somenteVendedor: acesso.somenteVendedor,
+      userId: ativa.userId,
+      email: ativa.email,
+      workspaceId: ativa.workspaceId,
+      donoId: ativa.donoId,
     };
   }
 );
 
-/** Page/action guard: anonymous -> /login, non-vendedor -> /. */
+/**
+ * Page/action guard: anonymous -> /login; anyone who is not a vendedor in the
+ * active company -> "sem acesso" (a page the proxy never redirects away from,
+ * so a mismatch can't bounce between /dashboard and /vendedor/*).
+ */
 export async function requireVendedor(): Promise<VendedorContext> {
   const ctx = await getVendedorContext();
   if (ctx) return ctx;
@@ -66,31 +51,27 @@ export async function requireVendedor(): Promise<VendedorContext> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  redirect(user ? "/" : "/login");
+  redirect(user ? "/sem-acesso?erro=1" : "/login");
 }
 
-export interface SemVinculoContext {
+export interface SolicitacaoContext {
+  userId: string;
   email: string;
   /** The caller's most recent request for access (any status), if any. */
   ultima: SolicitacaoVendedor | null;
 }
 
 /**
- * Guard for the code / "aguardando aprovação" screens. The proxy already keeps
- * a comercial account without a link on these two screens; this is the other
- * half: whoever is not in that state is sent where they belong (a linked
- * vendedor to their area, anyone else to the app).
+ * Guard for the code / "aguardando aprovação" screens. Any logged-in account
+ * may open them, with or without a company — the proxy already sends the
+ * anonymous to /login; this repeats it and loads the latest request.
  */
-export async function requireComercialSemVinculo(): Promise<SemVinculoContext> {
+export async function requireUsuarioComSolicitacao(): Promise<SolicitacaoContext> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-
-  const acesso = await getVendedorAcesso(supabase, user.id);
-  if (acesso.somenteVendedor) redirect(VENDEDOR_HOME);
-  if (!(await isComercialSemVinculo(supabase, user, acesso))) redirect("/");
 
   const { data } = await supabase
     .from("solicitacoes_vendedor")
@@ -101,6 +82,7 @@ export async function requireComercialSemVinculo(): Promise<SemVinculoContext> {
     .maybeSingle();
 
   return {
+    userId: user.id,
     email: user.email ?? "",
     ultima: (data as SolicitacaoVendedor | null) ?? null,
   };

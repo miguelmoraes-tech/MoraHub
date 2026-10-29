@@ -2,21 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getAcessoFinanceiroEdicao } from "@/lib/financeiro/acesso";
 import { GastoSchema } from "@/lib/validations/gasto";
 import type { ActionState } from "@/lib/actions/types";
+
+const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
 
 function textOrNull(value: FormDataEntryValue | null) {
   if (value === null) return null;
   const str = value.toString().trim();
   return str === "" ? null : str;
-}
-
-async function requireUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return { supabase, user };
 }
 
 function parseGastoForm(formData: FormData) {
@@ -41,11 +36,13 @@ export async function createGasto(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase, user } = await requireUser();
-  if (!user) return { error: "Sessão expirada. Faça login novamente." };
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
 
+  const supabase = await createClient();
   const { error } = await supabase.from("gastos").insert({
-    user_id: user.id,
+    user_id: acesso.donoId,
+    workspace_id: acesso.workspaceId,
     nome: parsed.data.nome,
     valor: parsed.data.valor,
     tipo: parsed.data.tipo,
@@ -71,7 +68,10 @@ export async function updateGasto(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const { supabase } = await requireUser();
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  const supabase = await createClient();
   const { error } = await supabase
     .from("gastos")
     .update({
@@ -84,7 +84,8 @@ export async function updateGasto(
       categoria: parsed.data.categoria ?? null,
       data: parsed.data.data,
     })
-    .eq("id", gastoId);
+    .eq("id", gastoId)
+    .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: "Não foi possível atualizar o gasto." };
 
   revalidatePath("/gastos");
@@ -92,7 +93,14 @@ export async function updateGasto(
 }
 
 export async function deleteGasto(gastoId: string) {
-  const { supabase } = await requireUser();
-  await supabase.from("gastos").delete().eq("id", gastoId);
+  const acesso = await getAcessoFinanceiroEdicao();
+  if (!acesso) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("gastos")
+    .delete()
+    .eq("id", gastoId)
+    .eq("workspace_id", acesso.workspaceId);
   revalidatePath("/gastos");
 }

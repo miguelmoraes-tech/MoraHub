@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { UserCheck } from "lucide-react";
 import type { ColaboradorPapel, ColaboradorVinculado, Convite } from "@/lib/types";
 import {
@@ -8,10 +8,11 @@ import {
   cancelarConvite,
 } from "@/app/(dashboard)/juridico/actions";
 import { formatDate } from "@/lib/format";
+import { useToast } from "@/components/toast";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { ConviteColaboradorDialog } from "@/components/convite-colaborador-dialog";
 import { ChatLink } from "@/components/chat/chat-link";
-import { isRotaHabilitada } from "@/lib/modulos-habilitados";
+import { CHAT_HABILITADO } from "@/lib/modulos/registry";
 
 const PAPEL_LABEL: Record<ColaboradorPapel, string> = {
   contador: "Contador",
@@ -56,6 +57,19 @@ export function ColaboradoresSection({
   papelFixo?: ColaboradorPapel;
   titulo?: string;
 }) {
+  const toast = useToast();
+  const [pending, startTransition] = useTransition();
+
+  // As duas ações são RPCs: com 2+ fundadores o pedido só é ENVIADO para aprovação
+  // (nada muda na lista; a página é relida pelo servidor). Erro agora aparece em aviso.
+  function executar(acao: () => Promise<{ ok: true; pendente?: boolean } | { error: string }>) {
+    startTransition(async () => {
+      const r = await acao();
+      setConfirmando(null);
+      if ("error" in r) toast.error(r.error);
+      else if (r.pendente) toast.aprovacao();
+    });
+  }
   const [confirmando, setConfirmando] = useState<Confirmando>(null);
 
   return (
@@ -98,14 +112,14 @@ export function ColaboradoresSection({
                 {confirmandoEste ? (
                   <div className="flex shrink-0 items-center gap-2 text-xs">
                     <span className="text-zinc-400">Remover acesso?</span>
-                    <form action={removerColaborador.bind(null, c.id)}>
-                      <button
-                        type="submit"
-                        className="rounded-md bg-rose-600 px-2 py-1 font-medium text-white hover:bg-rose-500"
-                      >
-                        Confirmar
-                      </button>
-                    </form>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => executar(() => removerColaborador(c.id))}
+                      className="rounded-md bg-rose-600 px-2 py-1 font-medium text-white hover:bg-rose-500 disabled:opacity-60"
+                    >
+                      Confirmar
+                    </button>
                     <button
                       type="button"
                       onClick={() => setConfirmando(null)}
@@ -116,7 +130,7 @@ export function ColaboradoresSection({
                   </div>
                 ) : (
                   <div className="flex shrink-0 items-center gap-1">
-                    {isRotaHabilitada("/chat") &&
+                    {CHAT_HABILITADO &&
                       conversaByColaborador.has(`${c.membro_id}|${c.papel}`) && (
                       <ChatLink
                         href={`/chat/${conversaByColaborador.get(`${c.membro_id}|${c.papel}`)}`}
@@ -177,14 +191,14 @@ export function ColaboradoresSection({
                     (confirmandoEste ? (
                       <div className="flex items-center gap-2 text-xs">
                         <span className="text-zinc-400">Cancelar convite?</span>
-                        <form action={cancelarConvite.bind(null, convite.id)}>
-                          <button
-                            type="submit"
-                            className="rounded-md bg-rose-600 px-2 py-1 font-medium text-white hover:bg-rose-500"
-                          >
-                            Confirmar
-                          </button>
-                        </form>
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => executar(() => cancelarConvite(convite.id))}
+                          className="rounded-md bg-rose-600 px-2 py-1 font-medium text-white hover:bg-rose-500 disabled:opacity-60"
+                        >
+                          Confirmar
+                        </button>
                         <button
                           type="button"
                           onClick={() => setConfirmando(null)}

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
+import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
+import { getColaboradoresDaEmpresa } from "@/lib/colaboradores";
 import { AgendaView } from "@/components/agenda/agenda-view";
 import type { ReuniaoComLead } from "@/lib/agenda-shared";
 import type { ColaboradorVinculado, Reuniao } from "@/lib/types";
@@ -12,7 +13,7 @@ export default async function AgendaPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
+  const workspaceId = (await getAcessoModulo("agenda"))?.workspaceId ?? null;
 
   const [{ data: reunioes }, { data: colaboradores }] = (await Promise.all([
     supabase
@@ -20,7 +21,7 @@ export default async function AgendaPage() {
       .select("*")
       .eq("workspace_id", workspaceId ?? "")
       .order("data_hora", { ascending: true }),
-    supabase.rpc("get_colaboradores_do_dono"),
+    getColaboradoresDaEmpresa(supabase, workspaceId).then((data) => ({ data })),
   ])) as [
     { data: Reuniao[] | null },
     { data: ColaboradorVinculado[] | null },
@@ -29,7 +30,11 @@ export default async function AgendaPage() {
 
   const leadIds = [...new Set(itens.map((r) => r.lead_id))];
   const { data: leads } = leadIds.length
-    ? ((await supabase.from("leads").select("id, nome").in("id", leadIds)) as {
+    ? ((await supabase
+        .from("leads")
+        .select("id, nome")
+        .eq("workspace_id", workspaceId ?? "")
+        .in("id", leadIds)) as {
         data: { id: string; nome: string }[] | null;
       })
     : { data: [] };

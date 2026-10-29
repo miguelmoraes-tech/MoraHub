@@ -4,9 +4,9 @@ import { Suspense, useActionState, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Handshake } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { signup } from "@/lib/actions/auth";
-import { ACCOUNT_TYPES, ACCOUNT_TYPE_STYLES, SIGNUP_ACCOUNT_TYPES } from "@/lib/account-types";
+import { ACCOUNT_TYPES, ACCOUNT_TYPE_STYLES, SIGNUP_OPCOES } from "@/lib/account-types";
 import { isCollaboratorAccountType, type AccountType } from "@/lib/hub-mode";
 
 function SignupForm() {
@@ -29,14 +29,12 @@ function SignupForm() {
     ? `/login?redirect=${encodeURIComponent(redirectTo)}&email=${encodeURIComponent(prefillEmail)}`
     : "/login";
 
+  // Rótulo/ícone do tipo escolhido: o da opção do cadastro quando ela existe
+  // (ex.: 'comercial' = "Sou funcionário"), senão o de ACCOUNT_TYPES (convites).
   const selected = ACCOUNT_TYPES.find((o) => o.value === accountType);
-  // The 'comercial' account type is only offered here as "Sou vendedor": no
-  // company of its own, it asks the gestor for access by code afterwards (or
-  // accepts an invite link). The shared ACCOUNT_TYPES entry stays for the
-  // account switcher.
-  const isVendedor = accountType === "comercial";
-  const selectedLabel = isVendedor ? "Sou vendedor" : selected?.label;
-  const SelectedIcon = isVendedor ? Handshake : selected?.icon;
+  const opcao = SIGNUP_OPCOES.find((o) => o.tipo === accountType);
+  const selectedLabel = opcao?.label ?? selected?.label;
+  const SelectedIcon = opcao?.icon ?? selected?.icon;
 
   return (
     <>
@@ -59,16 +57,16 @@ function SignupForm() {
         </div>
 
         {step === 1 ? (
-          <div className="grid grid-cols-2 gap-3">
-            {ACCOUNT_TYPES.filter((option) => SIGNUP_ACCOUNT_TYPES.includes(option.value)).map((option) => {
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {SIGNUP_OPCOES.map((option) => {
               const Icon = option.icon;
-              const styles = ACCOUNT_TYPE_STYLES[option.value];
+              const styles = ACCOUNT_TYPE_STYLES[option.tipo];
               return (
                 <button
-                  key={option.value}
+                  key={option.tipo}
                   type="button"
                   onClick={() => {
-                    setAccountType(option.value);
+                    setAccountType(option.tipo);
                     setStep(2);
                   }}
                   className={`flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-colors ${styles.card}`}
@@ -87,28 +85,6 @@ function SignupForm() {
                 </button>
               );
             })}
-            <button
-              type="button"
-              onClick={() => {
-                setAccountType("comercial");
-                setStep(2);
-              }}
-              className={`col-span-2 flex items-center gap-3 rounded-xl border p-4 text-left transition-colors ${ACCOUNT_TYPE_STYLES.comercial.card}`}
-            >
-              <span
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-950 ${ACCOUNT_TYPE_STYLES.comercial.iconBg}`}
-              >
-                <Handshake className="h-5 w-5" />
-              </span>
-              <span className="flex flex-col gap-1">
-                <span className={`text-sm font-semibold ${ACCOUNT_TYPE_STYLES.comercial.text}`}>
-                  Sou vendedor
-                </span>
-                <span className="text-xs leading-relaxed text-zinc-500">
-                  Tenho o código do meu gestor e quero acessar os leads da empresa dele
-                </span>
-              </span>
-            </button>
           </div>
         ) : (
           <form

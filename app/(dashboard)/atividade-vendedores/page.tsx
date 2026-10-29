@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
+import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
 import { AtividadeVendedoresBoard } from "@/components/atividade/atividade-vendedores-board";
 import { parseDias } from "@/lib/atividade-shared";
 import type { AtividadeVendedorRow } from "@/lib/types";
@@ -18,7 +18,7 @@ export default async function AtividadeVendedoresPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const workspaceId = await getWorkspaceIdPadrao(user.id, "empresarial");
+  const workspaceId = await getWorkspaceIdAtivo();
   if (!workspaceId) redirect("/dashboard");
 
   const { data, error } = (await supabase.rpc("relatorio_atividade_vendedores", {

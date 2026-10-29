@@ -1,23 +1,25 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEffectiveDonoIdForRH } from "@/lib/rh";
+import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { DepartamentosBoard } from "@/components/rh/departamentos-board";
 import type { Departamento, Funcionario } from "@/lib/types";
 
 export default async function DepartamentosPage() {
-  const donoId = await getEffectiveDonoIdForRH();
+  // RH por pessoa: fundador/cofundador ou quem tem permissão de leitura (o proxy já barra o resto).
+  const acesso = await getAcessoModulo("rh");
+  const workspaceId = acesso?.workspaceId ?? null;
   const supabase = await createClient();
 
-  const [{ data: departamentos }, { data: funcionarios }] = donoId
+  const [{ data: departamentos }, { data: funcionarios }] = workspaceId
     ? ((await Promise.all([
         supabase
           .from("departamentos")
           .select("*")
-          .eq("user_id", donoId)
+          .eq("workspace_id", workspaceId)
           .order("nome", { ascending: true }),
         supabase
           .from("funcionarios")
           .select("*")
-          .eq("user_id", donoId)
+          .eq("workspace_id", workspaceId)
           .order("nome", { ascending: true }),
       ])) as [{ data: Departamento[] | null }, { data: Funcionario[] | null }])
     : [{ data: [] as Departamento[] }, { data: [] as Funcionario[] }];

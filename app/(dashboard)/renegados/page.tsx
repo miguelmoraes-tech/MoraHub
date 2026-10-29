@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceIdPadrao } from "@/lib/workspace";
+import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { RenegadosBoard } from "@/components/renegados-board";
 import type { Renegado } from "@/lib/types";
 
@@ -8,7 +8,8 @@ export default async function RenegadosPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const workspaceId = user ? await getWorkspaceIdPadrao(user.id, "empresarial") : null;
+  const acesso = user ? await getAcessoModulo("renegados") : null;
+  const workspaceId = acesso?.workspaceId ?? null;
 
   const { data: renegados } = (await supabase
     .from("renegados")
@@ -18,5 +19,11 @@ export default async function RenegadosPage() {
     data: Renegado[] | null;
   };
 
-  return <RenegadosBoard renegados={renegados ?? []} />;
+  return (
+    <RenegadosBoard
+      renegados={renegados ?? []}
+      somenteLeitura={acesso?.nivel !== "edicao"}
+      semExportar={!acesso?.ehDono}
+    />
+  );
 }

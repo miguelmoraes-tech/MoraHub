@@ -14,9 +14,12 @@ const TIPO_CONTATO_OPTIONS: { value: LeadTipoContato; label: string }[] = [
 export function LeadFields({
   lead,
   campanhas = [],
+  ocultarContato = false,
 }: {
   lead?: Lead;
   campanhas?: CampanhaOption[];
+  /** Sem o extra "contato": o campo nem aparece (e a action preserva o valor salvo). */
+  ocultarContato?: boolean;
 }) {
   const [temSite, setTemSite] = useState(lead?.tem_site ?? false);
   const [temInsta, setTemInsta] = useState(lead?.tem_insta ?? false);
@@ -36,17 +39,19 @@ export function LeadFields({
             className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
           />
         </div>
-        <div className="col-span-2 space-y-1 sm:col-span-1">
-          <label className="text-xs font-medium text-zinc-400">
-            Contato
-          </label>
-          <input
-            name="contato"
-            placeholder="Telefone, e-mail..."
-            defaultValue={lead?.contato ?? ""}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
-          />
-        </div>
+        {!ocultarContato && (
+          <div className="col-span-2 space-y-1 sm:col-span-1">
+            <label className="text-xs font-medium text-zinc-400">
+              Contato
+            </label>
+            <input
+              name="contato"
+              placeholder="Telefone, e-mail..."
+              defaultValue={lead?.contato ?? ""}
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+            />
+          </div>
+        )}
       </div>
 
       <div className="space-y-1">
