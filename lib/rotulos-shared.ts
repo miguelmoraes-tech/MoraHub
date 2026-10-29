@@ -37,6 +37,20 @@ export const ROTULOS_PADRAO: Record<string, RotuloModulo> = {
   rh: { singular: "RH", plural: "RH" },
   marketing: { singular: "Marketing", plural: "Marketing" },
   juridico: { singular: "Jurídico & Contábil", plural: "Jurídico & Contábil" },
+  p3d_impressoras: { singular: "Impressora", plural: "Impressoras" },
+  p3d_estoque: { singular: "Material", plural: "Estoque" },
+  p3d_produtos: { singular: "Produto", plural: "Produtos e catálogo" },
+  p3d_precificacao: { singular: "Precificação", plural: "Precificação" },
+  p3d_orcamentos: { singular: "Orçamento", plural: "Orçamentos 3D" },
+  p3d_fornecedores: { singular: "Fornecedor", plural: "Fornecedores e compras" },
+  p3d_pedidos: { singular: "Pedido", plural: "Pedidos e vendas" },
+  p3d_producao: { singular: "Trabalho", plural: "Produção" },
+  p3d_qualidade: { singular: "Inspeção", plural: "Qualidade" },
+  p3d_expedicao: { singular: "Envio", plural: "Expedição" },
+  p3d_dashboard: { singular: "Dashboard", plural: "Dashboard 3D" },
+  p3d_relatorios: { singular: "Relatório", plural: "Relatórios 3D" },
+  p3d_automacoes: { singular: "Notificação", plural: "Notificações e alertas" },
+  p3d_integracoes: { singular: "Integração", plural: "Integrações" },
 };
 
 /** Primeira letra minúscula, exceto em sigla (RH, SST), para usar no meio da frase. */

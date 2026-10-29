@@ -45,7 +45,20 @@ export type IconeNome =
   | "gavel"
   | "shield-check"
   | "copyright"
-  | "blocks";
+  | "blocks"
+  | "printer"
+  | "boxes"
+  | "package"
+  | "calculator"
+  | "file-spreadsheet"
+  | "shopping-cart"
+  | "clipboard-list"
+  | "factory"
+  | "truck"
+  | "gauge"
+  | "bar-chart-3"
+  | "bell"
+  | "plug";
 
 export interface ItemMenu {
   label: string;
@@ -83,6 +96,7 @@ export const GRUPOS_MENU = [
   "Jurídico & Contábil",
   "RH",
   "Marketing",
+  "Impressão 3D",
 ] as const;
 
 export const MODULOS: ModuloRegistro[] = [
@@ -254,6 +268,123 @@ export const MODULOS: ModuloRegistro[] = [
       },
       { label: "Documentos", href: "/documentos", icone: "file-text", grupo: "Jurídico & Contábil" },
     ],
+  },
+  // --- Nicho Impressão 3D (Etapa A). Tabelas p3d_* isolam por workspace_id na RLS.
+  // O catálogo (modulos.ativo) segue false até a ativação manual. Os extras "custos" de
+  // Estoque e Orçamentos são só de tela (esconder custo, lucro e margem).
+  {
+    chave: "p3d_impressoras",
+    rotas: ["/impressao-3d/impressoras"],
+    icone: "printer",
+    tabelas: ["p3d_impressoras", "p3d_pecas_desgaste", "p3d_manutencoes"],
+    menu: [
+      { label: "Impressoras", href: "/impressao-3d/impressoras", icone: "printer", grupo: "Impressão 3D" },
+    ],
+  },
+  {
+    chave: "p3d_estoque",
+    rotas: ["/impressao-3d/estoque"],
+    icone: "boxes",
+    tabelas: ["p3d_materiais", "p3d_movimentos_estoque"],
+    menu: [{ label: "Estoque", href: "/impressao-3d/estoque", icone: "boxes", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_produtos",
+    rotas: ["/impressao-3d/produtos"],
+    icone: "package",
+    tabelas: ["p3d_produtos", "p3d_produto_variacoes", "p3d_produto_arquivos"],
+    menu: [
+      { label: "Produtos e catálogo", href: "/impressao-3d/produtos", icone: "package", grupo: "Impressão 3D" },
+    ],
+  },
+  {
+    chave: "p3d_precificacao",
+    rotas: ["/impressao-3d/precificacao"],
+    icone: "calculator",
+    tabelas: ["p3d_config_precificacao"],
+    menu: [
+      { label: "Precificação", href: "/impressao-3d/precificacao", icone: "calculator", grupo: "Impressão 3D" },
+    ],
+  },
+  {
+    chave: "p3d_orcamentos",
+    rotas: ["/impressao-3d/orcamentos"],
+    icone: "file-spreadsheet",
+    tabelas: ["p3d_orcamentos", "p3d_orcamento_itens"],
+    menu: [
+      { label: "Orçamentos 3D", href: "/impressao-3d/orcamentos", icone: "file-spreadsheet", grupo: "Impressão 3D" },
+    ],
+  },
+  // --- Nicho Impressão 3D (Etapa B). O extra "custos" de Pedidos esconde custo, lucro e margem.
+  {
+    chave: "p3d_fornecedores",
+    rotas: ["/impressao-3d/fornecedores"],
+    icone: "shopping-cart",
+    tabelas: ["p3d_fornecedores", "p3d_compras", "p3d_compra_itens"],
+    menu: [
+      { label: "Fornecedores e compras", href: "/impressao-3d/fornecedores", icone: "shopping-cart", grupo: "Impressão 3D" },
+    ],
+  },
+  {
+    chave: "p3d_pedidos",
+    rotas: ["/impressao-3d/pedidos"],
+    icone: "clipboard-list",
+    tabelas: ["p3d_pedidos", "p3d_pedido_itens", "p3d_pedido_pagamentos", "p3d_pedido_historico"],
+    menu: [{ label: "Pedidos e vendas", href: "/impressao-3d/pedidos", icone: "clipboard-list", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_producao",
+    rotas: ["/impressao-3d/producao"],
+    icone: "factory",
+    tabelas: ["p3d_producao"],
+    menu: [{ label: "Produção", href: "/impressao-3d/producao", icone: "factory", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_qualidade",
+    rotas: ["/impressao-3d/qualidade"],
+    icone: "shield-check",
+    tabelas: ["p3d_inspecoes", "p3d_falhas"],
+    menu: [{ label: "Qualidade", href: "/impressao-3d/qualidade", icone: "shield-check", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_expedicao",
+    rotas: ["/impressao-3d/expedicao"],
+    icone: "truck",
+    tabelas: ["p3d_envios"],
+    menu: [{ label: "Expedição", href: "/impressao-3d/expedicao", icone: "truck", grupo: "Impressão 3D" }],
+  },
+  // --- Nicho Impressão 3D (Etapa C-1). Dashboard e Relatórios têm o extra "custos" (custo, lucro e
+  // margem só de tela). Automações: notificações dentro do app (sem e-mail/WhatsApp/push).
+  // Integrações: só estrutura, sem conexão real.
+  {
+    chave: "p3d_dashboard",
+    rotas: ["/impressao-3d/dashboard"],
+    icone: "gauge",
+    // Sem tabela própria: lê por RPC (p3d_painel) e dispara p3d_atualizar_alertas.
+    tabelas: [],
+    menu: [{ label: "Dashboard 3D", href: "/impressao-3d/dashboard", icone: "gauge", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_relatorios",
+    rotas: ["/impressao-3d/relatorios"],
+    icone: "bar-chart-3",
+    // Sem tabela própria: só RPCs de leitura (p3d_relatorio_*).
+    tabelas: [],
+    menu: [{ label: "Relatórios 3D", href: "/impressao-3d/relatorios", icone: "bar-chart-3", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_automacoes",
+    rotas: ["/impressao-3d/notificacoes"],
+    icone: "bell",
+    tabelas: ["p3d_notificacoes", "p3d_config_alertas"],
+    menu: [{ label: "Notificações e alertas", href: "/impressao-3d/notificacoes", icone: "bell", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_integracoes",
+    rotas: ["/impressao-3d/integracoes"],
+    icone: "plug",
+    tabelas: ["p3d_integracoes"],
+    menu: [{ label: "Integrações", href: "/impressao-3d/integracoes", icone: "plug", grupo: "Impressão 3D" }],
   },
 ];
 

@@ -4,6 +4,7 @@ import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { getModulosHabilitados } from "@/lib/modulos/habilitados";
 import { isFollowupPendente } from "@/lib/leads";
 import { todayISO } from "@/lib/vencimentos/dates";
+import { RESUMO_P3D_VAZIO, getResumoImpressao3d, type ResumoImpressao3d } from "@/lib/impressao-3d/resumo";
 import type {
   AtividadeVendedorRow,
   ColaboradorVinculado,
@@ -37,6 +38,8 @@ export interface DashboardHomeOverview {
   financeiro: { contasPagarAbertas: number; contasReceberAbertas: number };
   rh: { funcionariosAtivos: number; vagasAbertas: number };
   juridico: { processosAbertos: number; compliancePendente: number };
+  /** Nicho Impressão 3D: só contagens, só dos módulos p3d_* ligados. */
+  impressao3d: ResumoImpressao3d;
 }
 
 const DIAS_ATIVIDADE = 7;
@@ -54,6 +57,7 @@ const VAZIO: DashboardHomeOverview = {
   financeiro: { contasPagarAbertas: 0, contasReceberAbertas: 0 },
   rh: { funcionariosAtivos: 0, vagasAbertas: 0 },
   juridico: { processosAbertos: 0, compliancePendente: 0 },
+  impressao3d: RESUMO_P3D_VAZIO,
 };
 
 export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview> {
@@ -191,6 +195,8 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
       : nada,
   ]);
 
+  const impressao3d = await getResumoImpressao3d(supabase, workspaceId, habilitados);
+
   const leads = (leadsRes.data ?? []) as Pick<
     Lead,
     "status" | "resultado" | "proximo_followup"
@@ -241,5 +247,6 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
       processosAbertos: processosRes.count ?? 0,
       compliancePendente: complianceRes.count ?? 0,
     },
+    impressao3d,
   };
 }

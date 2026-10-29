@@ -14,7 +14,9 @@ import {
   lerPermissoesProprias,
   modulosDasPermissoes,
   modulosVisiveis,
+  type PermissaoModulo,
 } from "@/lib/modulos/permissoes";
+import { configDoSino } from "@/lib/impressao-3d/sino";
 import { getEmpresaAtiva, getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 import { ToastProvider } from "@/components/toast";
 import { RotulosProvider } from "@/components/rotulos-provider";
@@ -52,6 +54,7 @@ export default async function DashboardLayout({
   const painel = ativa && temPainelCompleto(ativa.papel) ? ativa : null;
   const restrito = !!ativa && ehPapelRestrito(ativa.papel);
   let modulosHabilitados: string[] = [];
+  let permissoesProprias: PermissaoModulo[] = [];
   if (painel) {
     modulosHabilitados = await getModulosHabilitados(painel.workspaceId);
   } else if (restrito && ativa) {
@@ -60,12 +63,15 @@ export default async function DashboardLayout({
       lerPermissoesProprias(supabase, ativa.workspaceId, user.id),
       getModulosPermiteMembros(),
     ]);
+    permissoesProprias = permissoes;
     modulosHabilitados = modulosVisiveis(
       habilitados,
       modulosDasPermissoes(permissoes),
       permiteMembros
     );
   }
+  // Sino de alertas do nicho Impressão 3D: só com Dashboard ou Automações ligados e liberados.
+  const sinoAlertas = configDoSino(modulosHabilitados, !!painel, permissoesProprias);
 
   // Vencimentos e Chat não são módulos do catálogo (lib/modulos/registry.ts):
   // sem banner, sem contador de não lidas e sem as consultas deles.
@@ -116,6 +122,7 @@ export default async function DashboardLayout({
         restrito={restrito}
         empresas={empresas}
         empresaAtivaId={ativa?.workspaceId ?? null}
+        sinoAlertas={sinoAlertas}
       />
       <main className="flex flex-1 flex-col overflow-y-auto">
         {VENCIMENTOS_HABILITADO && <VencimentosBanner alertas={alertas} />}
