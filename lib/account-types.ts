@@ -77,8 +77,9 @@ export const ACCOUNT_TYPES: {
  * aqui. Cada opção grava o tipo de conta (`tipo`) que o resto do app já
  * entende: empreendedor = 'empresarial' (cria a primeira empresa no primeiro
  * acesso), funcionário = 'comercial' (entra por código/convite; a regra de
- * vendedor sem vínculo depende desse valor). Os demais tipos continuam em
- * ACCOUNT_TYPES, só não são oferecidos. Convites por link
+ * vendedor sem vínculo depende desse valor), pessoal = 'pessoal' (finanças e
+ * acervo pessoal em /pessoal/*, sem empresa; pode criar a sua depois). Os
+ * demais tipos continuam em ACCOUNT_TYPES, só não são oferecidos. Convites por link
  * (/convite/<token> -> /signup?papel=...) aceitam qualquer papel de
  * colaborador, independentemente desta lista.
  */
@@ -99,6 +100,12 @@ export const SIGNUP_OPCOES: {
     label: "Sou funcionário",
     description: "Trabalho em uma empresa e vou entrar nela com o código do meu gestor ou um convite",
     icon: Handshake,
+  },
+  {
+    tipo: "pessoal",
+    label: "Conta Pessoal",
+    description: "Para organizar sua vida financeira e pessoal",
+    icon: Home,
   },
 ];
 
