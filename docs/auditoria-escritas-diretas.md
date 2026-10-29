@@ -1,48 +1,68 @@
 # Auditoria: escritas diretas em `membros`, `convites` e `perfis_tipos_ativos`
 
-Levantamento da Fase 5 (só relato; o fluxo do vendedor não foi alterado). Método:
-busca por `.from("membros" | "convites" | "perfis_tipos_ativos")` seguida de
-`insert/update/delete/upsert` em todo `app/`, `components/`, `lib/` e `proxy.ts`,
-mais a lista de RPCs chamadas pelo app. Tudo o mais nessas tabelas é leitura ou
-passa por RPC.
+Fase 5 (levantamento) e Fase 5B (migração do /vendedores). Método: busca em todo
+`app/`, `components/`, `lib/`, `proxy.ts` e `scripts/` por
+`.from("membros" | "convites" | "perfis_tipos_ativos")` seguido (nas 8 linhas
+seguintes) de `insert/update/delete/upsert`, mais a lista de RPCs chamadas. A
+varredura roda sozinha em `scripts/auditar-isolamento.mts` (falha se aparecer
+escrita fora da exceção abaixo) e em `scripts/testar-acesso.mts`.
 
-| # | Onde | Escrita | Para que serve | RPC que substituiria | Fluxo |
-| - | ---- | ------- | -------------- | -------------------- | ----- |
-| 1 | `app/(dashboard)/juridico/actions.ts` → `convidarColaborador` | `INSERT convites` (`dono_id`, `email_convidado`, `papel`, `workspace_id`) | Convite de colaborador; hoje só a tela **/vendedores** o usa (`ColaboradoresSection` com `papelFixo="comercial"` → `ConviteColaboradorDialog`) | `convidar_membro(p_workspace_id, p_email, p_papel, p_permissoes)` | **Ativo** (só /vendedores). O código do Jurídico/Contábil que também o usava é legado desligado |
-| 2 | mesmo arquivo → `removerColaborador` | `UPDATE membros SET status='removido'` por `id` + `workspace_id` | Remover vendedor em /vendedores | `remover_membro(p_workspace_id, p_membro_id)` | **Ativo** (só /vendedores) |
-| 3 | mesmo arquivo → `cancelarConvite` | `DELETE convites` (`id`, `dono_id`, `workspace_id`, `status='pendente'`) | Cancelar convite pendente de vendedor | `cancelar_convite_empresa(p_id)` | **Ativo** (só /vendedores) |
-| 4 | `lib/perfil.ts` → `garantirTipoAtivo` | `INSERT perfis_tipos_ativos` (`user_id`, `tipo`, `nome?`) | Registrar o tipo de conta: cadastro (`lib/actions/auth.ts`, tipos que não são "empresarial") e o seletor de modos (`lib/actions/tipos-ativos.ts` → `ativarTipoConta`) | **Não existe RPC.** Para `empresarial` já vale `criar_empresa(p_nome, p_nicho)`; para os demais tipos faltaria uma RPC tipo `garantir_tipo_ativo(p_tipo)` | **Ativo** (cadastro e seletor). Para contador/advogado/financeiro/rh o destino (`/colaborador`) é legado desligado, mas o insert do cadastro ainda roda |
+## Situação atual
 
-Escritas indiretas (já por RPC, nada a migrar): `aceitar_convite_workspace`,
-`recusar_convite`, `convidar_membro`, `cancelar_convite_empresa`, `remover_membro`,
-`atualizar_permissoes_membro`, `criar_empresa`, `responder_solicitacao_*`.
+| Onde | Escrita | Fluxo | Situação |
+| ---- | ------- | ----- | -------- |
+| `lib/perfil.ts` → `garantirTipoAtivo` (linha 72) | `INSERT perfis_tipos_ativos` (`user_id`, `tipo`, `nome?`) | Cadastro (`lib/actions/auth.ts`, tipos que não são "empresarial") e seletor de modos (`lib/actions/tipos-ativos.ts` → `ativarTipoConta`). **Ativo** | **Sobra.** Não existe RPC (a empresa nasce por `criar_empresa(p_nome, p_nicho)`; os demais tipos precisariam de algo como `garantir_tipo_ativo(p_tipo)`). Não altera a empresa nem a equipe, então não passa pela aprovação entre fundadores |
+| `scripts/vendedor-rls-test.sql` | `INSERT INTO membros` (fixtures) | Script SQL manual de teste do RLS, rodado no SQL Editor, não faz parte do app | Não é código do app; relatado por completude |
 
-## A `convidar_membro` precisaria aceitar `comercial`?
+Mais nada: não há `UPDATE`, `DELETE` nem `UPSERT` direto nas três tabelas, em
+client, server actions, route handlers (`app/api/*` só exporta dados) nem scripts.
 
-**Sim**, para cobrir o /vendedores. Hoje o app só envia `socio`, `funcionario` e
-`cofundador` (enum em `app/(dashboard)/socios/actions.ts`), e o convite de
-vendedor sai do item 1 com `papel='comercial'`. Para migrar seria preciso:
+**`perfis_tipos_ativos` nunca sofre UPDATE/DELETE.** Renomear empresa é a RPC
+`renomear_empresa` (`lib/actions/empresa.ts`); a criação é `criar_empresa`. A
+única escrita é o INSERT acima.
 
-1. `convidar_membro` aceitar `p_papel = 'comercial'` (sem matriz de permissões,
-   que o vendedor não usa) e devolver o token como o item 1 devolve hoje;
-2. `remover_membro` receber o vínculo de vendedor (ele recebe `p_membro_id`, que é o
-   **user id**; o item 2 recebe o **id da linha** de `membros`: a tela teria de
-   passar o outro identificador);
-3. a tela /vendedores tratar o retorno `NULL` (2+ fundadores): avisar "Enviado para
-   aprovação" e não mostrar link.
+## Migrado na Fase 5B (`app/(dashboard)/juridico/actions.ts`, usadas só por /vendedores)
 
-Não consegui confirmar no banco se `convidar_membro` já aceita `comercial`
-(a consulta ao corpo da função não foi autorizada nesta sessão): conferir antes de migrar.
+| Função | Antes | Agora |
+| ------ | ----- | ----- |
+| `convidarColaborador` | `INSERT convites` | `convidar_membro(p_workspace_id, p_email, 'comercial', [])` |
+| `removerColaborador` | `UPDATE membros SET status='removido'` por id da linha | `remover_membro(p_workspace_id, p_membro_id)`; o id da **pessoa** (`membros.membro_id`) é buscado na linha, só dentro da empresa ativa |
+| `cancelarConvite` | `DELETE convites` (só pendente) | `cancelar_convite_empresa(p_id)` |
 
-## Risco que isto cria com a aprovação entre fundadores
+Com 2+ fundadores (`fundadores_da_empresa`) os três ficam **pendentes**: a tela
+mostra "Enviado para aprovação dos outros fundadores" com link para
+`/aprovacoes`, não monta link de convite (a RPC devolve `NULL`) e não altera a
+lista. Com 1 fundador tudo segue como antes. O pedido do convite aprovado traz o
+link `/convite/<token>` em Aprovações.
 
-Os itens 1, 2 e 3 são escritas **diretas**: não passam pela porta de aprovação do
-banco. Se o RLS deixa o dono gravar em `convites`/`membros`, com 2+ fundadores um
-deles ainda convida/remove **vendedor** sem a aprovação dos outros. O app não
-trava isso (a regra é "no /vendedores NÃO migre"). Decisão pendente para o banco ou
-para uma fase futura: migrar os três para as RPCs acima ou restringir o RLS.
+### Diferenças de comportamento (do código; o corpo das RPCs não foi inspecionado)
 
-## Migrado nesta fase
+Não rodei SQL e a consulta ao corpo das funções não foi autorizada nesta sessão,
+então a comparação de colunas abaixo vem só do lado do app. **Conferir no banco:**
 
-Nada. Os únicos fluxos ativos com escrita direta são o /vendedores (itens 1 a 3,
-fora do escopo) e o `garantirTipoAtivo` (item 4), que não tem RPC equivalente.
+- O INSERT antigo gravava `dono_id` (quem convidou, `auth.uid()`), `email_convidado`,
+  `papel`, `workspace_id`; `id`, `token`, `status`, `expira_em` e `created_at` vinham
+  de DEFAULT. A RPC recebe `p_workspace_id`, `p_email`, `p_papel`, `p_permissoes` e
+  devolve o token. Pontos a validar: (1) `dono_id` — o app usava o usuário logado
+  (cofundador incluído); a RPC pode gravar o dono da empresa; (2) a coluna de
+  permissões (`database.types.ts` está desatualizado e não a lista) deve ficar
+  vazia/`[]` para `comercial`; (3) `expira_em` (a tela de sócios diz "vale por 7
+  dias") e `token` devem ter o mesmo formato do DEFAULT antigo, para o fluxo de
+  aceite do vendedor (`get_convite_by_token`, `aceitar_convite_workspace`) não mudar.
+- Convite repetido: o app continua checando antes e mostrando a mensagem de sempre
+  ("Já existe um convite pendente para esse e-mail."); a checagem agora filtra por
+  empresa e e-mail, **sem** `dono_id` (assim vale também quando o convite foi de
+  outro fundador).
+- Remover e cancelar antes falhavam em silêncio; agora um erro da RPC aparece em
+  aviso (sem texto conhecido, "Não foi possível concluir a ação. Tente novamente.").
+- Os papéis antigos de colaborador (contador, advogado, ...) não passam mais por
+  `convidarColaborador` (desligados; ela só envia `comercial`): recebem "Este tipo
+  de colaborador não está disponível."
+- O vendedor (o convidado) não vê nenhuma mudança: o link, a aceitação e a área
+  `/vendedor/*` são os mesmos.
+
+## Escritas indiretas (já por RPC)
+
+`aceitar_convite_workspace`, `recusar_convite`, `convidar_membro`,
+`cancelar_convite_empresa`, `remover_membro`, `atualizar_permissoes_membro`,
+`criar_empresa`, `responder_solicitacao_acesso`, `responder_solicitacao_vendedor`.

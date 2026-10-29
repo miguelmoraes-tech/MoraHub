@@ -27,7 +27,7 @@ import { MODULOS, menuDoDono, moduloDaRota, primeiraRotaHabilitada, rotaPermitid
 import { permissoesJuridico } from "@/lib/juridico-shared";
 import { filtrarPermissoesOferecidas, modulosOferecidos } from "@/lib/socios-shared";
 import { getModulosPermiteMembrosDoCatalogo } from "@/lib/modulos/catalogo";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolverAcessoModulo } from "@/lib/modulos/guard";
 import { permissoesFinanceiro } from "@/lib/financeiro/permissoes";
 import { computeCampanhaDerived } from "@/lib/marketing/campanha-metrics-shared";
@@ -1374,6 +1374,89 @@ await teste("adicionar recomendados avisa quantos pedidos foram criados (um por 
   assert.ok(t.includes("enviados += 1") && t.includes("concluir(pendente, pendente ? enviados : undefined)"));
   const ui = readFileSync("components/modulos/modulos-board.tsx", "utf8");
   assert.ok(ui.includes("um por módulo"));
+});
+
+// ===========================================================================
+// Fase 5B — /vendedores escreve por RPC (convidar_membro, remover_membro, cancelar_convite_empresa)
+// ===========================================================================
+
+console.log("\nFase 5B — convidarColaborador / removerColaborador / cancelarConvite viram RPCs");
+const lerFonte = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+const trechoDaFuncao = (texto: string, nome: string) => {
+  const ini = texto.indexOf(`export async function ${nome}`);
+  assert.ok(ini >= 0, `função ${nome} não encontrada`);
+  const prox = texto.indexOf("\nexport async function ", ini + 10);
+  return texto.slice(ini, prox < 0 ? undefined : prox);
+};
+const juridicoActions = lerFonte("app/(dashboard)/juridico/actions.ts");
+await teste("convidarColaborador chama convidar_membro com 'comercial', sem permissões, e não insere em convites", () => {
+  const f = trechoDaFuncao(juridicoActions, "convidarColaborador");
+  assert.ok(f.includes('.rpc("convidar_membro"'));
+  assert.ok(f.includes('p_papel: "comercial"') && f.includes("p_permissoes: []"));
+  assert.ok(f.includes("p_workspace_id: workspaceId"), "empresa ativa vinda do servidor");
+  assert.ok(!/\.insert\(/.test(f), "sem INSERT direto");
+  // Convite repetido: mesma mensagem de sempre, antes de chamar a RPC.
+  assert.ok(f.indexOf("Já existe um convite pendente para esse e-mail.") < f.indexOf('.rpc("convidar_membro"'));
+  // Link e mensagem de sucesso: igual ao de hoje (origem + /convite/<token>).
+  assert.ok(f.includes("`${origin}/convite/${token}`"));
+  assert.ok(f.includes('"Não foi possível criar o convite."'), "mensagem de falha de sempre");
+});
+await teste("convidarColaborador trata o retorno NULL (2+ fundadores): pendente, sem link", () => {
+  const f = trechoDaFuncao(juridicoActions, "convidarColaborador");
+  assert.ok(/typeof token !== "string" \|\| !token\) return \{ ok: true, pendente: true \}/.test(f));
+  assert.ok(f.indexOf("pendente: true") < f.indexOf("getOrigin()"), "não monta link quando está pendente");
+});
+await teste("só 'comercial' passa pela RPC; papéis antigos de colaborador são recusados", () => {
+  const f = trechoDaFuncao(juridicoActions, "convidarColaborador");
+  assert.ok(f.includes('parsed.data.papel !== "comercial"'));
+});
+await teste("removerColaborador manda o id da PESSOA (membros.membro_id), buscado dentro da empresa ativa", () => {
+  const f = trechoDaFuncao(juridicoActions, "removerColaborador");
+  assert.ok(f.includes('.rpc("remover_membro"'));
+  assert.ok(f.includes("p_membro_id: pessoaId"));
+  assert.ok(/\.select\("membro_id"\)[\s\S]*\.eq\("id", membroId\)[\s\S]*\.eq\("workspace_id", workspaceId\)/.test(f), "lookup da linha só na empresa ativa");
+  assert.ok(!/\.update\(|\.delete\(/.test(f), "sem UPDATE/DELETE direto");
+  assert.ok(f.includes("exigeAprovacao(") && f.indexOf("exigeAprovacao(") < f.indexOf('.rpc("remover_membro"'), "consulta os fundadores antes");
+});
+await teste("cancelarConvite chama cancelar_convite_empresa e consulta os fundadores antes", () => {
+  const f = trechoDaFuncao(juridicoActions, "cancelarConvite");
+  assert.ok(f.includes('.rpc("cancelar_convite_empresa", { p_id: conviteId })'));
+  assert.ok(!/\.update\(|\.delete\(|\.insert\(/.test(f));
+  assert.ok(f.indexOf("exigeAprovacao(") < f.indexOf('.rpc("cancelar_convite_empresa"'));
+});
+await teste("remover e cancelar devolvem pendente (2+ fundadores) e a tela não age como se tivesse executado", () => {
+  for (const nome of ["removerColaborador", "cancelarConvite"])
+    assert.ok(trechoDaFuncao(juridicoActions, nome).includes("{ ok: true, pendente: true }"), nome);
+  const secao = lerFonte("components/colaboradores-section.tsx");
+  assert.ok(!secao.includes("<form action={removerColaborador") && !secao.includes("<form action={cancelarConvite"));
+  assert.ok(secao.includes("toast.aprovacao()") && secao.includes('"error" in r'));
+  const dialogo = lerFonte("components/convite-colaborador-dialog.tsx");
+  assert.ok(dialogo.includes("enviadoParaAprovacao") && dialogo.includes("AVISO_ENVIADO") && dialogo.includes("ROTA_APROVACOES"));
+});
+await teste("varredura: nenhuma escrita direta em membros/convites/perfis_tipos_ativos além de lib/perfil.ts", () => {
+  const sobras: string[] = [];
+  const andar = (dir: string): string[] =>
+    readdirSync(dir).flatMap((n) => {
+      const c = `${dir}/${n}`;
+      if (n === "node_modules" || n === ".next") return [];
+      if (statSync(c).isDirectory()) return andar(c);
+      return /\.(ts|tsx|mts)$/.test(n) && !n.endsWith("database.types.ts") ? [c] : [];
+    });
+  for (const pasta of ["app", "components", "lib", "scripts"])
+    for (const arq of andar(pasta)) {
+      const linhas = lerFonte(arq).split("\n");
+      linhas.forEach((linha, i) => {
+        const m = linha.match(/\.from\(\s*["'`](membros|convites|perfis_tipos_ativos)["'`]/);
+        if (m && /\.(insert|update|delete|upsert)\(/.test(linhas.slice(i, i + 8).join(" ")))
+          sobras.push(`${arq}:${i + 1} ${m[1]}`);
+      });
+    }
+  assert.deepEqual(sobras, ["lib/perfil.ts:72 perfis_tipos_ativos"]);
+});
+await teste("perfis_tipos_ativos nunca sofre UPDATE/DELETE direto: renomear empresa é a RPC renomear_empresa", () => {
+  assert.ok(lerFonte("lib/actions/empresa.ts").includes('.rpc("renomear_empresa"'));
+  const perfil = lerFonte("lib/perfil.ts");
+  assert.ok(!/perfis_tipos_ativos"\)\s*\.(update|delete|upsert)/.test(perfil));
 });
 
 console.log(`\n${total} testes`);

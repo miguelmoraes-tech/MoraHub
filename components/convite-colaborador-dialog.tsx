@@ -3,6 +3,8 @@
 import { useActionState, useRef, useState } from "react";
 import { Plus, X, Copy, Check } from "lucide-react";
 import { convidarColaborador } from "@/app/(dashboard)/juridico/actions";
+import Link from "next/link";
+import { AVISO_ENVIADO, ROTA_APROVACOES } from "@/lib/aprovacoes-shared";
 import type { ColaboradorPapel } from "@/lib/types";
 
 export function ConviteColaboradorDialog({
@@ -73,12 +75,37 @@ function ConviteColaboradorForm({
   );
   const [copied, setCopied] = useState(false);
   const [papel, setPapel] = useState<ColaboradorPapel>(papelFixo ?? "contador");
-  const created = state && "ok" in state ? state : null;
+  const created = state && "ok" in state && "inviteUrl" in state ? state : null;
+  // 2+ fundadores: o convite foi só enviado para aprovação (ainda não há link).
+  const enviadoParaAprovacao = !!state && "pendente" in state;
 
   async function handleCopy() {
     if (!created) return;
     await navigator.clipboard.writeText(created.inviteUrl);
     setCopied(true);
+  }
+
+  if (enviadoParaAprovacao) {
+    return (
+      <div className="space-y-4 px-5 py-4">
+        <p className="text-sm text-zinc-300">
+          {AVISO_ENVIADO}. O link do convite aparece em{" "}
+          <Link href={ROTA_APROVACOES} className="font-medium text-copper-400 underline underline-offset-2">
+            Aprovações
+          </Link>{" "}
+          quando todos aprovarem.
+        </p>
+        <div className="flex justify-end pt-2">
+          <button
+            type="button"
+            onClick={onDone}
+            className="rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-copper-500"
+          >
+            Concluir
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (created) {
