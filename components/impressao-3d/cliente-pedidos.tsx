@@ -22,6 +22,8 @@ export function ClientePedidosOrcamentos({ dados }: { dados: ComprasDoCliente })
         Pedidos e orçamentos
       </h2>
 
+      {dados.erro && <p className="text-xs text-rose-400">{dados.erro}</p>}
+
       {pedidos && (
         <div className="mb-5 space-y-3">
           <div className="grid grid-cols-2 gap-3">

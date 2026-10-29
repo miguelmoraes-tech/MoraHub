@@ -34,6 +34,8 @@ export interface ComprasDoCliente {
   totalComprado: number;
   /** Data do pedido não cancelado mais recente. */
   ultimaCompra: string | null;
+  /** Texto do erro de leitura (como veio do banco); com erro a tela não mostra "nenhum pedido". */
+  erro: string | null;
 }
 
 /** Total comprado e última compra: só pedidos não cancelados. */

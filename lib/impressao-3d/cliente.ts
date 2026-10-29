@@ -40,7 +40,11 @@ export async function getComprasDoCliente(clienteId: string): Promise<ComprasDoC
           .limit(200)
       : Promise.resolve({ data: null }),
   ]);
+  const erroLeitura = ("error" in pedidosRes ? pedidosRes.error : null) ?? ("error" in orcamentosRes ? orcamentosRes.error : null);
+  if (erroLeitura) {
+    return { pedidos: null, orcamentos: null, totalComprado: 0, ultimaCompra: null, erro: erroLeitura.message || "Não foi possível carregar os pedidos e orçamentos." };
+  }
   const pedidos = acessoPedidos ? ((pedidosRes.data ?? []) as unknown as PedidoDoCliente[]) : null;
   const orcamentos = acessoOrcamentos ? ((orcamentosRes.data ?? []) as unknown as OrcamentoDoCliente[]) : null;
-  return { pedidos, orcamentos, ...resumirCompras(pedidos ?? []) };
+  return { pedidos, orcamentos, ...resumirCompras(pedidos ?? []), erro: null };
 }

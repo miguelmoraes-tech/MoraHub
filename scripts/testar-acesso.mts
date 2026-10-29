@@ -3537,6 +3537,7 @@ await teste("Clientes: seção 'Pedidos e orçamentos' só com os módulos; tota
   const fonte = lerFonte("lib/impressao-3d/cliente.ts");
   assert.ok(fonte.includes("COLUNAS_PEDIDO_CLIENTE") && fonte.includes('getAcessoModulo("p3d_pedidos")') && fonte.includes('getAcessoModulo("p3d_orcamentos")'));
   assert.ok(fonte.includes("if (!acessoPedidos && !acessoOrcamentos) return null;"), "sem os módulos a página fica como hoje");
+  assert.ok(fonte.includes("if (erroLeitura)") && lerFonte("components/impressao-3d/cliente-pedidos.tsx").includes("{dados.erro &&"), "erro de leitura aparece como veio (não vira 'nenhum pedido')");
   assert.equal((fonte.match(/\.eq\("workspace_id", acesso(Pedidos|Orcamentos)\.workspaceId\)/g) ?? []).length, 2);
   const pagina = lerFonte("app/(dashboard)/clientes/[id]/page.tsx");
   assert.ok(pagina.includes("{comprasP3d && <ClientePedidosOrcamentos"));
