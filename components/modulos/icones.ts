@@ -3,6 +3,11 @@ import {
   BadgeCheck,
   Banknote,
   Blocks,
+  Boxes,
+  Calculator,
+  FileSpreadsheet,
+  Package,
+  Printer,
   Briefcase,
   Building2,
   CalendarClock,
@@ -71,6 +76,11 @@ const ICONES: Record<IconeNome, Icone> = {
   "shield-check": ShieldCheck,
   copyright: Copyright,
   blocks: Blocks,
+  printer: Printer,
+  boxes: Boxes,
+  package: Package,
+  calculator: Calculator,
+  "file-spreadsheet": FileSpreadsheet,
 };
 
 /** Ícone pelo nome; nome desconhecido (ex.: vindo do catálogo) cai num padrão. */

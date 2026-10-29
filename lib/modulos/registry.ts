@@ -45,7 +45,12 @@ export type IconeNome =
   | "gavel"
   | "shield-check"
   | "copyright"
-  | "blocks";
+  | "blocks"
+  | "printer"
+  | "boxes"
+  | "package"
+  | "calculator"
+  | "file-spreadsheet";
 
 export interface ItemMenu {
   label: string;
@@ -83,6 +88,7 @@ export const GRUPOS_MENU = [
   "Jurídico & Contábil",
   "RH",
   "Marketing",
+  "Impressão 3D",
 ] as const;
 
 export const MODULOS: ModuloRegistro[] = [
@@ -253,6 +259,52 @@ export const MODULOS: ModuloRegistro[] = [
         grupo: "Jurídico & Contábil",
       },
       { label: "Documentos", href: "/documentos", icone: "file-text", grupo: "Jurídico & Contábil" },
+    ],
+  },
+  // --- Nicho Impressão 3D (Etapa A). Tabelas p3d_* isolam por workspace_id na RLS.
+  // O catálogo (modulos.ativo) segue false até a ativação manual. Os extras "custos" de
+  // Estoque e Orçamentos são só de tela (esconder custo, lucro e margem).
+  {
+    chave: "p3d_impressoras",
+    rotas: ["/impressao-3d/impressoras"],
+    icone: "printer",
+    tabelas: ["p3d_impressoras", "p3d_pecas_desgaste", "p3d_manutencoes"],
+    menu: [
+      { label: "Impressoras", href: "/impressao-3d/impressoras", icone: "printer", grupo: "Impressão 3D" },
+    ],
+  },
+  {
+    chave: "p3d_estoque",
+    rotas: ["/impressao-3d/estoque"],
+    icone: "boxes",
+    tabelas: ["p3d_materiais", "p3d_movimentos_estoque"],
+    menu: [{ label: "Estoque", href: "/impressao-3d/estoque", icone: "boxes", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_produtos",
+    rotas: ["/impressao-3d/produtos"],
+    icone: "package",
+    tabelas: ["p3d_produtos", "p3d_produto_variacoes", "p3d_produto_arquivos"],
+    menu: [
+      { label: "Produtos e catálogo", href: "/impressao-3d/produtos", icone: "package", grupo: "Impressão 3D" },
+    ],
+  },
+  {
+    chave: "p3d_precificacao",
+    rotas: ["/impressao-3d/precificacao"],
+    icone: "calculator",
+    tabelas: ["p3d_config_precificacao"],
+    menu: [
+      { label: "Precificação", href: "/impressao-3d/precificacao", icone: "calculator", grupo: "Impressão 3D" },
+    ],
+  },
+  {
+    chave: "p3d_orcamentos",
+    rotas: ["/impressao-3d/orcamentos"],
+    icone: "file-spreadsheet",
+    tabelas: ["p3d_orcamentos", "p3d_orcamento_itens"],
+    menu: [
+      { label: "Orçamentos 3D", href: "/impressao-3d/orcamentos", icone: "file-spreadsheet", grupo: "Impressão 3D" },
     ],
   },
 ];

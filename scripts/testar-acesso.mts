@@ -86,6 +86,34 @@ import {
 import { garantirTipoAtivo, tipoContaDaMetadata } from "@/lib/perfil";
 import { NOVA_EMPRESA } from "@/lib/empresa";
 import { ACESSO_VENDEDOR_CODIGO } from "@/lib/vendedor-access";
+import {
+  CONFIG_PADRAO,
+  abaixoDoMinimo,
+  custoPorGrama,
+  depreciacaoPorHora,
+  desgastePorHora,
+  entradaParaRecalculo,
+  gramasDeRolos,
+  horasParaManutencao,
+  manutencaoVencida,
+  pecaVencida,
+  podeVerCustos,
+} from "@/lib/impressao-3d/regras";
+import { formatMoeda, formatNumero, formatPct, formatPercentualFracao, parseNumero } from "@/lib/impressao-3d/numeros";
+import {
+  ConfigSchema,
+  FAIXA_DESPERDICIO,
+  FAIXA_FALHAS,
+  ImpressoraSchema,
+  MaterialSchema,
+  MovimentoSchema,
+  OrcamentoSchema,
+} from "@/lib/impressao-3d/validacao";
+import { LIMITE_BYTES, caminhoValido, montarCaminho, tipoPorNome } from "@/lib/impressao-3d/arquivos";
+import { ESTADO_VAZIO, estadoParaEdicao, montarEntrada } from "@/lib/impressao-3d/simulador";
+import { lerCalculo, normalizarFracao, ocultarCustosDoCalculo } from "@/lib/impressao-3d/calculo";
+import { mensagemEscrita, mensagemRpc } from "@/lib/impressao-3d/erros";
+import { BUCKET_P3D } from "@/lib/impressao-3d/storage-constantes";
 
 let total = 0;
 function teste(nome: string, fn: () => void | Promise<void>) {
@@ -1616,6 +1644,467 @@ await teste("guard de /pessoal: exige o tipo 'pessoal' ativo; sem ele (ou com fa
   assert.ok(!/\.(insert|update|delete|upsert)\(/.test(guard));
   // O destino do guard não leva de volta a /pessoal: sem ciclo.
   assert.equal(vaiPara(decide("/dashboard", SEM_EMPRESA, [])), "seguir");
+});
+
+// ===========================================================================
+// Nicho Impressão 3D (Etapa A) — registro, acesso, regras e contrato das telas
+// ===========================================================================
+
+console.log("\nImpressão 3D — registro, rotas e menu");
+const P3D = ["p3d_impressoras", "p3d_estoque", "p3d_produtos", "p3d_precificacao", "p3d_orcamentos"];
+const ROTA_P3D: Record<string, string> = {
+  p3d_impressoras: "/impressao-3d/impressoras",
+  p3d_estoque: "/impressao-3d/estoque",
+  p3d_produtos: "/impressao-3d/produtos",
+  p3d_precificacao: "/impressao-3d/precificacao",
+  p3d_orcamentos: "/impressao-3d/orcamentos",
+};
+await teste("o registro cobre as 5 chaves do catálogo, cada uma com rota, menu e as tabelas p3d_*", () => {
+  for (const chave of P3D) {
+    const m = MODULOS.find((x) => x.chave === chave);
+    assert.ok(m, chave);
+    assert.deepEqual(m.rotas, [ROTA_P3D[chave]], chave);
+    assert.equal(m.menu.length, 1, chave);
+    assert.equal(m.menu[0].grupo, "Impressão 3D", chave);
+    assert.equal(m.menu[0].href, ROTA_P3D[chave], chave);
+    assert.ok(m.tabelas.every((t) => t.startsWith("p3d_")), chave);
+  }
+  const tabelas = MODULOS.filter((m) => P3D.includes(m.chave)).flatMap((m) => m.tabelas).sort();
+  assert.deepEqual(tabelas, [
+    "p3d_config_precificacao", "p3d_impressoras", "p3d_manutencoes", "p3d_materiais",
+    "p3d_movimentos_estoque", "p3d_orcamento_itens", "p3d_orcamentos", "p3d_pecas_desgaste",
+    "p3d_produto_arquivos", "p3d_produto_variacoes", "p3d_produtos",
+  ]);
+});
+await teste("moduloDaRota reconhece as telas (inclusive detalhes) e não confunde com /orcamentos do Financeiro", () => {
+  for (const [chave, rota] of Object.entries(ROTA_P3D)) {
+    assert.equal(moduloDaRota(rota), chave, rota);
+    assert.equal(moduloDaRota(`${rota}/abc`), chave, `${rota}/abc`);
+  }
+  assert.equal(moduloDaRota("/orcamentos"), "financeiro");
+  assert.equal(moduloDaRota("/impressao-3d"), null, "não há índice do nicho");
+  assert.equal(moduloDaRota("/impressao-3d/impressoras-antigo"), null);
+});
+await teste("módulo p3d DESLIGADO é negado ao dono (volta à 1ª rota ligada); LIGADO libera", () => {
+  for (const [chave, rota] of Object.entries(ROTA_P3D)) {
+    assert.equal(vaiPara(decide(rota, ok("dono"), ATUAIS)), "/leads", `desligado ${rota}`);
+    assert.equal(vaiPara(decide(`${rota}/x`, ok("cofundador"), [...ATUAIS, chave])), "seguir", `ligado ${rota}`);
+  }
+  // Ligar um módulo não abre os outros.
+  assert.equal(vaiPara(decide(ROTA_P3D.p3d_estoque, ok("dono"), [...ATUAIS, "p3d_impressoras"])), "/leads");
+});
+await teste("menu do dono: grupo 'Impressão 3D' só com os módulos ligados, na ordem do registro", () => {
+  const todos = menuDoDono([...ATUAIS, ...P3D]);
+  const grupo = todos.find((g) => g.titulo === "Impressão 3D");
+  assert.deepEqual(grupo?.itens.map((i) => i.href), P3D.map((c) => ROTA_P3D[c]));
+  const so = menuDoDono(["p3d_estoque"]);
+  assert.deepEqual(so.map((g) => g.titulo), ["Impressão 3D"]);
+  assert.deepEqual(so[0].itens.map((i) => i.href), ["/impressao-3d/estoque"]);
+  assert.equal(primeiraRotaHabilitada(["p3d_estoque", "p3d_produtos"]), "/impressao-3d/estoque");
+  assert.ok(menuDoDono(ATUAIS).every((g) => g.titulo !== "Impressão 3D"), "empresa atual não ganha o grupo");
+});
+await teste("sócio/funcionário: módulos p3d = ligados ∩ permissão ∩ permite_membros", () => {
+  const catalogo = [...CATALOGO, ...P3D];
+  const ligados = [...ATUAIS, ...P3D];
+  for (const papel of ["socio", "funcionario"] as const) {
+    assert.equal(vaiPara(decide(ROTA_P3D.p3d_estoque, ok(papel), ligados, false, ["p3d_estoque"], catalogo)), "seguir", papel);
+    assert.equal(vaiPara(decide(`${ROTA_P3D.p3d_orcamentos}/abc`, ok(papel), ligados, false, ["p3d_orcamentos"], catalogo)), "seguir", papel);
+    // permissão em outro módulo não abre este
+    assert.equal(vaiPara(decide(ROTA_P3D.p3d_estoque, ok(papel), ligados, false, ["p3d_impressoras"], catalogo)), ROTA_P3D.p3d_impressoras, papel);
+    // catálogo sem permite_membros nega mesmo com permissão gravada
+    assert.equal(vaiPara(decide(ROTA_P3D.p3d_estoque, ok(papel), ligados, false, ["p3d_estoque"], CATALOGO)), AGUARDANDO_LIBERACAO, papel);
+    // módulo desligado nega mesmo com permissão
+    assert.equal(vaiPara(decide(ROTA_P3D.p3d_estoque, ok(papel), ATUAIS, false, ["p3d_estoque"], catalogo)), AGUARDANDO_LIBERACAO, papel);
+  }
+  assert.deepEqual(modulosOferecidos(ligados, catalogo).filter((m) => m.startsWith("p3d_")), P3D);
+});
+await teste("vendedor (comercial) nunca abre as telas do nicho", () => {
+  for (const rota of Object.values(ROTA_P3D))
+    assert.equal(vaiPara(decide(rota, ok("comercial"), [...ATUAIS, ...P3D])), VENDEDOR_HOME, rota);
+});
+await teste("guard: leitura x edição por módulo p3d e extra 'custos' (só de tela)", () => {
+  const catalogo = [...CATALOGO, ...P3D];
+  const g = (modulo: string, papel: string, nivel: "leitura" | "edicao", permissoes: ReturnType<typeof perm>[] = []) =>
+    guard(modulo, papel, nivel, { habilitados: P3D, permiteMembros: catalogo, permissoes });
+  for (const m of P3D) {
+    assert.ok(g(m, "dono", "edicao")?.ehDono, m);
+    assert.equal(g(m, "socio", "leitura"), null, `${m} sem permissão`);
+    assert.ok(g(m, "socio", "leitura", [perm(m, "leitura")]), `${m} leitura`);
+    assert.equal(g(m, "socio", "edicao", [perm(m, "leitura")]), null, `${m} leitura não edita`);
+    assert.ok(g(m, "funcionario", "edicao", [perm(m, "edicao")]), `${m} edição`);
+  }
+  const comExtra = g("p3d_orcamentos", "socio", "leitura", [perm("p3d_orcamentos", "leitura", ["custos"])]);
+  const semExtra = g("p3d_orcamentos", "socio", "leitura", [perm("p3d_orcamentos", "leitura")]);
+  assert.equal(podeVerCustos(comExtra), true);
+  assert.equal(podeVerCustos(semExtra), false);
+  assert.equal(podeVerCustos(g("p3d_estoque", "dono", "leitura")), true, "fundador sempre vê custos");
+  assert.equal(podeVerCustos(g("p3d_estoque", "cofundador", "leitura")), true);
+  assert.equal(podeVerCustos(null), false);
+  // módulo desligado: nem o dono
+  assert.equal(guard("p3d_estoque", "dono", "leitura", { habilitados: ATUAIS }), null);
+});
+await teste("rótulos: cada módulo p3d tem nome padrão igual ao do menu (uma entrada → renomeável)", () => {
+  for (const chave of P3D) {
+    const m = MODULOS.find((x) => x.chave === chave)!;
+    assert.equal(ROTULOS_PADRAO[chave]?.plural, m.menu[0].label, chave);
+    assert.equal(criarRotulos().personalizado(chave), false);
+  }
+  const r = criarRotulos(lerMapaRotulos({ labels: { p3d_estoque: { singular: "Insumo", plural: "Insumos" } } }));
+  assert.equal(labelDoItemMenu(r, ROTA_P3D.p3d_estoque, "Estoque"), "Insumos");
+  assert.equal(labelDoItemMenu(r, ROTA_P3D.p3d_impressoras, "Impressoras"), "Impressoras");
+});
+await teste("o snapshot das empresas atuais não tem rota do nicho (nada mudou para elas)", () => {
+  assert.ok(Object.keys(dourado.rotaPermitida).every((p) => !p.startsWith("/impressao-3d")));
+  for (const rota of Object.values(ROTA_P3D)) assert.equal(rotaPermitida(rota, ATUAIS), false, rota);
+});
+
+console.log("\nImpressão 3D — regras de impressoras e estoque");
+await teste("depreciação por hora = (aquisição − residual) ÷ vida útil; 0 sem vida útil; nunca negativa", () => {
+  assert.equal(depreciacaoPorHora(3000, 500, 5000), 0.5);
+  assert.equal(depreciacaoPorHora(3000, 500, 0), 0);
+  assert.equal(depreciacaoPorHora(1000, 1500, 100), 0);
+});
+await teste("desgaste por hora = soma(custo ÷ vida útil), ignorando vida útil inválida", () => {
+  assert.equal(desgastePorHora([{ custo: 100, vida_util_horas: 500 }, { custo: 60, vida_util_horas: 300 }]), 0.4);
+  assert.equal(desgastePorHora([{ custo: 100, vida_util_horas: 0 }]), 0);
+  assert.equal(desgastePorHora([]), 0);
+});
+await teste("alerta de manutenção: horas_uso − horas_ultima_manutencao >= intervalo", () => {
+  const i = (uso: number, ultima: number, intervalo: number | null) => ({
+    horas_uso: uso, horas_ultima_manutencao: ultima, intervalo_manutencao_horas: intervalo,
+  });
+  assert.equal(manutencaoVencida(i(250, 0, 250)), true, "igual ao intervalo vence");
+  assert.equal(manutencaoVencida(i(249.9, 0, 250)), false);
+  assert.equal(manutencaoVencida(i(300, 100, 250)), false);
+  assert.equal(manutencaoVencida(i(400, 100, 250)), true);
+  assert.equal(manutencaoVencida(i(9999, 0, null)), false, "sem intervalo não alerta");
+  assert.equal(horasParaManutencao(i(300, 100, 250)), 50);
+  assert.equal(horasParaManutencao(i(400, 100, 250)), -50);
+  assert.equal(horasParaManutencao(i(1, 0, null)), null);
+  assert.equal(pecaVencida({ vida_util_horas: 100, horas_ultima_troca: 50 }, 150), true);
+  assert.equal(pecaVencida({ vida_util_horas: 100, horas_ultima_troca: 50 }, 149), false);
+});
+await teste("estoque: abaixo do mínimo só com mínimo > 0; rolos × peso líquido = gramas; custo/g", () => {
+  assert.equal(abaixoDoMinimo({ estoque_atual: 500, estoque_minimo: 1000 }), true);
+  assert.equal(abaixoDoMinimo({ estoque_atual: 1000, estoque_minimo: 1000 }), true);
+  assert.equal(abaixoDoMinimo({ estoque_atual: 1001, estoque_minimo: 1000 }), false);
+  assert.equal(abaixoDoMinimo({ estoque_atual: 0, estoque_minimo: 0 }), false);
+  assert.equal(gramasDeRolos(3, 1000), 3000);
+  assert.equal(custoPorGrama(120, 1000), 0.12);
+  assert.equal(custoPorGrama(120, null), 120);
+  assert.equal(custoPorGrama(null, 1000), 0);
+});
+
+console.log("\nImpressão 3D — números, validação e arquivos");
+await teste("parseNumero aceita vírgula, milhar e ponto decimal; vazio = null; lixo = NaN", () => {
+  assert.equal(parseNumero("12,5"), 12.5);
+  assert.equal(parseNumero("1.234,56"), 1234.56);
+  assert.equal(parseNumero("12.5"), 12.5);
+  assert.equal(parseNumero("R$ 7,90"), 7.9);
+  assert.equal(parseNumero(""), null);
+  assert.equal(parseNumero("  "), null);
+  assert.equal(parseNumero(undefined), null);
+  assert.ok(Number.isNaN(parseNumero("abc") as number));
+  assert.ok(Number.isNaN(parseNumero("1,2,3") as number));
+});
+await teste("formatação pt-BR: moeda BRL e vírgula decimal", () => {
+  assert.match(formatMoeda(1234.5).replace(/\s/g, " "), /^R\$ 1\.234,50$/);
+  assert.equal(formatNumero(12.5), "12,5");
+  assert.equal(formatPercentualFracao(0.2534), "25,3%");
+  assert.equal(formatPct(8), "8%");
+});
+await teste("ImpressoraSchema: residual > aquisição e horas da última manutenção > horas de uso são recusados", () => {
+  const base = { nome: "Ender 3", tecnologia: "fdm", status: "disponivel", valor_aquisicao: "1000", valor_residual: "200", vida_util_horas: "5000" };
+  assert.ok(ImpressoraSchema.safeParse(base).success);
+  assert.ok(!ImpressoraSchema.safeParse({ ...base, valor_residual: "1500" }).success);
+  assert.ok(!ImpressoraSchema.safeParse({ ...base, horas_uso: "10", horas_ultima_manutencao: "20" }).success);
+  assert.ok(!ImpressoraSchema.safeParse({ ...base, nome: "  " }).success);
+  const r = ImpressoraSchema.safeParse({ ...base, valor_aquisicao: "1.000,50", volume_x_mm: "" });
+  assert.ok(r.success && r.data.valor_aquisicao === 1000.5 && r.data.volume_x_mm === null);
+});
+await teste("ConfigSchema: faixas do banco (desperdício/falhas 0–50, margem < 100, fração 0–1)", () => {
+  const base = { modo_preco: "margem", base_custo_material: "cadastro" };
+  const r = ConfigSchema.safeParse(base);
+  assert.ok(r.success);
+  assert.equal(r.success && r.data.desperdicio_pct, 8);
+  assert.equal(r.success && r.data.falha_pct, 7);
+  assert.equal(r.success && r.data.margem_pct, 30);
+  assert.ok(!ConfigSchema.safeParse({ ...base, desperdicio_pct: "51" }).success);
+  assert.ok(!ConfigSchema.safeParse({ ...base, falha_pct: "-1" }).success);
+  assert.ok(!ConfigSchema.safeParse({ ...base, margem_pct: "100" }).success);
+  assert.ok(ConfigSchema.safeParse({ ...base, margem_pct: "99,9" }).success);
+  assert.ok(!ConfigSchema.safeParse({ ...base, falha_fracao_perdida: "1,5" }).success);
+  assert.ok(!ConfigSchema.safeParse({ ...base, modo_preco: "lucro" }).success);
+  assert.equal(FAIXA_DESPERDICIO.min, 5);
+  assert.equal(FAIXA_DESPERDICIO.max, 15);
+  assert.equal(FAIXA_FALHAS.max, 10);
+});
+await teste("MaterialSchema/MovimentoSchema/OrcamentoSchema: cor #RRGGBB, ajuste com sinal, só campos permitidos", () => {
+  const m = { tipo: "filamento", nome: "PLA", unidade: "g" };
+  assert.ok(MaterialSchema.safeParse({ ...m, cor_hex: "#FF8800" }).success);
+  assert.ok(!MaterialSchema.safeParse({ ...m, cor_hex: "FF8800" }).success);
+  assert.ok(!MaterialSchema.safeParse({ ...m, peso_liquido_rolo_g: "0" }).success);
+  const mov = { material_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", tipo: "ajuste" };
+  assert.ok(MovimentoSchema.safeParse({ ...mov, quantidade: "-120" }).success);
+  assert.ok(!MovimentoSchema.safeParse({ ...mov, quantidade: "0" }).success);
+  assert.ok(!MovimentoSchema.safeParse({ ...mov, tipo: "saida_producao", quantidade: "1" }).success, "só entrada/ajuste/perda pela tela");
+  const o = OrcamentoSchema.safeParse({ titulo: "Peças", status: "aprovado", total: "999", numero: "5" });
+  assert.ok(o.success);
+  assert.deepEqual(Object.keys(o.success ? o.data : {}).sort(), ["cliente_id", "desconto_valor", "observacoes", "titulo", "validade"]);
+});
+await teste("arquivos: caminho '<workspace>/<produto>/<uuid>-<nome>' e recusa de outra empresa", () => {
+  const prod = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const c = montarCaminho(WS_A, prod, "u-u-i-d", "Suporte Ção.STL");
+  assert.equal(c, `${WS_A}/${prod}/u-u-i-d-Suporte_Cao.STL`);
+  assert.ok(caminhoValido(c, WS_A, prod));
+  assert.ok(!caminhoValido(c, WS_ALHEIA, prod), "outra empresa");
+  assert.ok(!caminhoValido(c, WS_A, "outro-produto"));
+  assert.ok(!caminhoValido(`${WS_A}/${prod}/../${WS_ALHEIA}/x.stl`, WS_A, prod), "path traversal");
+  assert.ok(!caminhoValido(`${WS_A}/${prod}/`, WS_A, prod), "sem nome");
+  assert.equal(tipoPorNome("x.STL"), "stl");
+  assert.equal(tipoPorNome("x.3mf"), "3mf");
+  assert.equal(tipoPorNome("x.gcode"), "gcode");
+  assert.equal(tipoPorNome("foto.JPG"), "foto");
+  assert.equal(tipoPorNome("x.zip"), "outro");
+  assert.equal(LIMITE_BYTES, 100 * 1024 * 1024);
+});
+
+console.log("\nImpressão 3D — simulador e cálculo");
+const CONFIG_TESTE = { ...CONFIG_PADRAO };
+await teste("montarEntrada: só vai o que foi preenchido; vazio = padrão; modo de preço só se diferir", () => {
+  const vazio = montarEntrada({ ...ESTADO_VAZIO }, CONFIG_TESTE);
+  assert.deepEqual(vazio.erros, []);
+  assert.deepEqual(vazio.entrada, { quantidade: 1 });
+  const r = montarEntrada(
+    {
+      ...ESTADO_VAZIO, impressora_id: "i1", material_id: "m1", quantidade: "10",
+      campos: { peso_peca_g: "250,5", peso_suporte_g: "20", horas_impressao: "12", mao_obra_horas: "1", margem_pct: "40", tarifa_kwh: "0,95" },
+      outros: [{ nome: "Ímã", valor: "3,5" }, { nome: "", valor: "" }],
+    },
+    CONFIG_TESTE
+  );
+  assert.deepEqual(r.erros, []);
+  assert.deepEqual(r.entrada, {
+    impressora_id: "i1", material_id: "m1", quantidade: 10, peso_peca_g: 250.5, peso_suporte_g: 20,
+    horas_impressao: 12, mao_obra_horas: 1, outros_custos: [{ nome: "Ímã", valor: 3.5 }], tarifa_kwh: 0.95, margem_pct: 40,
+  });
+  const markup = montarEntrada({ ...ESTADO_VAZIO, modo_preco: "markup", campos: { markup_pct: "80", margem_pct: "10" } }, CONFIG_TESTE);
+  assert.equal(markup.entrada.modo_preco, "markup");
+  assert.equal(markup.entrada.markup_pct, 80);
+  assert.ok(!("margem_pct" in markup.entrada), "margem digitada é ignorada no modo markup");
+});
+await teste("montarEntrada: peso total do fatiador x por componente; purga é subconjunto do total", () => {
+  const total = montarEntrada(
+    { ...ESTADO_VAZIO, pesoModo: "total", campos: { peso_total_g: "500", peso_purga_g: "30", peso_peca_g: "999" } },
+    CONFIG_TESTE
+  );
+  assert.equal(total.entrada.peso_total_g, 500);
+  assert.equal(total.entrada.peso_purga_g, 30);
+  assert.ok(!("peso_peca_g" in total.entrada), "componentes não vão junto com o total");
+  const det = montarEntrada({ ...ESTADO_VAZIO, campos: { peso_total_g: "500", peso_peca_g: "100", peso_brim_g: "5" } }, CONFIG_TESTE);
+  assert.ok(!("peso_total_g" in det.entrada));
+  assert.equal(det.entrada.peso_brim_g, 5);
+});
+await teste("montarEntrada: valida quantidade, números e margem < 100", () => {
+  assert.ok(montarEntrada({ ...ESTADO_VAZIO, quantidade: "0" }, CONFIG_TESTE).erros.length > 0);
+  assert.ok(montarEntrada({ ...ESTADO_VAZIO, quantidade: "1,5" }, CONFIG_TESTE).erros.length > 0);
+  assert.ok(montarEntrada({ ...ESTADO_VAZIO, campos: { peso_peca_g: "abc" } }, CONFIG_TESTE).erros.length > 0);
+  assert.ok(montarEntrada({ ...ESTADO_VAZIO, campos: { peso_peca_g: "-5" } }, CONFIG_TESTE).erros.length > 0);
+  assert.ok(montarEntrada({ ...ESTADO_VAZIO, campos: { margem_pct: "100" } }, CONFIG_TESTE).erros.length > 0);
+  assert.ok(montarEntrada({ ...ESTADO_VAZIO, outros: [{ nome: "x", valor: "0" }] }, CONFIG_TESTE).erros.length > 0);
+});
+await teste("recalcular com valores atuais: mantém só o que é do item e descarta os parâmetros do snapshot", () => {
+  const snapshot = {
+    impressora_id: "i1", material_id: "m1", quantidade: 5, peso_peca_g: 100, horas_impressao: 3, preco_manual: 99,
+    outros_custos: [{ nome: "x", valor: 2 }], preco_por_g: 0.2, tarifa_kwh: 0.9, potencia_media_kw: 0.12,
+    margem_pct: 30, modo_preco: "margem", desperdicio_pct: 8, valor_aquisicao: 3000,
+  };
+  assert.deepEqual(entradaParaRecalculo(snapshot), {
+    impressora_id: "i1", material_id: "m1", quantidade: 5, peso_peca_g: 100, horas_impressao: 3, preco_manual: 99,
+    outros_custos: [{ nome: "x", valor: 2 }],
+  });
+  assert.deepEqual(entradaParaRecalculo({}), {});
+});
+await teste("editar item: carrega o que é do item e o modo/percentual só quando diferem da configuração", () => {
+  const e = estadoParaEdicao(
+    { quantidade: 4, peso_total_g: 300, horas_impressao: 5, tarifa_kwh: 0.9, modo_preco: "markup", markup_pct: 80 },
+    CONFIG_TESTE
+  );
+  assert.equal(e.quantidade, "4");
+  assert.equal(e.pesoModo, "total");
+  assert.equal(e.modo_preco, "markup");
+  assert.equal(e.campos.markup_pct, "80");
+  assert.ok(!("tarifa_kwh" in e.campos), "parâmetro de custo não é carregado");
+  const igual = estadoParaEdicao({ quantidade: 1, modo_preco: "margem", margem_pct: 30 }, CONFIG_TESTE);
+  assert.ok(!("margem_pct" in igual.campos), "igual à configuração = padrão");
+});
+await teste("lerCalculo: lê o contrato, tolera lixo e normaliza margem/markup (fração ou %)", () => {
+  const bruto = {
+    custos: { material: 10, energia: 2, depreciacao: 1, manutencao: 0.5, falhas: 1, mao_obra: 5, acabamento: 0, montagem: 0, embalagem: 1, outros: 0.5, rateio_despesas_fixas: 0 },
+    custo_total: 21, impostos_valor: 3, taxas_valor: 2, preco_recomendado: 40, preco_final: 40, lucro: 14,
+    margem_real: 0.35, markup_real: 0.6667,
+    por_unidade: { custo: 2.1, preco: 4, lucro: 1.4 },
+    detalhes: { material: { peso_total_g: 100, desperdicio_g: 8, peso_consumo_g: 108, preco_por_g: 0.1 }, energia: { kwh: 1.2, potencia_kw: 0.1, tarifa_kwh: 0.9 }, depreciacao: { por_hora: 0.6 }, falha: { tentativas_esperadas: 1.07, custo_de_uma_tentativa: 9 } },
+    avisos: ["Sem material"], tipo_valores: "estimado", versao_formula: 1,
+  };
+  const c = lerCalculo(bruto)!;
+  assert.equal(c.custo_total, 21);
+  assert.equal(c.custos.energia, 2);
+  assert.equal(c.detalhes.depreciacao_por_hora, 0.6);
+  assert.deepEqual(c.avisos, ["Sem material"]);
+  assert.ok(Math.abs(c.margem_real - 0.35) < 1e-9);
+  // percentual (35) vira fração
+  const pct = lerCalculo({ ...bruto, margem_real: 35, markup_real: 66.67 })!;
+  assert.ok(Math.abs(pct.margem_real - 0.35) < 1e-9);
+  assert.ok(Math.abs(pct.markup_real - 0.6667) < 1e-9);
+  assert.equal(lerCalculo(null), null);
+  assert.equal(lerCalculo("x"), null);
+  const torto = lerCalculo({ custo_total: "abc", custos: { material: null }, avisos: [1, "ok"] })!;
+  assert.equal(torto.custo_total, 0);
+  assert.deepEqual(torto.avisos, ["ok"]);
+  assert.equal(normalizarFracao(0.3, 30, 100), 0.3);
+  assert.equal(normalizarFracao(30, 30, 100), 0.3);
+  assert.equal(normalizarFracao(40, 0, 0), 0.4);
+});
+await teste("sem o extra 'custos', o cálculo sai só com preços (servidor remove custo/lucro/margem)", () => {
+  const oculto = ocultarCustosDoCalculo({
+    custos: { material: 10 }, custo_total: 21, lucro: 14, margem_real: 0.35, markup_real: 0.6,
+    preco_final: 40, preco_recomendado: 38, por_unidade: { custo: 2, preco: 4, lucro: 1 }, detalhes: { x: 1 },
+    avisos: ["a"], impostos_valor: 3, taxas_valor: 2,
+  });
+  assert.deepEqual(Object.keys(oculto).sort(), ["avisos", "por_unidade", "preco_final", "preco_recomendado", "tipo_valores", "versao_formula"]);
+  assert.deepEqual(oculto.por_unidade, { preco: 4 });
+  const lido = lerCalculo(oculto)!;
+  assert.equal(lido.preco_final, 40);
+  assert.equal(lido.custo_total, 0);
+});
+
+console.log("\nImpressão 3D — contrato do banco no código (RPCs, campos protegidos, empresa ativa)");
+const ARQ_P3D = [
+  "app/(dashboard)/impressao-3d/impressoras/actions.ts",
+  "app/(dashboard)/impressao-3d/estoque/actions.ts",
+  "app/(dashboard)/impressao-3d/produtos/actions.ts",
+  "app/(dashboard)/impressao-3d/precificacao/actions.ts",
+  "app/(dashboard)/impressao-3d/orcamentos/actions.ts",
+];
+await teste("toda action de escrita do nicho passa por getAcessoEdicao do módulo certo", () => {
+  const modulo: Record<string, string> = {
+    impressoras: "p3d_impressoras", estoque: "p3d_estoque", produtos: "p3d_produtos",
+    precificacao: "p3d_precificacao", orcamentos: "p3d_orcamentos",
+  };
+  for (const arq of ARQ_P3D) {
+    const texto = lerFonte(arq);
+    const chave = arq.split("/")[3];
+    assert.ok(texto.includes(`const MODULO = "${modulo[chave]}"`) || texto.includes(`getAcessoEdicao("${modulo[chave]}")`), arq);
+    for (const parte of texto.split(/\nexport async function /).slice(1)) {
+      const nome = parte.slice(0, parte.indexOf("(")).trim();
+      assert.ok(parte.includes("getAcessoEdicao("), `${arq} ${nome} sem guarda de edição`);
+      if (/\.(insert|update|upsert|delete)\(/.test(parte)) assert.ok(parte.includes("workspace_id"), `${arq} ${nome} sem workspace_id`);
+    }
+  }
+});
+await teste("leitura: simulação e download passam por getAcessoModulo (nunca só pelo cookie)", () => {
+  const sim = lerFonte("app/(dashboard)/impressao-3d/precificacao/simulacao.ts");
+  assert.ok(sim.includes('getAcessoModulo("p3d_orcamentos", "edicao")') && sim.includes('getAcessoModulo("p3d_precificacao")'));
+  assert.ok(sim.includes("p3d_simular_preco") && sim.includes("p_ws: acesso.workspaceId"));
+  const dl = lerFonte("app/(dashboard)/impressao-3d/produtos/arquivos-leitura.ts");
+  assert.ok(dl.includes('getAcessoModulo("p3d_produtos")') && dl.includes('.eq("workspace_id", acesso.workspaceId)'));
+  assert.ok(dl.includes("assinarArquivo"), "download por signed URL");
+});
+await teste("páginas do nicho leem pelo guard e filtram por workspace_id da empresa ativa", () => {
+  const paginas: [string, string][] = [
+    ["app/(dashboard)/impressao-3d/impressoras/page.tsx", "p3d_impressoras"],
+    ["app/(dashboard)/impressao-3d/estoque/page.tsx", "p3d_estoque"],
+    ["app/(dashboard)/impressao-3d/produtos/page.tsx", "p3d_produtos"],
+    ["app/(dashboard)/impressao-3d/produtos/[id]/page.tsx", "p3d_produtos"],
+    ["app/(dashboard)/impressao-3d/precificacao/page.tsx", "p3d_precificacao"],
+    ["app/(dashboard)/impressao-3d/orcamentos/page.tsx", "p3d_orcamentos"],
+    ["app/(dashboard)/impressao-3d/orcamentos/[id]/page.tsx", "p3d_orcamentos"],
+  ];
+  for (const [arq, modulo] of paginas) {
+    const t = lerFonte(arq);
+    assert.ok(t.includes(`getAcessoModulo("${modulo}")`), arq);
+    assert.ok(t.includes("workspace_id"), arq);
+    assert.ok(!/getDonoIdAtivo|getWorkspaceIdAtivo/.test(t), `${arq} usa o código antigo de dono`);
+  }
+});
+await teste("campos protegidos NUNCA vão em insert/update direto (materiais e orçamentos)", () => {
+  const PROTEGIDOS_MATERIAL = ["estoque_atual", "custo_medio", "ultimo_custo", "custo_cadastro"];
+  const PROTEGIDOS_ORCAMENTO = ["status", "numero", "subtotal", "total", "custo_total", "lucro_total", "enviado_em", "aprovado_em"];
+  const est = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
+  const orc = lerFonte("app/(dashboard)/impressao-3d/orcamentos/actions.ts");
+  const cheiro = (texto: string, tabela: string) => {
+    const trechos: string[] = [];
+    const re = new RegExp(`\\.from\\("${tabela}"\\)\\s*\\.(insert|update|upsert)\\(`, "g");
+    for (let m = re.exec(texto); m; m = re.exec(texto)) {
+      let i = m.index + m[0].length, nivel = 1;
+      const ini = i;
+      while (i < texto.length && nivel > 0) { if (texto[i] === "(") nivel++; else if (texto[i] === ")") nivel--; i++; }
+      trechos.push(texto.slice(ini, i - 1));
+    }
+    return trechos;
+  };
+  const trechosMat = cheiro(est, "p3d_materiais");
+  assert.ok(trechosMat.length >= 2);
+  for (const t of trechosMat) for (const c of PROTEGIDOS_MATERIAL) assert.ok(!new RegExp(`\\b${c}\\b`).test(t), `materiais.${c}`);
+  const trechosOrc = cheiro(orc, "p3d_orcamentos");
+  assert.ok(trechosOrc.length >= 2);
+  for (const t of trechosOrc) for (const c of PROTEGIDOS_ORCAMENTO) assert.ok(!new RegExp(`\\b${c}\\b`).test(t), `orcamentos.${c}`);
+  // os schemas que alimentam esses payloads não têm campo protegido
+  const val = lerFonte("lib/impressao-3d/validacao.ts");
+  const mat = val.slice(val.indexOf("export const MaterialSchema"), val.indexOf("export const ProdutoSchema"));
+  for (const c of PROTEGIDOS_MATERIAL) assert.ok(!new RegExp(`\\b${c}:`).test(mat), `MaterialSchema.${c}`);
+  const orcS = val.slice(val.indexOf("export const OrcamentoSchema"), val.indexOf("/** Faixas de referência"));
+  for (const c of PROTEGIDOS_ORCAMENTO) assert.ok(!new RegExp(`\\b${c}:`).test(orcS), `OrcamentoSchema.${c}`);
+});
+await teste("estoque, status e itens só por RPC; erros da RPC são mostrados como vieram", () => {
+  const est = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
+  assert.ok(est.includes('.rpc("p3d_movimentar_estoque"'));
+  assert.ok(est.includes("p_ws: acesso.workspaceId") && est.includes("p_permitir_negativo") === false, "não permite saldo negativo");
+  const orc = lerFonte("app/(dashboard)/impressao-3d/orcamentos/actions.ts");
+  for (const rpc of ["p3d_salvar_item_orcamento", "p3d_remover_item_orcamento", "p3d_mudar_status_orcamento"])
+    assert.ok(orc.includes(`.rpc("${rpc}"`), rpc);
+  assert.ok(!/\.from\("p3d_orcamento_itens"\)\s*\.(insert|update|delete|upsert)/.test(orc), "itens são somente leitura");
+  assert.ok(/mensagemRpc\(error/.test(orc) && /mensagemRpc\(error/.test(est));
+  assert.equal(mensagemRpc({ message: "Saldo insuficiente de PLA." }, "padrão"), "Saldo insuficiente de PLA.");
+  assert.equal(mensagemRpc({ message: " " }, "padrão"), "padrão");
+  assert.equal(mensagemRpc(null, "padrão"), "padrão");
+  assert.match(mensagemEscrita({ code: "23505" }, "x"), /Já existe/);
+  assert.match(mensagemEscrita({ code: "23503" }, "x"), /Arquive/);
+});
+await teste("orçamento: update/delete só em rascunho; recalcular não manda parâmetros do snapshot", () => {
+  const orc = lerFonte("app/(dashboard)/impressao-3d/orcamentos/actions.ts");
+  assert.equal((orc.match(/\.eq\("status", "rascunho"\)/g) ?? []).length, 2, "update e delete filtram por rascunho");
+  assert.ok(orc.includes("entradaParaRecalculo("));
+  const tela = lerFonte("components/impressao-3d/orcamento-detalhe.tsx");
+  assert.ok(tela.includes("Recalcular com valores atuais"));
+  assert.ok(tela.includes("rascunho") && tela.includes("editavel"), "edição só em rascunho");
+});
+await teste("arquivos: upload no caminho <workspace>/<produto>/..., registro confere a empresa e exclusão remove objeto e linha", () => {
+  const acoes = lerFonte("app/(dashboard)/impressao-3d/produtos/actions.ts");
+  assert.ok(acoes.includes("caminhoValido(entrada.storagePath, acesso.workspaceId, entrada.produtoId)"));
+  const excluir = acoes.slice(acoes.indexOf("export async function excluirArquivoProduto"));
+  assert.ok(excluir.indexOf("removerObjetos") > 0 && excluir.indexOf("removerObjetos") < excluir.indexOf('.from("p3d_produto_arquivos")\n    .delete()'));
+  const tela = lerFonte("components/impressao-3d/produto-detalhe.tsx");
+  assert.ok(tela.includes("montarCaminho(workspaceId, produtoId, crypto.randomUUID(), arquivo.name)"));
+  assert.ok(tela.includes("storage.remove([caminho])"), "desfaz o upload se o registro falhar");
+  const st = lerFonte("lib/impressao-3d/storage.ts");
+  assert.ok(st.includes("createSignedUrl"));
+  assert.equal(BUCKET_P3D, "p3d-arquivos");
+});
+await teste("integração da impressora guarda só tipo e endereço (nunca token ou senha)", () => {
+  const tela = lerFonte("components/impressao-3d/impressoras-board.tsx");
+  assert.ok(tela.includes("Não guarde token nem senha"));
+  const val = lerFonte("lib/impressao-3d/validacao.ts");
+  assert.ok(!/token|senha|password|api_key/i.test(val));
+  assert.ok(!/token|senha|password|api_key/i.test(lerFonte("app/(dashboard)/impressao-3d/impressoras/actions.ts")));
+});
+await teste("Visão Geral: resumo do nicho só consulta módulos ligados e só leva contagens", () => {
+  const r = lerFonte("lib/impressao-3d/resumo.ts");
+  for (const chave of P3D) assert.ok(r.includes(`com("${chave}")`), chave);
+  assert.ok(!/preco_|custo|lucro|valor_/.test(r.replace(/\/\*[\s\S]*?\*\//g, "")), "sem valores monetários");
+  const home = lerFonte("components/dashboard-home/dashboard-home-board.tsx");
+  for (const chave of P3D) assert.ok(home.includes(`com("${chave}")`), chave);
 });
 
 console.log(`\n${total} testes`);

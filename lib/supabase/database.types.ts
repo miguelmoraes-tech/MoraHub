@@ -74,6 +74,113 @@ export type Database = {
           },
         ]
       }
+      aprovacao_regras: {
+        Row: {
+          descricao: string
+          exige: boolean
+          tipo: string
+        }
+        Insert: {
+          descricao: string
+          exige?: boolean
+          tipo: string
+        }
+        Update: {
+          descricao?: string
+          exige?: boolean
+          tipo?: string
+        }
+        Relationships: []
+      }
+      aprovacoes: {
+        Row: {
+          created_at: string
+          decidido_em: string | null
+          erro: string | null
+          expira_em: string
+          id: string
+          payload: Json
+          proposto_por: string
+          resultado: Json | null
+          resumo: string
+          status: string
+          tipo: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          decidido_em?: string | null
+          erro?: string | null
+          expira_em?: string
+          id?: string
+          payload?: Json
+          proposto_por: string
+          resultado?: Json | null
+          resumo: string
+          status?: string
+          tipo: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          decidido_em?: string | null
+          erro?: string | null
+          expira_em?: string
+          id?: string
+          payload?: Json
+          proposto_por?: string
+          resultado?: Json | null
+          resumo?: string
+          status?: string
+          tipo?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aprovacoes_tipo_fkey"
+            columns: ["tipo"]
+            isOneToOne: false
+            referencedRelation: "aprovacao_regras"
+            referencedColumns: ["tipo"]
+          },
+          {
+            foreignKeyName: "aprovacoes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aprovacoes_votos: {
+        Row: {
+          aprovacao_id: string
+          created_at: string
+          user_id: string
+          voto: boolean
+        }
+        Insert: {
+          aprovacao_id: string
+          created_at?: string
+          user_id: string
+          voto: boolean
+        }
+        Update: {
+          aprovacao_id?: string
+          created_at?: string
+          user_id?: string
+          voto?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aprovacoes_votos_aprovacao_id_fkey"
+            columns: ["aprovacao_id"]
+            isOneToOne: false
+            referencedRelation: "aprovacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assinaturas: {
         Row: {
           cliente_id: string
@@ -1037,6 +1144,7 @@ export type Database = {
           expira_em: string
           id: string
           papel: string
+          permissoes: Json
           respondido_em: string | null
           status: string
           token: string
@@ -1049,6 +1157,7 @@ export type Database = {
           expira_em?: string
           id?: string
           papel: string
+          permissoes?: Json
           respondido_em?: string | null
           status?: string
           token?: string
@@ -1061,6 +1170,7 @@ export type Database = {
           expira_em?: string
           id?: string
           papel?: string
+          permissoes?: Json
           respondido_em?: string | null
           status?: string
           token?: string
@@ -2166,6 +2276,50 @@ export type Database = {
           },
         ]
       }
+      modelos: {
+        Row: {
+          ativo: boolean
+          chave: string
+          config: Json
+          descricao: string | null
+          id: string
+          nicho_chave: string
+          nome: string
+          ordem: number
+          semente: Json
+        }
+        Insert: {
+          ativo?: boolean
+          chave: string
+          config?: Json
+          descricao?: string | null
+          id?: string
+          nicho_chave: string
+          nome: string
+          ordem?: number
+          semente?: Json
+        }
+        Update: {
+          ativo?: boolean
+          chave?: string
+          config?: Json
+          descricao?: string | null
+          id?: string
+          nicho_chave?: string
+          nome?: string
+          ordem?: number
+          semente?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modelos_nicho_chave_fkey"
+            columns: ["nicho_chave"]
+            isOneToOne: false
+            referencedRelation: "nichos"
+            referencedColumns: ["chave"]
+          },
+        ]
+      }
       modelos_contrato: {
         Row: {
           arquivo_path: string | null
@@ -2226,6 +2380,7 @@ export type Database = {
           ordem: number
           padrao: boolean
           permissoes_extras: Json
+          permite_membros: boolean
         }
         Insert: {
           ativo?: boolean
@@ -2239,6 +2394,7 @@ export type Database = {
           ordem?: number
           padrao?: boolean
           permissoes_extras?: Json
+          permite_membros?: boolean
         }
         Update: {
           ativo?: boolean
@@ -2252,6 +2408,76 @@ export type Database = {
           ordem?: number
           padrao?: boolean
           permissoes_extras?: Json
+          permite_membros?: boolean
+        }
+        Relationships: []
+      }
+      nicho_modulos: {
+        Row: {
+          modulo_chave: string
+          nicho_chave: string
+          ordem: number
+          recomendado: boolean
+        }
+        Insert: {
+          modulo_chave: string
+          nicho_chave: string
+          ordem?: number
+          recomendado?: boolean
+        }
+        Update: {
+          modulo_chave?: string
+          nicho_chave?: string
+          ordem?: number
+          recomendado?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nicho_modulos_modulo_chave_fkey"
+            columns: ["modulo_chave"]
+            isOneToOne: false
+            referencedRelation: "modulos"
+            referencedColumns: ["chave"]
+          },
+          {
+            foreignKeyName: "nicho_modulos_nicho_chave_fkey"
+            columns: ["nicho_chave"]
+            isOneToOne: false
+            referencedRelation: "nichos"
+            referencedColumns: ["chave"]
+          },
+        ]
+      }
+      nichos: {
+        Row: {
+          ativo: boolean
+          chave: string
+          config: Json
+          created_at: string
+          descricao: string | null
+          icone: string | null
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          ativo?: boolean
+          chave: string
+          config?: Json
+          created_at?: string
+          descricao?: string | null
+          icone?: string | null
+          nome: string
+          ordem?: number
+        }
+        Update: {
+          ativo?: boolean
+          chave?: string
+          config?: Json
+          created_at?: string
+          descricao?: string | null
+          icone?: string | null
+          nome?: string
+          ordem?: number
         }
         Relationships: []
       }
@@ -2296,6 +2522,770 @@ export type Database = {
           },
         ]
       }
+      p3d_config_precificacao: {
+        Row: {
+          arredondar_para: number
+          base_custo_material: string
+          comissao_pct: number
+          desperdicio_pct: number
+          despesas_fixas_pct: number
+          falha_fracao_perdida: number
+          falha_pct: number
+          impostos_pct: number
+          margem_pct: number
+          markup_pct: number
+          modo_preco: string
+          preco_minimo: number
+          tarifa_kwh: number
+          taxa_fixa_pagamento: number
+          taxa_pagamento_pct: number
+          updated_at: string
+          updated_by: string | null
+          valor_hora_mao_obra: number
+          workspace_id: string
+        }
+        Insert: {
+          arredondar_para?: number
+          base_custo_material?: string
+          comissao_pct?: number
+          desperdicio_pct?: number
+          despesas_fixas_pct?: number
+          falha_fracao_perdida?: number
+          falha_pct?: number
+          impostos_pct?: number
+          margem_pct?: number
+          markup_pct?: number
+          modo_preco?: string
+          preco_minimo?: number
+          tarifa_kwh?: number
+          taxa_fixa_pagamento?: number
+          taxa_pagamento_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+          valor_hora_mao_obra?: number
+          workspace_id: string
+        }
+        Update: {
+          arredondar_para?: number
+          base_custo_material?: string
+          comissao_pct?: number
+          desperdicio_pct?: number
+          despesas_fixas_pct?: number
+          falha_fracao_perdida?: number
+          falha_pct?: number
+          impostos_pct?: number
+          margem_pct?: number
+          markup_pct?: number
+          modo_preco?: string
+          preco_minimo?: number
+          tarifa_kwh?: number
+          taxa_fixa_pagamento?: number
+          taxa_pagamento_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+          valor_hora_mao_obra?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_config_precificacao_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      p3d_impressoras: {
+        Row: {
+          ativo: boolean
+          bico_mm: number | null
+          created_at: string
+          data_aquisicao: string | null
+          horas_ultima_manutencao: number
+          horas_uso: number
+          id: string
+          integracao_tipo: string | null
+          integracao_url: string | null
+          intervalo_manutencao_horas: number | null
+          manutencao_ciclo: number
+          manutencao_hora: number
+          marca: string | null
+          modelo: string | null
+          nome: string
+          observacoes: string | null
+          potencia_media_kw: number
+          status: string
+          tecnologia: string
+          updated_at: string
+          user_id: string
+          valor_aquisicao: number
+          valor_residual: number
+          vida_util_horas: number
+          volume_x_mm: number | null
+          volume_y_mm: number | null
+          volume_z_mm: number | null
+          workspace_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          bico_mm?: number | null
+          created_at?: string
+          data_aquisicao?: string | null
+          horas_ultima_manutencao?: number
+          horas_uso?: number
+          id?: string
+          integracao_tipo?: string | null
+          integracao_url?: string | null
+          intervalo_manutencao_horas?: number | null
+          manutencao_ciclo?: number
+          manutencao_hora?: number
+          marca?: string | null
+          modelo?: string | null
+          nome: string
+          observacoes?: string | null
+          potencia_media_kw?: number
+          status?: string
+          tecnologia?: string
+          updated_at?: string
+          user_id?: string
+          valor_aquisicao?: number
+          valor_residual?: number
+          vida_util_horas?: number
+          volume_x_mm?: number | null
+          volume_y_mm?: number | null
+          volume_z_mm?: number | null
+          workspace_id: string
+        }
+        Update: {
+          ativo?: boolean
+          bico_mm?: number | null
+          created_at?: string
+          data_aquisicao?: string | null
+          horas_ultima_manutencao?: number
+          horas_uso?: number
+          id?: string
+          integracao_tipo?: string | null
+          integracao_url?: string | null
+          intervalo_manutencao_horas?: number | null
+          manutencao_ciclo?: number
+          manutencao_hora?: number
+          marca?: string | null
+          modelo?: string | null
+          nome?: string
+          observacoes?: string | null
+          potencia_media_kw?: number
+          status?: string
+          tecnologia?: string
+          updated_at?: string
+          user_id?: string
+          valor_aquisicao?: number
+          valor_residual?: number
+          vida_util_horas?: number
+          volume_x_mm?: number | null
+          volume_y_mm?: number | null
+          volume_z_mm?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_impressoras_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      p3d_manutencoes: {
+        Row: {
+          created_at: string
+          custo: number
+          data: string
+          descricao: string
+          horas_uso_no_momento: number | null
+          id: string
+          impressora_id: string
+          tipo: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          custo?: number
+          data?: string
+          descricao: string
+          horas_uso_no_momento?: number | null
+          id?: string
+          impressora_id: string
+          tipo?: string
+          user_id?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          custo?: number
+          data?: string
+          descricao?: string
+          horas_uso_no_momento?: number | null
+          id?: string
+          impressora_id?: string
+          tipo?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_manutencoes_impressora_id_workspace_id_fkey"
+            columns: ["impressora_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_impressoras"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_materiais: {
+        Row: {
+          ativo: boolean
+          cor: string | null
+          cor_hex: string | null
+          created_at: string
+          custo_cadastro: number | null
+          custo_medio: number
+          diametro_mm: number | null
+          estoque_atual: number
+          estoque_minimo: number
+          fornecedor_id: string | null
+          id: string
+          localizacao: string | null
+          marca: string | null
+          material: string | null
+          nome: string
+          peso_liquido_rolo_g: number | null
+          preco_compra: number | null
+          tipo: string
+          ultimo_custo: number
+          unidade: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string | null
+          cor_hex?: string | null
+          created_at?: string
+          custo_cadastro?: number | null
+          custo_medio?: number
+          diametro_mm?: number | null
+          estoque_atual?: number
+          estoque_minimo?: number
+          fornecedor_id?: string | null
+          id?: string
+          localizacao?: string | null
+          marca?: string | null
+          material?: string | null
+          nome: string
+          peso_liquido_rolo_g?: number | null
+          preco_compra?: number | null
+          tipo?: string
+          ultimo_custo?: number
+          unidade?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string | null
+          cor_hex?: string | null
+          created_at?: string
+          custo_cadastro?: number | null
+          custo_medio?: number
+          diametro_mm?: number | null
+          estoque_atual?: number
+          estoque_minimo?: number
+          fornecedor_id?: string | null
+          id?: string
+          localizacao?: string | null
+          marca?: string | null
+          material?: string | null
+          nome?: string
+          peso_liquido_rolo_g?: number | null
+          preco_compra?: number | null
+          tipo?: string
+          ultimo_custo?: number
+          unidade?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_materiais_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      p3d_movimentos_estoque: {
+        Row: {
+          created_at: string
+          custo_total: number | null
+          custo_unitario: number | null
+          delta: number
+          id: string
+          material_id: string
+          observacao: string | null
+          referencia_id: string | null
+          referencia_tipo: string | null
+          saldo_apos: number
+          tipo: string
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          custo_total?: number | null
+          custo_unitario?: number | null
+          delta: number
+          id?: string
+          material_id: string
+          observacao?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          saldo_apos: number
+          tipo: string
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          custo_total?: number | null
+          custo_unitario?: number | null
+          delta?: number
+          id?: string
+          material_id?: string
+          observacao?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          saldo_apos?: number
+          tipo?: string
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_movimentos_estoque_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_orcamento_itens: {
+        Row: {
+          calculado_em: string
+          calculo: Json
+          custo_total: number
+          descricao: string
+          entrada: Json
+          id: string
+          lucro: number
+          orcamento_id: string
+          ordem: number
+          preco_total: number
+          preco_unitario: number
+          produto_id: string | null
+          quantidade: number
+          variacao_id: string | null
+          versao_formula: number
+          workspace_id: string
+        }
+        Insert: {
+          calculado_em?: string
+          calculo: Json
+          custo_total: number
+          descricao: string
+          entrada: Json
+          id?: string
+          lucro: number
+          orcamento_id: string
+          ordem?: number
+          preco_total: number
+          preco_unitario: number
+          produto_id?: string | null
+          quantidade: number
+          variacao_id?: string | null
+          versao_formula?: number
+          workspace_id: string
+        }
+        Update: {
+          calculado_em?: string
+          calculo?: Json
+          custo_total?: number
+          descricao?: string
+          entrada?: Json
+          id?: string
+          lucro?: number
+          orcamento_id?: string
+          ordem?: number
+          preco_total?: number
+          preco_unitario?: number
+          produto_id?: string | null
+          quantidade?: number
+          variacao_id?: string | null
+          versao_formula?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_orcamento_itens_orcamento_id_workspace_id_fkey"
+            columns: ["orcamento_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_orcamentos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_orcamento_itens_produto_id_workspace_id_fkey"
+            columns: ["produto_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produtos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_orcamento_itens_variacao_id_workspace_id_fkey"
+            columns: ["variacao_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produto_variacoes"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_orcamentos: {
+        Row: {
+          aprovado_em: string | null
+          cliente_id: string | null
+          created_at: string
+          custo_total: number
+          desconto_valor: number
+          enviado_em: string | null
+          id: string
+          lucro_total: number
+          numero: number
+          observacoes: string | null
+          status: string
+          subtotal: number
+          titulo: string
+          total: number
+          updated_at: string
+          user_id: string
+          validade: string | null
+          workspace_id: string
+        }
+        Insert: {
+          aprovado_em?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          custo_total?: number
+          desconto_valor?: number
+          enviado_em?: string | null
+          id?: string
+          lucro_total?: number
+          numero?: number
+          observacoes?: string | null
+          status?: string
+          subtotal?: number
+          titulo: string
+          total?: number
+          updated_at?: string
+          user_id?: string
+          validade?: string | null
+          workspace_id: string
+        }
+        Update: {
+          aprovado_em?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          custo_total?: number
+          desconto_valor?: number
+          enviado_em?: string | null
+          id?: string
+          lucro_total?: number
+          numero?: number
+          observacoes?: string | null
+          status?: string
+          subtotal?: number
+          titulo?: string
+          total?: number
+          updated_at?: string
+          user_id?: string
+          validade?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_orcamentos_cliente_id_workspace_id_fkey"
+            columns: ["cliente_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_orcamentos_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      p3d_pecas_desgaste: {
+        Row: {
+          categoria: string
+          created_at: string
+          custo: number
+          horas_ultima_troca: number
+          id: string
+          impressora_id: string
+          nome: string
+          vida_util_horas: number
+          workspace_id: string
+        }
+        Insert: {
+          categoria?: string
+          created_at?: string
+          custo: number
+          horas_ultima_troca?: number
+          id?: string
+          impressora_id: string
+          nome: string
+          vida_util_horas: number
+          workspace_id: string
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          custo?: number
+          horas_ultima_troca?: number
+          id?: string
+          impressora_id?: string
+          nome?: string
+          vida_util_horas?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_pecas_desgaste_impressora_id_workspace_id_fkey"
+            columns: ["impressora_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_impressoras"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_produto_arquivos: {
+        Row: {
+          created_at: string
+          id: string
+          mime_type: string | null
+          nome: string
+          produto_id: string
+          storage_path: string
+          tamanho_bytes: number | null
+          tipo: string
+          user_id: string | null
+          variacao_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mime_type?: string | null
+          nome: string
+          produto_id: string
+          storage_path: string
+          tamanho_bytes?: number | null
+          tipo: string
+          user_id?: string | null
+          variacao_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mime_type?: string | null
+          nome?: string
+          produto_id?: string
+          storage_path?: string
+          tamanho_bytes?: number | null
+          tipo?: string
+          user_id?: string | null
+          variacao_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_produto_arquivos_produto_id_workspace_id_fkey"
+            columns: ["produto_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produtos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_produto_arquivos_variacao_id_workspace_id_fkey"
+            columns: ["variacao_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produto_variacoes"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_produto_variacoes: {
+        Row: {
+          ativo: boolean
+          cor: string | null
+          created_at: string
+          horas_estimadas: number | null
+          id: string
+          material_id: string | null
+          nome: string
+          peso_g: number | null
+          preco_venda: number | null
+          produto_id: string
+          sku: string | null
+          tamanho: string | null
+          workspace_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string | null
+          created_at?: string
+          horas_estimadas?: number | null
+          id?: string
+          material_id?: string | null
+          nome: string
+          peso_g?: number | null
+          preco_venda?: number | null
+          produto_id: string
+          sku?: string | null
+          tamanho?: string | null
+          workspace_id: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string | null
+          created_at?: string
+          horas_estimadas?: number | null
+          id?: string
+          material_id?: string | null
+          nome?: string
+          peso_g?: number | null
+          preco_venda?: number | null
+          produto_id?: string
+          sku?: string | null
+          tamanho?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_produto_variacoes_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_produto_variacoes_produto_id_workspace_id_fkey"
+            columns: ["produto_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produtos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_produtos: {
+        Row: {
+          ativo: boolean
+          categoria: string | null
+          created_at: string
+          descricao: string | null
+          horas_estimadas: number | null
+          id: string
+          impressora_id: string | null
+          material_id: string | null
+          nome: string
+          peso_estimado_g: number | null
+          preco_venda: number | null
+          publicado_loja: boolean
+          sku: string | null
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string | null
+          created_at?: string
+          descricao?: string | null
+          horas_estimadas?: number | null
+          id?: string
+          impressora_id?: string | null
+          material_id?: string | null
+          nome: string
+          peso_estimado_g?: number | null
+          preco_venda?: number | null
+          publicado_loja?: boolean
+          sku?: string | null
+          updated_at?: string
+          user_id?: string
+          workspace_id: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string | null
+          created_at?: string
+          descricao?: string | null
+          horas_estimadas?: number | null
+          id?: string
+          impressora_id?: string | null
+          material_id?: string | null
+          nome?: string
+          peso_estimado_g?: number | null
+          preco_venda?: number | null
+          publicado_loja?: boolean
+          sku?: string | null
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_produtos_impressora_id_workspace_id_fkey"
+            columns: ["impressora_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_impressoras"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_produtos_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_produtos_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       perfis: {
         Row: {
           created_at: string
@@ -2316,6 +3306,47 @@ export type Database = {
           tipo_conta_padrao?: string
         }
         Relationships: []
+      }
+      perfis_acesso: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          permissoes: Json
+          workspace_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          permissoes?: Json
+          workspace_id: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          permissoes?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "perfis_acesso_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       perfis_tipos_ativos: {
         Row: {
@@ -2340,6 +3371,51 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      permissoes_membro: {
+        Row: {
+          created_at: string
+          extras: string[]
+          membro_id: string
+          modulo_chave: string
+          nivel: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          extras?: string[]
+          membro_id: string
+          modulo_chave: string
+          nivel: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          extras?: string[]
+          membro_id?: string
+          modulo_chave?: string
+          nivel?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permissoes_membro_modulo_chave_fkey"
+            columns: ["modulo_chave"]
+            isOneToOne: false
+            referencedRelation: "modulos"
+            referencedColumns: ["chave"]
+          },
+          {
+            foreignKeyName: "permissoes_membro_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pessoal_accounts: {
         Row: {
@@ -3578,6 +4654,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          perfil_acesso_id: string | null
           respondido_em: string | null
           status: string
           user_id: string
@@ -3587,6 +4664,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          perfil_acesso_id?: string | null
           respondido_em?: string | null
           status?: string
           user_id: string
@@ -3596,12 +4674,20 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          perfil_acesso_id?: string | null
           respondido_em?: string | null
           status?: string
           user_id?: string
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "solicitacoes_vendedor_perfil_acesso_id_fkey"
+            columns: ["perfil_acesso_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_acesso"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "solicitacoes_vendedor_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -3849,6 +4935,52 @@ export type Database = {
           },
         ]
       }
+      workspace_config: {
+        Row: {
+          config: Json
+          modelo_id: string | null
+          nicho_chave: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          config?: Json
+          modelo_id?: string | null
+          nicho_chave?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          config?: Json
+          modelo_id?: string | null
+          nicho_chave?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_config_modelo_id_fkey"
+            columns: ["modelo_id"]
+            isOneToOne: false
+            referencedRelation: "modelos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_config_nicho_chave_fkey"
+            columns: ["nicho_chave"]
+            isOneToOne: false
+            referencedRelation: "nichos"
+            referencedColumns: ["chave"]
+          },
+          {
+            foreignKeyName: "workspace_config_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_modulos: {
         Row: {
           config: Json
@@ -3893,7 +5025,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _executar_aprovacao: {
+        Args: { a: Database["public"]["Tables"]["aprovacoes"]["Row"] }
+        Returns: Json
+      }
+      _finalizar_se_completa: { Args: { p_id: string }; Returns: string }
+      _fundadores: { Args: { p_ws: string }; Returns: string[] }
+      _gate: {
+        Args: {
+          p_payload: Json
+          p_resumo: string
+          p_tipo: string
+          p_ws: string
+        }
+        Returns: boolean
+      }
+      _validar_permissoes: {
+        Args: { p_permissoes: Json; p_ws: string }
+        Returns: Json
+      }
       aceitar_convite: { Args: { p_token: string }; Returns: string }
+      aceitar_convite_workspace: { Args: { p_token: string }; Returns: string }
       agendar_reuniao: {
         Args: {
           p_canal?: string
@@ -3905,6 +5057,32 @@ export type Database = {
         }
         Returns: string
       }
+      aplicar_nicho: {
+        Args: { p_modelo?: string; p_nicho: string; p_workspace_id: string }
+        Returns: undefined
+      }
+      aprovar_alteracao: {
+        Args: { p_aprovar: boolean; p_id: string }
+        Returns: string
+      }
+      atualizar_perfil_acesso: {
+        Args: {
+          p_ativo?: boolean
+          p_descricao?: string
+          p_id: string
+          p_nome?: string
+          p_permissoes?: Json
+        }
+        Returns: undefined
+      }
+      atualizar_permissoes_membro: {
+        Args: {
+          p_membro_id: string
+          p_permissoes: Json
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       atualizar_reuniao: {
         Args: {
           p_data_hora?: string
@@ -3914,12 +5092,32 @@ export type Database = {
         }
         Returns: undefined
       }
+      cancelar_alteracao: { Args: { p_id: string }; Returns: undefined }
+      cancelar_convite_empresa: { Args: { p_id: string }; Returns: undefined }
       converter_lead_em_cliente: {
         Args: { p_lead_id: string }
         Returns: string
       }
+      convidar_membro: {
+        Args: {
+          p_email: string
+          p_papel: string
+          p_permissoes?: Json
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       criar_empresa: {
         Args: { p_nicho?: string; p_nome: string }
+        Returns: string
+      }
+      criar_perfil_acesso: {
+        Args: {
+          p_descricao?: string
+          p_nome: string
+          p_permissoes?: Json
+          p_workspace_id: string
+        }
         Returns: string
       }
       current_user_email: { Args: never; Returns: string }
@@ -3930,6 +5128,16 @@ export type Database = {
       eh_comercial_workspace: { Args: { p_ws: string }; Returns: boolean }
       eh_dono_workspace: { Args: { p_ws: string }; Returns: boolean }
       eh_membro_workspace: { Args: { ws: string }; Returns: boolean }
+      eh_proprietario_workspace: { Args: { p_ws: string }; Returns: boolean }
+      fundadores_da_empresa: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          email: string
+          nome: string
+          papel: string
+          user_id: string
+        }[]
+      }
       gerar_codigo_vendedor: { Args: never; Returns: string }
       get_colaboradores_do_dono: {
         Args: never
@@ -3983,6 +5191,47 @@ export type Database = {
       }
       lead_view_ping: { Args: { p_view_id: string }; Returns: undefined }
       lead_view_start: { Args: { p_lead_id: string }; Returns: string }
+      listar_aprovacoes: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          created_at: string
+          decidido_em: string
+          erro: string
+          eu_posso_votar: boolean
+          expira_em: string
+          faltam: Json
+          id: string
+          proposto_por: string
+          proposto_por_nome: string
+          resultado: Json
+          resumo: string
+          status: string
+          tipo: string
+          votos: Json
+        }[]
+      }
+      listar_convites_empresa: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          created_at: string
+          email_convidado: string
+          expira_em: string
+          id: string
+          papel: string
+          permissoes: Json
+        }[]
+      }
+      listar_membros_empresa: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          membro_id: string
+          nome: string
+          papel: string
+          permissoes: Json
+        }[]
+      }
       meu_codigo_vendedor: { Args: { p_workspace_id: string }; Returns: string }
       meu_papel_na_empresa: {
         Args: { p_workspace_id: string }
@@ -4001,7 +5250,62 @@ export type Database = {
         Args: { p_chave: string; ws: string }
         Returns: boolean
       }
+      p3d_calcular_preco: { Args: { p: Json }; Returns: Json }
+      p3d_garantir_config: { Args: { p_ws: string }; Returns: undefined }
+      p3d_movimentar_estoque: {
+        Args: {
+          p_custo_total?: number
+          p_custo_unitario?: number
+          p_material_id: string
+          p_observacao?: string
+          p_permitir_negativo?: boolean
+          p_quantidade: number
+          p_referencia_id?: string
+          p_referencia_tipo?: string
+          p_tipo: string
+          p_ws: string
+        }
+        Returns: Json
+      }
+      p3d_mudar_status_orcamento: {
+        Args: { p_orcamento_id: string; p_status: string }
+        Returns: string
+      }
+      p3d_num: { Args: { d?: number; k: string; p: Json }; Returns: number }
+      p3d_recalc_orcamento: { Args: { p_id: string }; Returns: undefined }
+      p3d_remover_item_orcamento: {
+        Args: { p_item_id: string }
+        Returns: undefined
+      }
+      p3d_salvar_item_orcamento: {
+        Args: {
+          p_descricao: string
+          p_entrada: Json
+          p_item_id?: string
+          p_orcamento_id: string
+          p_produto_id?: string
+          p_quantidade: number
+          p_variacao_id?: string
+        }
+        Returns: string
+      }
+      p3d_simular_preco: {
+        Args: { p_entrada: Json; p_ws: string }
+        Returns: Json
+      }
+      pessoas_da_empresa: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          nome: string
+          papel: string
+          pessoa_id: string
+        }[]
+      }
       recusar_convite: { Args: { p_token: string }; Returns: undefined }
+      regenerar_codigo_perfil_acesso: {
+        Args: { p_id: string }
+        Returns: string
+      }
       regenerar_codigo_vendedor: {
         Args: { p_workspace_id: string }
         Returns: string
@@ -4022,15 +5326,37 @@ export type Database = {
           vendedor_id: string
         }[]
       }
+      remover_membro: {
+        Args: { p_membro_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
       renomear_empresa: {
         Args: { p_nome: string; p_workspace_id: string }
+        Returns: undefined
+      }
+      responder_solicitacao_acesso: {
+        Args: { p_aprovar: boolean; p_id: string }
         Returns: undefined
       }
       responder_solicitacao_vendedor: {
         Args: { p_aprovar: boolean; p_id: string }
         Returns: undefined
       }
+      salvar_rotulos: {
+        Args: { p_rotulos: Json; p_workspace_id: string }
+        Returns: undefined
+      }
+      solicitar_acesso: { Args: { p_codigo: string }; Returns: string }
       solicitar_acesso_vendedor: { Args: { p_codigo: string }; Returns: string }
+      tem_permissao: {
+        Args: {
+          p_extra?: string
+          p_modulo: string
+          p_nivel?: string
+          p_ws: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

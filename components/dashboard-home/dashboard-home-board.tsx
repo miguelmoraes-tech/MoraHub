@@ -11,6 +11,11 @@ import {
   Wallet,
   Users2,
   Scale,
+  Printer,
+  Boxes,
+  Package,
+  Calculator,
+  FileSpreadsheet,
 } from "lucide-react";
 import { SetorResumoCard } from "@/components/dashboard-executivo/setor-resumo-card";
 import type { DashboardHomeOverview } from "@/lib/dashboard-home/get-overview";
@@ -28,6 +33,7 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
     financeiro,
     rh,
     juridico,
+    impressao3d,
     habilitados,
   } = overview;
   const rotulos = await getRotulos();
@@ -42,6 +48,11 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
     "financeiro",
     "rh",
     "juridico",
+    "p3d_impressoras",
+    "p3d_estoque",
+    "p3d_produtos",
+    "p3d_precificacao",
+    "p3d_orcamentos",
   ].some(com);
 
   return (
@@ -229,6 +240,77 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
                 value: String(juridico.compliancePendente),
                 tone: juridico.compliancePendente > 0 ? "amber" : "emerald",
               },
+            ]}
+          />
+        )}
+
+        {com("p3d_impressoras") && (
+          <SetorResumoCard
+            icon={Printer}
+            titulo={rotulos.plural("p3d_impressoras")}
+            href="/impressao-3d/impressoras"
+            stats={[
+              { label: "ativas", value: String(impressao3d.impressoras.ativas) },
+              {
+                label: "manutenção vencida",
+                value: String(impressao3d.impressoras.manutencaoVencida),
+                tone: impressao3d.impressoras.manutencaoVencida > 0 ? "rose" : "emerald",
+              },
+            ]}
+          />
+        )}
+
+        {com("p3d_estoque") && (
+          <SetorResumoCard
+            icon={Boxes}
+            titulo={rotulos.plural("p3d_estoque")}
+            href="/impressao-3d/estoque"
+            stats={[
+              { label: "materiais", value: String(impressao3d.estoque.itens) },
+              {
+                label: "abaixo do mínimo",
+                value: String(impressao3d.estoque.abaixoDoMinimo),
+                tone: impressao3d.estoque.abaixoDoMinimo > 0 ? "amber" : "emerald",
+              },
+            ]}
+          />
+        )}
+
+        {com("p3d_produtos") && (
+          <SetorResumoCard
+            icon={Package}
+            titulo={rotulos.plural("p3d_produtos")}
+            href="/impressao-3d/produtos"
+            stats={[{ label: "produtos ativos", value: String(impressao3d.produtos.ativos) }]}
+          />
+        )}
+
+        {com("p3d_precificacao") && (
+          <SetorResumoCard
+            icon={Calculator}
+            titulo={rotulos.plural("p3d_precificacao")}
+            href="/impressao-3d/precificacao"
+            stats={
+              impressao3d.precificacao
+                ? [
+                    {
+                      label: impressao3d.precificacao.modo === "margem" ? "margem padrão" : "markup padrão",
+                      value: `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(impressao3d.precificacao.percentual)}%`,
+                    },
+                  ]
+                : [{ label: "configuração", value: "pendente", tone: "amber" }]
+            }
+          />
+        )}
+
+        {com("p3d_orcamentos") && (
+          <SetorResumoCard
+            icon={FileSpreadsheet}
+            titulo={rotulos.plural("p3d_orcamentos")}
+            href="/impressao-3d/orcamentos"
+            stats={[
+              { label: "em rascunho", value: String(impressao3d.orcamentos.rascunhos) },
+              { label: "enviados", value: String(impressao3d.orcamentos.enviados), tone: impressao3d.orcamentos.enviados > 0 ? "copper" : "zinc" },
             ]}
           />
         )}

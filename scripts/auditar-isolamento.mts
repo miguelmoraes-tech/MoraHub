@@ -36,6 +36,12 @@ const MODULOS_NOVOS: Record<string, string[]> = {
     "juridico", "documentos", "processos", "compliance_juridico", "propriedade_intelectual",
     "modelos_contrato",
   ],
+  // Nicho Impressão 3D (Etapa A): todas as tabelas p3d_* isolam por workspace_id.
+  impressao_3d: [
+    "p3d_config_precificacao", "p3d_impressoras", "p3d_pecas_desgaste", "p3d_manutencoes",
+    "p3d_materiais", "p3d_movimentos_estoque", "p3d_produtos", "p3d_produto_variacoes",
+    "p3d_produto_arquivos", "p3d_orcamentos", "p3d_orcamento_itens",
+  ],
 };
 const ESTRITAS = Object.values(MODULOS_NOVOS).flat();
 
@@ -78,7 +84,7 @@ for (const base of ["app", "lib", "components"]) {
     const rel = relative(raiz, arq);
     const ignorado = IGNORAR.some((r) => r.test(rel));
     const texto = readFileSync(arq, "utf8").replace(/\r\n/g, "\n");
-    const re = /\.from\("([a-z_]+)"\)/g;
+    const re = /\.from\("([a-z0-9_]+)"\)/g;
     for (let m = re.exec(texto); m; m = re.exec(texto)) {
       if (!TABELAS.includes(m[1])) continue;
       const linha = texto.slice(0, m.index).split("\n").length;
@@ -166,6 +172,11 @@ const ACTIONS_COM_GUARDA = [
   "app/(dashboard)/juridico/propriedade-intelectual/actions.ts",
   "app/(dashboard)/juridico/modelos-contrato/actions.ts",
   "app/(dashboard)/documentos/actions.ts",
+  "app/(dashboard)/impressao-3d/impressoras/actions.ts",
+  "app/(dashboard)/impressao-3d/estoque/actions.ts",
+  "app/(dashboard)/impressao-3d/produtos/actions.ts",
+  "app/(dashboard)/impressao-3d/precificacao/actions.ts",
+  "app/(dashboard)/impressao-3d/orcamentos/actions.ts",
 ];
 const semGuarda: string[] = [];
 let actionsVerificadas = 0;
@@ -205,6 +216,7 @@ const PASTAS_CONCLUIDAS: Record<string, string[]> = {
     "app/(dashboard)/juridico/modelos-contrato", "app/(dashboard)/documentos",
     "components/juridico", "lib/juridico-acesso.ts", "lib/juridico-shared.ts",
   ],
+  impressao_3d: ["app/(dashboard)/impressao-3d", "lib/impressao-3d", "components/impressao-3d"],
 };
 const proibidos = [
   /getDonoIdAtivo/, /getWorkspaceIdAtivo/, /get_colaboradores_do_dono_by_id/,
@@ -273,3 +285,123 @@ console.log(`\nEscritas diretas em membros/convites/perfis_tipos_ativos: ${escri
 for (const s of escritasDiretas) console.log(`  ${ESCRITAS_PERMITIDAS.has(s.split(":")[0]) ? "-" : "!"} ${s}`);
 console.log(`Fora das exceções conhecidas: ${naoPermitidas.length}`);
 if (naoPermitidas.length) process.exitCode = 1;
+
+// --- Nicho Impressão 3D: guard por módulo --------------------------------------
+// Toda página do nicho lê por getAcessoModulo("p3d_x") do módulo dono da rota e toda
+// action de escrita por getAcessoEdicao("p3d_x"); ninguém usa getAcessoSoDono.
+// (simulacao.ts e arquivos-leitura.ts são leituras: getAcessoModulo.)
+const MODULO_DA_PASTA: Record<string, string> = {
+  impressoras: "p3d_impressoras",
+  estoque: "p3d_estoque",
+  produtos: "p3d_produtos",
+  precificacao: "p3d_precificacao",
+  orcamentos: "p3d_orcamentos",
+};
+const p3dSemGuard: string[] = [];
+let p3dArquivos = 0;
+for (const arq of arquivos(join(raiz, "app/(dashboard)/impressao-3d"))) {
+  const rel = relative(raiz, arq).replace(/\\/g, "/");
+  if (!/(page|actions|simulacao|arquivos-leitura)\.tsx?$/.test(arq)) continue;
+  const pasta = rel.split("/")[3];
+  const modulo = MODULO_DA_PASTA[pasta];
+  p3dArquivos++;
+  if (!modulo) {
+    p3dSemGuard.push(`${rel} fora de uma pasta de módulo conhecida`);
+    continue;
+  }
+  const texto = readFileSync(arq, "utf8");
+  const ehAction = /actions\.tsx?$/.test(arq);
+  const esperado = ehAction ? `getAcessoEdicao` : `getAcessoModulo`;
+  if (!texto.includes(esperado)) p3dSemGuard.push(`${rel} sem ${esperado}`);
+  if (!texto.includes(`"${modulo}"`)) p3dSemGuard.push(`${rel} não confere o módulo ${modulo}`);
+  if (texto.includes("getAcessoSoDono")) p3dSemGuard.push(`${rel} usa getAcessoSoDono`);
+}
+console.log(`\nImpressão 3D: páginas/actions verificadas: ${p3dArquivos}`);
+console.log(`Impressão 3D sem guard por módulo: ${p3dSemGuard.length}`);
+for (const s of p3dSemGuard) console.log("  ! " + s);
+if (p3dSemGuard.length) process.exitCode = 1;
+
+// --- Nicho Impressão 3D: campos que só o banco escreve -------------------------
+// O banco barra, mas o código nunca deve tentar: saldo e custos do material e
+// numeração/status/totais do orçamento só mudam pelas RPCs; itens do orçamento e
+// movimentos de estoque são somente leitura (escrita só por RPC).
+const PROTEGIDOS: Record<string, string[]> = {
+  p3d_materiais: ["estoque_atual", "custo_medio", "ultimo_custo", "custo_cadastro"],
+  p3d_orcamentos: ["status", "numero", "subtotal", "total", "custo_total", "lucro_total", "enviado_em", "aprovado_em"],
+};
+const SOMENTE_LEITURA = ["p3d_orcamento_itens", "p3d_movimentos_estoque"];
+const escritasProtegidas: string[] = [];
+let escritasP3d = 0;
+
+/** Texto entre os parênteses do .insert/.update/.upsert que abre em `inicio`. */
+function argumentos(texto: string, inicio: number): string {
+  let nivel = 1;
+  let i = inicio;
+  while (i < texto.length && nivel > 0) {
+    if (texto[i] === "(") nivel++;
+    else if (texto[i] === ")") nivel--;
+    i++;
+  }
+  return texto.slice(inicio, i - 1);
+}
+
+for (const pasta of ["app", "components", "lib"]) {
+  for (const arq of arquivos(join(raiz, pasta))) {
+    const rel = relative(raiz, arq).replace(/\\/g, "/");
+    const texto = readFileSync(arq, "utf8").replace(/\r\n/g, "\n");
+    const re = /\.from\(\s*["'`](p3d_[a-z_]+)["'`]\s*\)\s*\.(insert|update|upsert|delete)\(/g;
+    for (let m = re.exec(texto); m; m = re.exec(texto)) {
+      escritasP3d++;
+      const tabela = m[1];
+      const linha = texto.slice(0, m.index).split("\n").length;
+      if (SOMENTE_LEITURA.includes(tabela)) {
+        escritasProtegidas.push(`${rel}:${linha} ${tabela} (${m[2]}): tabela somente leitura, use a RPC`);
+        continue;
+      }
+      const payload = argumentos(texto, m.index + m[0].length);
+      for (const campo of PROTEGIDOS[tabela] ?? []) {
+        if (new RegExp(`\\b${campo}\\b`).test(payload)) {
+          escritasProtegidas.push(`${rel}:${linha} ${tabela} (${m[2]}) envia ${campo}`);
+        }
+      }
+    }
+  }
+}
+
+// Os schemas que alimentam esses payloads (spread de parsed.data) também não podem ter o campo.
+const schemas = readFileSync(join(raiz, "lib/impressao-3d/validacao.ts"), "utf8");
+const SCHEMA_DA_TABELA: Record<string, string> = { p3d_materiais: "MaterialSchema", p3d_orcamentos: "OrcamentoSchema" };
+for (const [tabela, campos] of Object.entries(PROTEGIDOS)) {
+  const ini = schemas.indexOf(`export const ${SCHEMA_DA_TABELA[tabela]}`);
+  const fim = schemas.indexOf("\nexport const", ini + 10);
+  const corpo = schemas.slice(ini, fim === -1 ? undefined : fim);
+  for (const campo of campos) {
+    if (new RegExp(`\\b${campo}:`).test(corpo)) {
+      escritasProtegidas.push(`lib/impressao-3d/validacao.ts ${SCHEMA_DA_TABELA[tabela]} aceita ${campo}`);
+    }
+  }
+}
+console.log(`\nImpressão 3D: escritas diretas em p3d_* verificadas: ${escritasP3d}`);
+console.log(`Escritas em campo protegido / tabela somente leitura: ${escritasProtegidas.length}`);
+for (const s of escritasProtegidas) console.log("  ! " + s);
+if (escritasProtegidas.length) process.exitCode = 1;
+
+// --- Nicho Impressão 3D: bucket privado, caminho por empresa -------------------
+// Todo acesso ao storage do nicho usa o bucket p3d-arquivos (nunca o de clientes) e o
+// caminho nasce de montarCaminho (<workspace_id>/<produto_id>/<uuid>-<nome>).
+const storageFora: string[] = [];
+for (const pasta of ["app/(dashboard)/impressao-3d", "components/impressao-3d", "lib/impressao-3d"]) {
+  for (const arq of arquivos(join(raiz, pasta))) {
+    const rel = relative(raiz, arq).replace(/\\/g, "/");
+    const texto = readFileSync(arq, "utf8");
+    for (const m of texto.matchAll(/\.storage\s*\.from\(\s*([^)]*)\)/g)) {
+      if (m[1].trim() !== "BUCKET_P3D") storageFora.push(`${rel} usa storage.from(${m[1].trim()})`);
+    }
+    if (/\.storage\b/.test(texto) && /arquivos-clientes|arquivos-pessoais/.test(texto)) {
+      storageFora.push(`${rel} mistura o bucket do nicho com outro`);
+    }
+  }
+}
+console.log(`\nImpressão 3D: acessos ao storage fora do bucket p3d-arquivos: ${storageFora.length}`);
+for (const s of storageFora) console.log("  ! " + s);
+if (storageFora.length) process.exitCode = 1;
