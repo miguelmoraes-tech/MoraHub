@@ -20,6 +20,7 @@ import type { OpcaoMaterial, Opcoes } from "@/lib/impressao-3d/opcoes";
 import { cotacoesAbertas, historicoRecebido } from "@/lib/impressao-3d/regras-operacao";
 import { formatMoeda } from "@/lib/impressao-3d/numeros";
 import { formatDate } from "@/lib/format";
+import { abaInicial } from "@/lib/modulos/preferencias";
 
 export const TOM_STATUS_COMPRA: Record<StatusCompra, ChipTone> = {
   cotacao: "sky",
@@ -272,14 +273,17 @@ export function FornecedoresBoard({
   historico,
   materiais,
   podeEditar,
+  abas,
 }: {
   fornecedores: Fornecedor[];
   compras: Compra[];
   historico: HistoricoPreco[];
   materiais: Opcoes<OpcaoMaterial>;
   podeEditar: boolean;
+  /** Abas visíveis pela preferência de navegação (nunca vazia; ordem do registro). */
+  abas: string[];
 }) {
-  const [aba, setAba] = useState<"fornecedores" | "compras" | "precos">("compras");
+  const [aba, setAba] = useState<"fornecedores" | "compras" | "precos">(abaInicial(abas, "compras"));
   const [novo, setNovo] = useState(false);
   const [statusFiltro, setStatusFiltro] = useState("");
   const [mostrarArquivados, setMostrarArquivados] = useState(false);
@@ -318,7 +322,7 @@ export function FornecedoresBoard({
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
-          {([["compras", "Compras"], ["fornecedores", "Fornecedores"], ["precos", "Preços"]] as const).map(([k, l]) => (
+          {([["compras", "Compras"], ["fornecedores", "Fornecedores"], ["precos", "Preços"]] as const).filter(([k]) => abas.includes(k)).map(([k, l]) => (
             <button
               key={k}
               type="button"

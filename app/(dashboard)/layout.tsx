@@ -17,6 +17,7 @@ import {
   type PermissaoModulo,
 } from "@/lib/modulos/permissoes";
 import { configDoSino } from "@/lib/impressao-3d/sino";
+import { getPreferenciasNavegacao } from "@/lib/modulos/preferencias-servidor";
 import { getEmpresaAtiva, getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 import { ToastProvider } from "@/components/toast";
 import { RotulosProvider } from "@/components/rotulos-provider";
@@ -46,10 +47,11 @@ export default async function DashboardLayout({
   // cofundador = painel completo; sócio e funcionário = só os módulos da
   // empresa que as permissões deles liberam. Vendedor tem interface própria
   // em /vendedor/*.
-  const [ativa, empresas, configEmpresa] = await Promise.all([
+  const [ativa, empresas, configEmpresa, preferencias] = await Promise.all([
     getEmpresaAtiva(),
     getEmpresasDoUsuario(),
     getConfigEmpresa(),
+    getPreferenciasNavegacao(),
   ]);
   const painel = ativa && temPainelCompleto(ativa.papel) ? ativa : null;
   const restrito = !!ativa && ehPapelRestrito(ativa.papel);
@@ -123,6 +125,7 @@ export default async function DashboardLayout({
         empresas={empresas}
         empresaAtivaId={ativa?.workspaceId ?? null}
         sinoAlertas={sinoAlertas}
+        preferencia={preferencias.efetiva}
       />
       <main className="flex flex-1 flex-col overflow-y-auto">
         {VENCIMENTOS_HABILITADO && <VencimentosBanner alertas={alertas} />}

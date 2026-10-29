@@ -137,7 +137,8 @@ function PainelReceber({
   const toast = useToast();
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
-  const [gerar, setGerar] = useState(false);
+  // Pré-marcado quando o Financeiro está ligado e a pessoa o edita (o vencimento passa a ser obrigatório).
+  const [gerar, setGerar] = useState(podeGerarContaPagar);
   const [erro, setErro] = useState<string | null>(null);
 
   function enviar(formData: FormData) {

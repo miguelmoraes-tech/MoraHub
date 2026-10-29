@@ -32,6 +32,12 @@ export const AGUARDANDO_LIBERACAO = "/sem-acesso?aguardando=1";
 /** Telas de gestão da empresa: só o painel completo (fundador/cofundador). */
 const ROTAS_SO_PAINEL = ["/modulos", "/socios", "/configuracoes", "/aprovacoes"];
 
+/**
+ * Exceção dentro de /configuracoes: a personalização da PRÓPRIA navegação vale para sócio e
+ * funcionário com algum módulo liberado (só aparência; o banco só deixa gravar a linha pessoal).
+ */
+export const ROTA_NAVEGACAO = "/configuracoes/navegacao";
+
 function casa(path: string, prefixo: string) {
   return path === prefixo || path.startsWith(`${prefixo}/`);
 }
@@ -143,6 +149,7 @@ function decidirRestrito(
   const home = primeiraRotaHabilitada(liberados) ?? AGUARDANDO_LIBERACAO;
 
   if (naEntrada || path === "/" || path === HOME_DONO) return para(home);
+  if (path === ROTA_NAVEGACAO) return liberados.length > 0 ? seguir : para(home);
   if (isRotaDoVendedor(path) || ROTAS_SO_PAINEL.some((p) => casa(path, p))) return para(home);
   // Só a lista de clientes: o detalhe /clientes/[id] é do painel completo.
   if (path.startsWith("/clientes/")) return para(home);
@@ -151,5 +158,6 @@ function decidirRestrito(
 
 /** True se o caminho depende dos módulos ligados (precisa da leitura de workspace_modulos). */
 export function precisaDeModulos(path: string): boolean {
-  return !isRotaIsenta(path) && !isRotaLivre(path);
+  // A personalização da navegação é rota livre, mas a equipe só entra com algum módulo liberado.
+  return !isRotaIsenta(path) && (!isRotaLivre(path) || path === ROTA_NAVEGACAO);
 }

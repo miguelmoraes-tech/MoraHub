@@ -5,6 +5,10 @@ import { getModulosHabilitados } from "@/lib/modulos/habilitados";
 import { isFollowupPendente } from "@/lib/leads";
 import { todayISO } from "@/lib/vencimentos/dates";
 import { RESUMO_P3D_VAZIO, getResumoImpressao3d, type ResumoImpressao3d } from "@/lib/impressao-3d/resumo";
+import { lerFatosPassos, montarPassos, todosConcluidos, type Passo } from "@/lib/impressao-3d/primeiros-passos";
+import { getConfigEmpresa } from "@/lib/rotulos";
+import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
+import { ABAS_VISAO_GERAL, CHAVE_VISAO_GERAL } from "@/lib/modulos/registry";
 import type {
   AtividadeVendedorRow,
   ColaboradorVinculado,
@@ -40,6 +44,13 @@ export interface DashboardHomeOverview {
   juridico: { processosAbertos: number; compliancePendente: number };
   /** Nicho Impressão 3D: só contagens, só dos módulos p3d_* ligados. */
   impressao3d: ResumoImpressao3d;
+  /**
+   * "Primeiros passos" (empresa com nicho Impressão 3D), por dados reais. null = outro nicho,
+   * tudo concluído ou seção oculta na preferência de navegação.
+   */
+  primeirosPassos: Passo[] | null;
+  /** Seções visíveis da Visão Geral (preferência de navegação, chave "visao_geral"). */
+  secoes: string[];
 }
 
 const DIAS_ATIVIDADE = 7;
@@ -58,6 +69,8 @@ const VAZIO: DashboardHomeOverview = {
   rh: { funcionariosAtivos: 0, vagasAbertas: 0 },
   juridico: { processosAbertos: 0, compliancePendente: 0 },
   impressao3d: RESUMO_P3D_VAZIO,
+  primeirosPassos: null,
+  secoes: ABAS_VISAO_GERAL.map((a) => a.chave),
 };
 
 export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview> {
@@ -195,7 +208,16 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
       : nada,
   ]);
 
-  const impressao3d = await getResumoImpressao3d(supabase, workspaceId, habilitados);
+  const [impressao3d, config, secoes] = await Promise.all([
+    getResumoImpressao3d(supabase, workspaceId, habilitados),
+    getConfigEmpresa(),
+    getAbasVisiveis(CHAVE_VISAO_GERAL),
+  ]);
+  let primeirosPassos: Passo[] | null = null;
+  if (config.nichoChave === "impressao_3d" && secoes.includes("primeiros_passos")) {
+    const passos = montarPassos(await lerFatosPassos(supabase, workspaceId, habilitados), habilitados);
+    primeirosPassos = todosConcluidos(passos) ? null : passos;
+  }
 
   const leads = (leadsRes.data ?? []) as Pick<
     Lead,
@@ -248,5 +270,7 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
       compliancePendente: complianceRes.count ?? 0,
     },
     impressao3d,
+    primeirosPassos,
+    secoes,
   };
 }

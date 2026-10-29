@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
+import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { ImpressorasBoard, type TrabalhoAtual } from "@/components/impressao-3d/impressoras-board";
 import {
   COLUNAS_IMPRESSORA,
@@ -13,6 +14,7 @@ import {
 export default async function ImpressorasPage() {
   const acesso = await getAcessoModulo("p3d_impressoras");
   if (!acesso) redirect(HOME_DONO);
+  const abas = await getAbasVisiveis("p3d_impressoras");
   const supabase = await createClient();
   const ws = acesso.workspaceId;
 
@@ -50,6 +52,7 @@ export default async function ImpressorasPage() {
 
   return (
     <ImpressorasBoard
+      abas={abas}
       impressoras={(impressoras ?? []) as unknown as Impressora[]}
       pecas={(pecas ?? []) as unknown as PecaDesgaste[]}
       manutencoes={(manutencoes ?? []) as unknown as Manutencao[]}

@@ -45,6 +45,16 @@ export default async function ConfiguracoesPage() {
         <RenomearEmpresaForm nomeAtual={empresa.nome ?? ""} />
       </div>
 
+      <Link
+        href="/configuracoes/navegacao"
+        className="block rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
+      >
+        <p className="text-sm font-semibold text-zinc-100">Personalizar navegação</p>
+        <p className="mt-1 text-xs text-zinc-500">
+          Ordem e itens do menu, abas das telas e o padrão da empresa. Só aparência: não muda módulos, permissões nem dados.
+        </p>
+      </Link>
+
       {habilitados.some((c) => c.startsWith("p3d_")) && (
         <Link
           href="/configuracoes/nicho"

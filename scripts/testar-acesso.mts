@@ -149,6 +149,14 @@ import { primeiroErro } from "@/lib/impressao-3d/validacao";
 import { configDoSino } from "@/lib/impressao-3d/sino";
 import { atalhosConfiguracaoNicho } from "@/lib/impressao-3d/configuracoes";
 import { adicionarDias, dataIsoValida, diasEntre, formatDataIso, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/impressao-3d/datas";
+import {
+  CHAVE_VALIDA, ITENS_FIXOS, abaInicial, abasDe, abasVisiveis, aplicarPreferenciaMenu, chaveDoHref, gruposDoMenu, itemFixo,
+  lerPreferencia, ordenarComPreferencia, prepararPreferencia, resolverPreferencia,
+} from "@/lib/modulos/preferencias";
+import { CHAVE_VISAO_GERAL } from "@/lib/modulos/registry";
+import { ROTA_NAVEGACAO, precisaDeModulos } from "@/lib/acesso";
+import { PASSOS, montarPassos, precificacaoAjustada, todosConcluidos } from "@/lib/impressao-3d/primeiros-passos";
+import { COLUNAS_ORCAMENTO_CLIENTE, COLUNAS_PEDIDO_CLIENTE, resumirCompras } from "@/lib/impressao-3d/cliente-compras";
 
 let total = 0;
 function teste(nome: string, fn: () => void | Promise<void>) {
@@ -3301,6 +3309,254 @@ await teste("documentação: docs/nicho-impressao-3d.md descreve a Etapa C-1, as
     "WhatsApp Cloud API", "OctoPrint", "Moonraker", "Bambu", "Melhor Envio", "Correios", "ainda não conectada", "Estimado", "Real",
   ]) {
     assert.ok(doc.includes(trecho), `doc sem "${trecho}"`);
+  }
+});
+
+// ===========================================================================
+// Etapa D — navegação e abas personalizáveis, Módulos, Clientes, Financeiro e Primeiros passos
+// ===========================================================================
+
+console.log("\nEtapa D — menu personalizável (menu_preferencias)");
+const GRUPOS_ATUAIS = gruposDoMenu(ATUAIS, true, false);
+await teste("sem preferência o menu é IDÊNTICO ao do snapshot (Mora Lab e vendedores intactos)", () => {
+  const modulos = GRUPOS_ATUAIS.filter((g) => g.titulo !== "Dashboards" && g.titulo !== "Empresa");
+  const comoRegistro = modulos.map((g) => ({ titulo: g.titulo, itens: g.itens }));
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(aplicarPreferenciaMenu(comoRegistro, null))),
+    JSON.parse(JSON.stringify(menuDoDono(ATUAIS).map((g) => ({ titulo: g.titulo, itens: g.itens.map((i) => ({ label: i.label, href: i.href, icone: i.icone, ...(i.badge ? { badge: i.badge } : {}) })) }))))
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(menuDoDono(ATUAIS))), dourado.menu);
+  assert.equal(aplicarPreferenciaMenu(GRUPOS_ATUAIS, null), GRUPOS_ATUAIS, "sem preferência = os mesmos grupos");
+  assert.equal(aplicarPreferenciaMenu(GRUPOS_ATUAIS, { itens: [], abasOcultas: {} }), GRUPOS_ATUAIS, "preferência vazia = os mesmos grupos");
+  // Ordem dos blocos fixa: Dashboards, módulos (registro), Empresa.
+  assert.deepEqual(GRUPOS_ATUAIS.map((g) => g.titulo), ["Dashboards", ...menuDoDono(ATUAIS).map((g) => g.titulo), "Empresa"]);
+  assert.deepEqual(gruposDoMenu(ATUAIS, false, true).map((g) => g.titulo), menuDoDono(ATUAIS).map((g) => g.titulo), "equipe: sem Visão Geral e sem Empresa");
+});
+await teste("Visão Geral, Módulos e Configurações nunca somem, mesmo que a preferência diga oculto", () => {
+  const pref = {
+    itens: ["dashboard", "modulos", "configuracoes", "socios", "leads"].map((chave, ordem) => ({ chave, visivel: false, ordem })),
+    abasOcultas: {},
+  };
+  const hrefs = aplicarPreferenciaMenu(GRUPOS_ATUAIS, pref).flatMap((g) => g.itens.map((i) => i.href));
+  for (const h of ["/dashboard", "/modulos", "/configuracoes"]) assert.ok(hrefs.includes(h), h);
+  assert.ok(!hrefs.includes("/socios") && !hrefs.includes("/leads"), "os demais podem ser ocultados");
+  for (const f of ITENS_FIXOS) assert.equal(itemFixo(f), true);
+  const prep = prepararPreferencia(pref, { itensVisiveis: ["dashboard", "modulos", "configuracoes", "socios", "leads"], chavesComAbas: [] }, null);
+  assert.ok(prep.ok);
+  if (prep.ok) for (const f of ITENS_FIXOS) assert.equal(prep.pref.itens.find((i) => i.chave === f)?.visivel, true, `${f} gravado visível`);
+});
+await teste("ordem pela preferência dentro do grupo; item novo entra no fim, visível; grupo vazio some", () => {
+  const grupos = [{ titulo: "Gestão", itens: [{ href: "/leads" }, { href: "/renegados" }, { href: "/clientes" }, { href: "/agenda" }] }];
+  const pref = { itens: [{ chave: "clientes", visivel: true, ordem: 0 }, { chave: "leads", visivel: true, ordem: 1 }, { chave: "renegados", visivel: false, ordem: 2 }], abasOcultas: {} };
+  assert.deepEqual(aplicarPreferenciaMenu(grupos, pref)[0].itens.map((i) => i.href), ["/clientes", "/leads", "/agenda"], "agenda (sem preferência) no fim");
+  const tudoOculto = { itens: grupos[0].itens.map((i, ordem) => ({ chave: chaveDoHref(i.href), visivel: false, ordem })), abasOcultas: {} };
+  assert.deepEqual(aplicarPreferenciaMenu(grupos, tudoOculto), [], "grupo sem item visível some");
+  // A tela de personalização vê todos, inclusive os ocultos.
+  const ord = ordenarComPreferencia(grupos, pref)[0].itens;
+  assert.deepEqual(ord.map((x) => [x.chave, x.visivel]), [["clientes", true], ["leads", true], ["renegados", false], ["agenda", true]]);
+});
+await teste("módulo desligado some do menu, mas a preferência dele fica guardada e volta ao religar", () => {
+  const pref = { itens: [{ chave: "impressao-3d/estoque", visivel: true, ordem: 0 }, { chave: "leads", visivel: false, ordem: 1 }], abasOcultas: { p3d_estoque: ["historico"] } };
+  const semEstoque = aplicarPreferenciaMenu(gruposDoMenu(ATUAIS, true, false), pref).flatMap((g) => g.itens.map((i) => i.href));
+  assert.ok(!semEstoque.includes("/impressao-3d/estoque"));
+  // Salvar com o módulo desligado preserva o que estava guardado para ele.
+  const prep = prepararPreferencia(
+    { itens: [{ chave: "leads", visivel: true, ordem: 0 }], abasOcultas: {} },
+    { itensVisiveis: ["leads", "dashboard"], chavesComAbas: [] },
+    pref
+  );
+  assert.ok(prep.ok);
+  if (prep.ok) {
+    assert.deepEqual(prep.pref.itens.find((i) => i.chave === "impressao-3d/estoque"), { chave: "impressao-3d/estoque", visivel: true, ordem: 0 });
+    assert.deepEqual(prep.pref.abasOcultas, { p3d_estoque: ["historico"] });
+    assert.equal(prep.pref.itens.find((i) => i.chave === "leads")?.visivel, true);
+  }
+  const religado = aplicarPreferenciaMenu(gruposDoMenu([...ATUAIS, "p3d_estoque"], true, false), pref).flatMap((g) => g.itens.map((i) => i.href));
+  assert.ok(religado.includes("/impressao-3d/estoque") && !religado.includes("/leads"));
+});
+await teste("só entram itens que a pessoa já vê; chaves fora do formato são descartadas", () => {
+  const prep = prepararPreferencia(
+    { itens: [{ chave: "leads", visivel: false, ordem: 0 }, { chave: "rh", visivel: false, ordem: 1 }, { chave: "../x", visivel: true, ordem: 2 }, { chave: "LEADS", visivel: true, ordem: 3 }, { chave: "leads", visivel: true, ordem: 9 }] },
+    { itensVisiveis: ["leads"], chavesComAbas: [] },
+    null
+  );
+  assert.ok(prep.ok);
+  if (prep.ok) assert.deepEqual(prep.pref.itens, [{ chave: "leads", visivel: false, ordem: 0 }]);
+  assert.equal(lerPreferencia(null), null);
+  assert.deepEqual(lerPreferencia({ itens: "x", abas_ocultas: [] }), { itens: [], abasOcultas: {} });
+  assert.deepEqual(lerPreferencia({ itens: [{ chave: "a", visivel: "sim", ordem: 1 }, { chave: "b", visivel: true, ordem: Number.NaN }] })!.itens, []);
+});
+await teste("hierarquia: pessoal → padrão da empresa → ordem do registro", () => {
+  const pessoal = { itens: [{ chave: "leads", visivel: false, ordem: 0 }], abasOcultas: {} };
+  const padrao = { itens: [{ chave: "clientes", visivel: false, ordem: 0 }], abasOcultas: {} };
+  assert.equal(resolverPreferencia(pessoal, padrao), pessoal);
+  assert.equal(resolverPreferencia(null, padrao), padrao);
+  assert.equal(resolverPreferencia(null, null), null);
+});
+await teste("esconder item NÃO bloqueia a rota: a decisão do proxy não lê preferência", () => {
+  const acesso = lerFonte("lib/acesso.ts");
+  assert.ok(!/preferencia|menu_preferencias/i.test(acesso));
+  assert.ok(!/menu_preferencias|preferencia/i.test(lerFonte("lib/supabase/proxy.ts")));
+  assert.equal(vaiPara(decide("/leads", ok("dono"), ATUAIS)), "seguir");
+  assert.ok(lerFonte("components/empresa/navegacao-board.tsx").includes("não bloqueia a página"));
+});
+await teste("/configuracoes/navegacao: dono e cofundador sim; equipe só com módulo liberado; vendedor nunca; /configuracoes segue só do painel", () => {
+  assert.equal(vaiPara(decide(ROTA_NAVEGACAO, ok("dono"), ATUAIS)), "seguir");
+  assert.equal(vaiPara(decide(ROTA_NAVEGACAO, ok("cofundador"), ATUAIS)), "seguir");
+  for (const papel of ["socio", "funcionario"] as const) {
+    assert.equal(vaiPara(decide(ROTA_NAVEGACAO, ok(papel), ATUAIS, false, ["leads"])), "seguir", papel);
+    assert.equal(vaiPara(decide(ROTA_NAVEGACAO, ok(papel), ATUAIS, false, [])), AGUARDANDO_LIBERACAO, `${papel} sem módulo`);
+    assert.notEqual(vaiPara(decide("/configuracoes", ok(papel), ATUAIS, false, ["leads"])), "seguir", `${papel} /configuracoes`);
+    assert.notEqual(vaiPara(decide("/configuracoes/nicho", ok(papel), ATUAIS, false, ["leads"])), "seguir", `${papel} hub do nicho`);
+  }
+  assert.equal(vaiPara(decide(ROTA_NAVEGACAO, ok("comercial"), ATUAIS)), VENDEDOR_HOME);
+  assert.equal(precisaDeModulos(ROTA_NAVEGACAO), true, "o proxy lê os módulos para decidir a equipe");
+  assert.equal(precisaDeModulos("/configuracoes"), false);
+});
+await teste("gravação segue o contrato: lê, update pelo id ou insert, relê em corrida (23505); nunca upsert; restaurar apaga só a linha pessoal", () => {
+  const a = lerFonte("app/(dashboard)/configuracoes/navegacao/actions.ts");
+  assert.ok(!/\.upsert\(/.test(a), "sem upsert");
+  assert.ok(a.includes('.from("menu_preferencias").select("id, itens, abas_ocultas").eq("workspace_id", ws)'));
+  assert.ok(a.includes('q.eq("user_id", userId)') && a.includes('q.is("user_id", null)'));
+  assert.ok(a.includes('.eq("id", id)') && a.includes('.eq("workspace_id", ws)'));
+  assert.ok(a.includes('ins.error?.code !== "23505"') && a.includes("await lerLinha(supabase, ws, userId)"), "corrida: relê e faz update");
+  assert.ok(a.includes('escopo === "empresa" && !ctx.painel'), "padrão só fundador/cofundador");
+  const restaurar = a.slice(a.indexOf("export async function restaurarNavegacao"));
+  assert.ok(restaurar.includes(".delete()") && restaurar.includes('.eq("user_id", ctx.userId)') && !restaurar.includes('is("user_id", null)'));
+  assert.ok(a.includes("prepararPreferencia("), "valida e preserva o guardado");
+  assert.ok(a.includes("error.message"), "erro do banco como veio");
+  for (const proibido of ["workspace_modulos", "permissoes_membro", "definir_modulo", ".rpc("]) assert.ok(!a.includes(proibido), `navegação não toca ${proibido}`);
+});
+await teste("o layout aplica a preferência no servidor (sem piscar) e a barra lateral usa a mesma função da pré-visualização", () => {
+  const layout = lerFonte("app/(dashboard)/layout.tsx");
+  assert.ok(layout.includes("getPreferenciasNavegacao()") && layout.includes("preferencia={preferencias.efetiva}"));
+  const sidebar = lerFonte("components/sidebar.tsx");
+  assert.ok(sidebar.includes("aplicarPreferenciaMenu(") && sidebar.includes("gruposDoMenu(modulosHabilitados, painelCompleto, restrito)"));
+  assert.ok(sidebar.includes('href="/configuracoes/navegacao"'), "atalho no bloco do perfil");
+  assert.ok(lerFonte("components/empresa/navegacao-board.tsx").includes("aplicarPreferenciaMenu("));
+  assert.ok(lerFonte("app/(dashboard)/configuracoes/page.tsx").includes('href="/configuracoes/navegacao"'));
+  const srv = lerFonte("lib/modulos/preferencias-servidor.ts");
+  assert.ok(srv.includes('.eq("workspace_id", ativa.workspaceId)') && srv.includes("user_id.is.null,user_id.eq."));
+});
+
+console.log("\nEtapa D — abas opcionais");
+const COM_ABAS = MODULOS.filter((m) => m.abas && m.abas.length > 0).map((m) => m.chave);
+await teste("o registro tem abas com chave estável nas telas do nicho; chaves únicas e no formato do banco", () => {
+  assert.deepEqual(COM_ABAS.sort(), [
+    "p3d_automacoes", "p3d_dashboard", "p3d_estoque", "p3d_fornecedores", "p3d_impressoras", "p3d_precificacao",
+    "p3d_producao", "p3d_qualidade", "p3d_relatorios",
+  ].sort());
+  assert.deepEqual(abasDe("p3d_fornecedores").map((a) => a.chave), ["compras", "fornecedores", "precos"]);
+  assert.deepEqual(abasDe("p3d_relatorios").map((a) => a.chave), ["vendas", "produtos", "produtividade"]);
+  assert.deepEqual(abasDe("p3d_impressoras").map((a) => a.chave), ["dados", "pecas", "manutencoes"]);
+  assert.deepEqual(abasDe(CHAVE_VISAO_GERAL).map((a) => a.chave), ["primeiros_passos", "resumo"]);
+  for (const chave of [...COM_ABAS, CHAVE_VISAO_GERAL]) {
+    const ks = abasDe(chave).map((a) => a.chave);
+    assert.equal(new Set(ks).size, ks.length, chave);
+    for (const k of ks) assert.ok(CHAVE_VALIDA.test(k), `${chave}.${k}`);
+  }
+  assert.deepEqual(abasDe("leads"), [], "módulos antigos sem abas: nada muda");
+});
+await teste("mínimo de 1 aba visível; aba padrão oculta abre a primeira visível", () => {
+  assert.deepEqual(abasVisiveis("p3d_fornecedores", null), ["compras", "fornecedores", "precos"]);
+  assert.deepEqual(abasVisiveis("p3d_fornecedores", { itens: [], abasOcultas: { p3d_fornecedores: ["compras"] } }), ["fornecedores", "precos"]);
+  assert.deepEqual(abasVisiveis("p3d_fornecedores", { itens: [], abasOcultas: { p3d_fornecedores: ["compras", "fornecedores", "precos"] } }), ["compras"], "tudo oculto (forjado) = volta a padrão");
+  assert.equal(abaInicial(["fornecedores", "precos"], "compras"), "fornecedores");
+  assert.equal(abaInicial(["compras", "precos"], "compras"), "compras");
+  const ctx = { itensVisiveis: [], chavesComAbas: ["p3d_fornecedores", CHAVE_VISAO_GERAL] };
+  const tudo = prepararPreferencia({ abasOcultas: { p3d_fornecedores: ["compras", "fornecedores", "precos"] } }, ctx, null);
+  assert.equal(tudo.ok, false);
+  if (!tudo.ok) assert.ok(tudo.erro.includes("pelo menos uma aba"));
+  assert.equal(prepararPreferencia({ abasOcultas: { visao_geral: ["primeiros_passos", "resumo"] } }, ctx, null).ok, false);
+  const ok1 = prepararPreferencia({ abasOcultas: { p3d_fornecedores: ["precos", "xyz"], p3d_estoque: ["historico"], visao_geral: ["primeiros_passos"] } }, ctx, null);
+  assert.ok(ok1.ok);
+  if (ok1.ok) assert.deepEqual(ok1.pref.abasOcultas, { p3d_fornecedores: ["precos"], visao_geral: ["primeiros_passos"] }, "aba desconhecida e tela não visível descartadas");
+});
+await teste("as páginas leem as abas no servidor e os boards só mostram as visíveis, abrindo na primeira visível", () => {
+  const telas: [string, string, string][] = [
+    ["estoque", "p3d_estoque", "estoque-board.tsx"], ["fornecedores", "p3d_fornecedores", "fornecedores-board.tsx"],
+    ["impressoras", "p3d_impressoras", "impressoras-board.tsx"], ["precificacao", "p3d_precificacao", "precificacao-board.tsx"],
+    ["producao", "p3d_producao", "producao-board.tsx"], ["qualidade", "p3d_qualidade", "qualidade-board.tsx"],
+    ["notificacoes", "p3d_automacoes", "notificacoes-board.tsx"], ["dashboard", "p3d_dashboard", "dashboard-board.tsx"],
+    ["relatorios", "p3d_relatorios", "relatorios-board.tsx"],
+  ];
+  for (const [pasta, modulo, board] of telas) {
+    const pagina = lerFonte(`app/(dashboard)/impressao-3d/${pasta}/page.tsx`);
+    assert.ok(pagina.includes(`getAbasVisiveis("${modulo}")`) && pagina.includes("abas={abas}"), pasta);
+    const b = lerFonte(`components/impressao-3d/${board}`);
+    assert.ok(/abas\.includes\(/.test(b), `${board} filtra pelas abas visíveis`);
+  }
+  for (const board of ["estoque-board.tsx", "fornecedores-board.tsx", "impressoras-board.tsx", "precificacao-board.tsx", "producao-board.tsx", "qualidade-board.tsx", "notificacoes-board.tsx"]) {
+    assert.ok(lerFonte(`components/impressao-3d/${board}`).includes("abaInicial(abas,"), board);
+  }
+  assert.ok(lerFonte("app/(dashboard)/impressao-3d/relatorios/page.tsx").includes("abaInicial("), "relatório: aba oculta pela URL abre a primeira visível");
+  assert.ok(lerFonte("components/impressao-3d/dashboard-board.tsx").includes('abas.includes("resultado") && verCustos && resultado'), "seção oculta + extra custos");
+});
+
+console.log("\nEtapa D — Visão Geral, Módulos, Clientes e Financeiro");
+await teste("Primeiros passos: só por dado real, link para a tela certa, módulo desligado leva a Módulos, some quando tudo pronto", () => {
+  const todosFalsos = { precificacao: false, impressora: false, material: false, entrada_estoque: false, produto: false, orcamento: false, pedido: false };
+  const todosLigados = PASSOS.map((p) => p.modulo);
+  const passos = montarPassos({ ...todosFalsos, impressora: true }, todosLigados);
+  assert.deepEqual(passos.filter((p) => p.concluido).map((p) => p.chave), ["impressora"]);
+  assert.equal(passos.find((p) => p.chave === "pedido")!.destino, "/impressao-3d/pedidos");
+  assert.equal(passos.find((p) => p.chave === "precificacao")!.destino, "/impressao-3d/precificacao");
+  const semPedidos = montarPassos({ ...todosFalsos, pedido: true }, todosLigados.filter((m) => m !== "p3d_pedidos"));
+  assert.equal(semPedidos.find((p) => p.chave === "pedido")!.concluido, false, "módulo desligado não conta como feito");
+  assert.equal(semPedidos.find((p) => p.chave === "pedido")!.destino, "/modulos");
+  const tudo = Object.fromEntries(Object.keys(todosFalsos).map((k) => [k, true])) as typeof todosFalsos;
+  assert.equal(todosConcluidos(montarPassos(tudo, todosLigados)), true);
+  assert.equal(precificacaoAjustada({ tarifa_kwh: 0.9, valor_hora_mao_obra: 30 }), true);
+  assert.equal(precificacaoAjustada({ tarifa_kwh: 0, valor_hora_mao_obra: 30 }), false);
+  assert.equal(precificacaoAjustada({ tarifa_kwh: 0.9, valor_hora_mao_obra: 0 }), false);
+  assert.equal(precificacaoAjustada(null), false);
+  const fonte = lerFonte("lib/impressao-3d/primeiros-passos.ts");
+  assert.ok(fonte.includes('.gt("preco_compra", 0)') && fonte.includes('.eq("tipo", "entrada")'));
+  assert.ok(!/\.(insert|update|upsert|delete)\(/.test(fonte), "nada marcado à mão");
+  assert.equal((fonte.match(/\.eq\("workspace_id", ws\)/g) ?? []).length, 7, "toda leitura pela empresa ativa");
+  const ov = lerFonte("lib/dashboard-home/get-overview.ts");
+  assert.ok(ov.includes('config.nichoChave === "impressao_3d" && secoes.includes("primeiros_passos")') && ov.includes("todosConcluidos(passos) ? null"));
+  const home = lerFonte("components/dashboard-home/dashboard-home-board.tsx");
+  assert.ok(home.includes('secoes.includes("resumo")') && home.includes("<PrimeirosPassos"));
+});
+await teste("Módulos: o card avisa que remover preserva os dados; desligar é só o flag (definir_modulo), sem exclusão", () => {
+  const board = lerFonte("components/modulos/modulos-board.tsx");
+  assert.ok(board.includes("Remover não apaga nada: os dados ficam guardados e voltam ao adicionar o módulo de novo."));
+  const acao = lerFonte("lib/actions/modulos.ts");
+  assert.ok(acao.includes('.rpc("definir_modulo"') && !/\.delete\(/.test(acao));
+});
+await teste("Clientes: seção 'Pedidos e orçamentos' só com os módulos; total e última compra ignoram cancelados; sem custo", () => {
+  const r = resumirCompras([
+    { status: "entregue", total: 100, data_pedido: "2026-09-01" },
+    { status: "cancelado", total: 999, data_pedido: "2026-10-20" },
+    { status: "novo", total: 50.5, data_pedido: "2026-10-05" },
+  ]);
+  assert.deepEqual(r, { totalComprado: 150.5, ultimaCompra: "2026-10-05" });
+  assert.deepEqual(resumirCompras([]), { totalComprado: 0, ultimaCompra: null });
+  assert.ok(!/custo|lucro|margem/.test(COLUNAS_PEDIDO_CLIENTE + COLUNAS_ORCAMENTO_CLIENTE));
+  const fonte = lerFonte("lib/impressao-3d/cliente.ts");
+  assert.ok(fonte.includes("COLUNAS_PEDIDO_CLIENTE") && fonte.includes('getAcessoModulo("p3d_pedidos")') && fonte.includes('getAcessoModulo("p3d_orcamentos")'));
+  assert.ok(fonte.includes("if (!acessoPedidos && !acessoOrcamentos) return null;"), "sem os módulos a página fica como hoje");
+  assert.equal((fonte.match(/\.eq\("workspace_id", acesso(Pedidos|Orcamentos)\.workspaceId\)/g) ?? []).length, 2);
+  const pagina = lerFonte("app/(dashboard)/clientes/[id]/page.tsx");
+  assert.ok(pagina.includes("{comprasP3d && <ClientePedidosOrcamentos"));
+  const tela = lerFonte("components/impressao-3d/cliente-pedidos.tsx");
+  assert.ok(tela.includes("/impressao-3d/pedidos/${p.id}") && tela.includes("/impressao-3d/orcamentos/${o.id}"));
+  assert.ok(!/custo|lucro/i.test(tela.replace(/\/\*[\s\S]*?\*\//g, "")), "nenhum custo/lucro na tela (fora dos comentários)");
+});
+await teste("Financeiro por padrão: pré-marcado só quando aparece (ligado + edição); o servidor confere de novo", () => {
+  const ped = lerFonte("components/impressao-3d/pedido-detalhe.tsx");
+  assert.ok(/podeLancarFinanceiro \? \([\s\S]{0,300}name="lancar_financeiro" defaultChecked/.test(ped));
+  const comp = lerFonte("components/impressao-3d/compra-detalhe.tsx");
+  assert.ok(comp.includes("useState(podeGerarContaPagar)") && comp.includes('{gerar && <Entrada rotulo="Vencimento *" name="vencimento" type="date" required'));
+  assert.ok(lerFonte("app/(dashboard)/impressao-3d/pedidos/actions.ts").includes('getAcessoEdicao("financeiro")'));
+  assert.ok(lerFonte("app/(dashboard)/impressao-3d/fornecedores/actions.ts").includes('getAcessoEdicao("financeiro")'));
+  assert.ok(lerFonte("app/(dashboard)/impressao-3d/fornecedores/compras/[id]/page.tsx").includes('getAcessoEdicao("financeiro")'));
+});
+await teste("documentação da Etapa D", () => {
+  const doc = lerFonte("docs/nicho-impressao-3d.md");
+  for (const t of ["Etapa D", "menu_preferencias", "Personalizar navegação", "abas_ocultas", "visao_geral", "Primeiros passos", "Restaurar padrão"]) {
+    assert.ok(doc.includes(t), `doc sem "${t}"`);
   }
 });
 

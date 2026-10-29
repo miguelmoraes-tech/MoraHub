@@ -245,7 +245,8 @@ function FormPagamento({
       {tipo === "pagamento" ? (
         podeLancarFinanceiro ? (
           <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input type="checkbox" name="lancar_financeiro" />
+            {/* Pré-marcado: com Financeiro ligado e edição nele, o padrão é lançar. */}
+            <input type="checkbox" name="lancar_financeiro" defaultChecked />
             Lançar no Financeiro (cria a conta a receber)
           </label>
         ) : (

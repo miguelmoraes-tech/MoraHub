@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
+import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { CONFIG_PADRAO } from "@/lib/impressao-3d/regras";
 import { getOpcoesImpressoras, getOpcoesMateriais } from "@/lib/impressao-3d/opcoes";
 import { PrecificacaoBoard } from "@/components/impressao-3d/precificacao-board";
@@ -13,6 +14,7 @@ const COLUNAS_CONFIG =
 export default async function PrecificacaoPage() {
   const acesso = await getAcessoModulo("p3d_precificacao");
   if (!acesso) redirect(HOME_DONO);
+  const abas = await getAbasVisiveis("p3d_precificacao");
   const supabase = await createClient();
   const ws = acesso.workspaceId;
   const podeEditar = acesso.nivel === "edicao";
@@ -46,6 +48,7 @@ export default async function PrecificacaoPage() {
 
   return (
     <PrecificacaoBoard
+      abas={abas}
       config={(config as unknown as ConfigPrecificacao | null) ?? CONFIG_PADRAO}
       configSalva={!!config}
       impressoras={impressoras}

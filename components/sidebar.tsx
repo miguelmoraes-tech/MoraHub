@@ -21,6 +21,7 @@ import {
   UsersRound,
   ShieldCheck,
   LogOut,
+  SlidersHorizontal,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
@@ -34,7 +35,13 @@ import { useAprovacoes } from "@/components/aprovacoes/aprovacoes-provider";
 import type { AccountType } from "@/lib/hub-mode";
 import type { EmpresaVinculo } from "@/lib/empresas";
 import { iconeDe } from "@/components/modulos/icones";
-import { CHAT_HABILITADO, menuDoDono, rotaPermitida, type ItemMenu } from "@/lib/modulos/registry";
+import { CHAT_HABILITADO, rotaPermitida } from "@/lib/modulos/registry";
+import {
+  aplicarPreferenciaMenu,
+  gruposDoMenu,
+  type ItemNavegacao,
+  type Preferencia,
+} from "@/lib/modulos/preferencias";
 import { useRotulos } from "@/components/rotulos-provider";
 import { labelDoItemMenu, type Rotulos } from "@/lib/rotulos-shared";
 
@@ -49,23 +56,24 @@ type NavItem = {
 type Accent = "copper" | "petrol";
 
 // O menu do dono sai do registro de módulos (lib/modulos/registry.ts) ∩ os
-// módulos ligados da empresa ativa. As listas abaixo são só do bloco fixo do
-// painel e da Conta Pessoal.
-const VISAO_GERAL: NavItem = { label: "Visão Geral", href: "/dashboard", icon: LayoutGrid };
+// módulos ligados da empresa ativa (gruposDoMenu), com a preferência de
+// navegação aplicada por cima (só aparência). Os ícones abaixo são dos itens
+// fixos do painel; as listas seguintes, da Conta Pessoal.
+const ICONE_FIXO: Record<string, React.ComponentType<{ className?: string }>> = {
+  "/dashboard": LayoutGrid,
+  "/modulos": Blocks,
+  "/socios": UsersRound,
+  "/aprovacoes": ShieldCheck,
+  "/configuracoes": Settings,
+};
 
-const EMPRESA_ITEMS: NavItem[] = [
-  { label: "Módulos", href: "/modulos", icon: Blocks },
-  { label: "Sócios", href: "/socios", icon: UsersRound },
-  { label: "Aprovações", href: "/aprovacoes", icon: ShieldCheck, badge: "aprovacoes" },
-  { label: "Configurações", href: "/configuracoes", icon: Settings },
-];
-
-function itemDeMenu(item: ItemMenu, rotulos: Rotulos): NavItem {
+function itemDeMenu(item: ItemNavegacao, rotulos: Rotulos): NavItem {
+  const fixo = ICONE_FIXO[item.href];
   return {
     // Rótulo da empresa (nicho/modelo) quando houver; senão o nome do registro.
-    label: labelDoItemMenu(rotulos, item.href, item.label),
+    label: fixo ? item.label : labelDoItemMenu(rotulos, item.href, item.label),
     href: item.href,
-    icon: iconeDe(item.icone),
+    icon: fixo ?? iconeDe(item.icone),
     badge: item.badge,
   };
 }
@@ -173,6 +181,7 @@ export function Sidebar({
   empresas,
   empresaAtivaId,
   sinoAlertas = null,
+  preferencia = null,
 }: {
   userEmail: string;
   userId: string;
@@ -190,6 +199,8 @@ export function Sidebar({
   empresaAtivaId: string | null;
   /** Sino de alertas do nicho Impressão 3D; null = empresa sem Dashboard/Automações ligados. */
   sinoAlertas?: ConfigSino | null;
+  /** Preferência de navegação que vale (pessoal → padrão da empresa); null = ordem do registro. */
+  preferencia?: Preferencia | null;
 }) {
   const pathname = usePathname();
   const rotulos = useRotulos();
@@ -248,15 +259,10 @@ export function Sidebar({
             </>
           ) : (
             <>
-              {!restrito && (
-                <NavGroup
-                  title="Dashboards"
-                  items={[VISAO_GERAL]}
-                  accent={accent}
-                  habilitados={modulosHabilitados}
-                />
-              )}
-              {menuDoDono(modulosHabilitados).map((grupo) => (
+              {aplicarPreferenciaMenu(
+                gruposDoMenu(modulosHabilitados, painelCompleto, restrito),
+                preferencia
+              ).map((grupo) => (
                 <NavGroup
                   key={grupo.titulo}
                   title={grupo.titulo}
@@ -265,14 +271,6 @@ export function Sidebar({
                   habilitados={modulosHabilitados}
                 />
               ))}
-              {painelCompleto && (
-                <NavGroup
-                  title="Empresa"
-                  items={EMPRESA_ITEMS}
-                  accent={accent}
-                  habilitados={modulosHabilitados}
-                />
-              )}
             </>
           )}
         </div>
@@ -289,6 +287,15 @@ export function Sidebar({
         <div className="mb-2 truncate px-2 text-xs text-zinc-500">
           {userEmail}
         </div>
+        {!isPessoal && (painelCompleto || (restrito && modulosHabilitados.length > 0)) && (
+          <Link
+            href="/configuracoes/navegacao"
+            className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Personalizar navegação
+          </Link>
+        )}
         <form action={logout}>
           <button
             type="submit"

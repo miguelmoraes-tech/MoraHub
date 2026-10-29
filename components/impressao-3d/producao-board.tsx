@@ -27,6 +27,7 @@ import {
 } from "@/lib/impressao-3d/regras-operacao";
 import { formatDataHora, formatGramas, formatHoras, formatNumero } from "@/lib/impressao-3d/numeros";
 import { formatDate } from "@/lib/format";
+import { abaInicial } from "@/lib/modulos/preferencias";
 
 export interface ImpressoraProducao {
   id: string;
@@ -528,6 +529,7 @@ export function ProducaoBoard({
   pedidos,
   podeEditar,
   hoje,
+  abas,
 }: {
   trabalhos: Trabalho[];
   truncado: boolean;
@@ -538,11 +540,13 @@ export function ProducaoBoard({
   pedidos: Opcoes<OpcaoPedido>;
   podeEditar: boolean;
   hoje: string;
+  /** Abas visíveis pela preferência de navegação (nunca vazia; ordem do registro). */
+  abas: string[];
 }) {
   const router = useRouter();
   const toast = useToast();
   const [pendente, iniciar] = useTransition();
-  const [aba, setAba] = useState<StatusProducao | "produtividade">("fila");
+  const [aba, setAba] = useState<StatusProducao | "produtividade">(abaInicial(abas, "fila"));
   const [novo, setNovo] = useState(false);
   const [avisos, setAvisos] = useState<string[]>([]);
 
@@ -610,7 +614,7 @@ export function ProducaoBoard({
       )}
 
       <div className="mb-6 inline-flex flex-wrap rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
-        {[...ABAS, "produtividade" as const].map((k) => (
+        {[...ABAS, "produtividade" as const].filter((k) => abas.includes(k)).map((k) => (
           <button
             key={k}
             type="button"

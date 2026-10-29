@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { podeVerCustos } from "@/lib/impressao-3d/regras";
 import { HOME_DONO } from "@/lib/modulos/registry";
+import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { getOpcoesImpressoras, getOpcoesMateriais, getOpcoesProdutos } from "@/lib/impressao-3d/opcoes";
 import { QualidadeBoard } from "@/components/impressao-3d/qualidade-board";
 import { COLUNAS_FALHA, COLUNAS_FALHA_CUSTOS, COLUNAS_INSPECAO, COLUNAS_TRABALHO, type Falha, type Inspecao, type Trabalho } from "@/lib/impressao-3d/tipos-operacao";
@@ -12,6 +13,7 @@ const LIMITE = 2000;
 export default async function QualidadePage() {
   const acesso = await getAcessoModulo("p3d_qualidade");
   if (!acesso) redirect(HOME_DONO);
+  const abas = await getAbasVisiveis("p3d_qualidade");
   const supabase = await createClient();
   const ws = acesso.workspaceId;
   const verCustos = podeVerCustos(acesso);
@@ -39,6 +41,7 @@ export default async function QualidadePage() {
 
   return (
     <QualidadeBoard
+      abas={abas}
       inspecoes={(inspecoes ?? []) as unknown as Inspecao[]}
       falhas={(falhas ?? []) as unknown as Falha[]}
       trabalhos={(trabalhos ?? []) as unknown as Trabalho[]}
