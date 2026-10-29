@@ -47,6 +47,10 @@ export const ROTULOS_PADRAO: Record<string, RotuloModulo> = {
   p3d_producao: { singular: "Trabalho", plural: "Produção" },
   p3d_qualidade: { singular: "Inspeção", plural: "Qualidade" },
   p3d_expedicao: { singular: "Envio", plural: "Expedição" },
+  p3d_dashboard: { singular: "Dashboard", plural: "Dashboard 3D" },
+  p3d_relatorios: { singular: "Relatório", plural: "Relatórios 3D" },
+  p3d_automacoes: { singular: "Notificação", plural: "Notificações e alertas" },
+  p3d_integracoes: { singular: "Integração", plural: "Integrações" },
 };
 
 /** Primeira letra minúscula, exceto em sigla (RH, SST), para usar no meio da frase. */

@@ -8,6 +8,10 @@ import {
   Factory,
   ShoppingCart,
   Truck,
+  Gauge,
+  BarChart3,
+  Bell,
+  Plug,
   Calculator,
   FileSpreadsheet,
   Package,
@@ -89,6 +93,10 @@ const ICONES: Record<IconeNome, Icone> = {
   "clipboard-list": ClipboardList,
   factory: Factory,
   truck: Truck,
+  gauge: Gauge,
+  "bar-chart-3": BarChart3,
+  bell: Bell,
+  plug: Plug,
 };
 
 /** Ícone pelo nome; nome desconhecido (ex.: vindo do catálogo) cai num padrão. */

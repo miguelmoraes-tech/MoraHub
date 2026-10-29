@@ -28,6 +28,7 @@ import { EmpresaSwitcher } from "@/components/empresa/empresa-switcher";
 import { GlobalSearch } from "@/components/global-search";
 import { GlobalChatBadge } from "@/components/chat/global-chat-badge";
 import { SolicitacoesBell } from "@/components/vendedor/solicitacoes-bell";
+import { SinoAlertas, type ConfigSino } from "@/components/impressao-3d/sino-alertas";
 import { useSolicitacoes } from "@/components/vendedor/solicitacoes-provider";
 import { useAprovacoes } from "@/components/aprovacoes/aprovacoes-provider";
 import type { AccountType } from "@/lib/hub-mode";
@@ -171,6 +172,7 @@ export function Sidebar({
   restrito,
   empresas,
   empresaAtivaId,
+  sinoAlertas = null,
 }: {
   userEmail: string;
   userId: string;
@@ -186,6 +188,8 @@ export function Sidebar({
   /** Empresas com vínculo ativo da conta, para o seletor. */
   empresas: EmpresaVinculo[];
   empresaAtivaId: string | null;
+  /** Sino de alertas do nicho Impressão 3D; null = empresa sem Dashboard/Automações ligados. */
+  sinoAlertas?: ConfigSino | null;
 }) {
   const pathname = usePathname();
   const rotulos = useRotulos();
@@ -211,7 +215,14 @@ export function Sidebar({
             HUB
           </span>
         </span>
-        {!isPessoal && <SolicitacoesBell />}
+        {!isPessoal && (
+          <div className="ml-auto flex items-center gap-0.5">
+            {sinoAlertas && empresaAtivaId && (
+              <SinoAlertas key={empresaAtivaId} empresaId={empresaAtivaId} config={sinoAlertas} />
+            )}
+            <SolicitacoesBell />
+          </div>
+        )}
       </div>
 
       <div className="space-y-3 border-b border-zinc-900 px-3 pb-4">

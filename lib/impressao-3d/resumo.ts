@@ -21,6 +21,8 @@ export interface ResumoImpressao3d {
   /** null = Qualidade desligada ou sem a contagem de Produção. */
   qualidade: { paraInspecionar: number; reprovados: number } | null;
   expedicao: { emAberto: number };
+  // Etapa C-1: null = Automações desligado.
+  alertas: { abertos: number; criticos: number } | null;
 }
 
 export const RESUMO_P3D_VAZIO: ResumoImpressao3d = {
@@ -34,6 +36,7 @@ export const RESUMO_P3D_VAZIO: ResumoImpressao3d = {
   producao: { fila: 0, imprimindo: 0, urgentesNaFila: 0 },
   qualidade: null,
   expedicao: { emAberto: 0 },
+  alertas: null,
 };
 
 export async function getResumoImpressao3d(
@@ -46,7 +49,7 @@ export async function getResumoImpressao3d(
 
   const [
     impressorasRes, materiaisRes, produtosRes, configRes, orcamentosRes,
-    fornecedoresRes, comprasRes, pedidosRes, producaoRes, enviosRes,
+    fornecedoresRes, comprasRes, pedidosRes, producaoRes, enviosRes, alertasRes,
   ] = await Promise.all([
     com("p3d_impressoras")
       ? supabase
@@ -103,6 +106,9 @@ export async function getResumoImpressao3d(
           .eq("workspace_id", workspaceId)
           .in("status", ["preparando", "postado", "em_transito", "problema"])
       : nada,
+    com("p3d_automacoes")
+      ? supabase.from("p3d_notificacoes").select("severidade").eq("workspace_id", workspaceId).is("resolvida_em", null)
+      : nada,
   ]);
 
   const impressoras = (impressorasRes.data ?? []) as {
@@ -149,5 +155,11 @@ export async function getResumoImpressao3d(
         }
       : null,
     expedicao: { emAberto: (enviosRes.data ?? []).length },
+    alertas: com("p3d_automacoes")
+      ? {
+          abertos: ((alertasRes.data ?? []) as { severidade: string }[]).length,
+          criticos: ((alertasRes.data ?? []) as { severidade: string }[]).filter((a) => a.severidade === "critico").length,
+        }
+      : null,
   };
 }

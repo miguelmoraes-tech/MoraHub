@@ -2651,6 +2651,56 @@ export type Database = {
           },
         ]
       }
+      p3d_config_alertas: {
+        Row: {
+          compra_pendente_dias: number
+          estoque_baixo: boolean
+          falhas_recorrentes_dias: number
+          falhas_recorrentes_limite: number
+          manutencao: boolean
+          orcamento_validade: boolean
+          pagamento_pendente_dias: number
+          prazo_pedido_dias: number
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          compra_pendente_dias?: number
+          estoque_baixo?: boolean
+          falhas_recorrentes_dias?: number
+          falhas_recorrentes_limite?: number
+          manutencao?: boolean
+          orcamento_validade?: boolean
+          pagamento_pendente_dias?: number
+          prazo_pedido_dias?: number
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          compra_pendente_dias?: number
+          estoque_baixo?: boolean
+          falhas_recorrentes_dias?: number
+          falhas_recorrentes_limite?: number
+          manutencao?: boolean
+          orcamento_validade?: boolean
+          pagamento_pendente_dias?: number
+          prazo_pedido_dias?: number
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_config_alertas_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       p3d_config_precificacao: {
         Row: {
           arredondar_para: number
@@ -3090,6 +3140,56 @@ export type Database = {
           },
         ]
       }
+      p3d_integracoes: {
+        Row: {
+          ativo: boolean
+          config: Json
+          created_at: string
+          id: string
+          segredo_configurado: boolean
+          status: string
+          tipo: string
+          ultima_verificacao: string | null
+          ultimo_erro: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          config?: Json
+          created_at?: string
+          id?: string
+          segredo_configurado?: boolean
+          status?: string
+          tipo: string
+          ultima_verificacao?: string | null
+          ultimo_erro?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          ativo?: boolean
+          config?: Json
+          created_at?: string
+          id?: string
+          segredo_configurado?: boolean
+          status?: string
+          tipo?: string
+          ultima_verificacao?: string | null
+          ultimo_erro?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_integracoes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       p3d_manutencoes: {
         Row: {
           created_at: string
@@ -3283,6 +3383,62 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "p3d_materiais"
             referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_notificacoes: {
+        Row: {
+          chave: string
+          created_at: string
+          id: string
+          lida_em: string | null
+          lida_por: string | null
+          mensagem: string | null
+          referencia_id: string | null
+          referencia_tipo: string | null
+          resolvida_em: string | null
+          severidade: string
+          tipo: string
+          titulo: string
+          workspace_id: string
+        }
+        Insert: {
+          chave: string
+          created_at?: string
+          id?: string
+          lida_em?: string | null
+          lida_por?: string | null
+          mensagem?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          resolvida_em?: string | null
+          severidade?: string
+          tipo: string
+          titulo: string
+          workspace_id: string
+        }
+        Update: {
+          chave?: string
+          created_at?: string
+          id?: string
+          lida_em?: string | null
+          lida_por?: string | null
+          mensagem?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          resolvida_em?: string | null
+          severidade?: string
+          tipo?: string
+          titulo?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_notificacoes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -6111,6 +6267,19 @@ export type Database = {
         Args: { p_chave: string; ws: string }
         Returns: boolean
       }
+      p3d_alertas_calculados: {
+        Args: { p_ws: string }
+        Returns: {
+          chave: string
+          mensagem: string
+          ref_id: string
+          ref_tipo: string
+          severidade: string
+          tipo: string
+          titulo: string
+        }[]
+      }
+      p3d_atualizar_alertas: { Args: { p_ws: string }; Returns: number }
       p3d_calcular_preco: { Args: { p: Json }; Returns: Json }
       p3d_cancelar_producao: {
         Args: { p_motivo: string; p_producao_id: string }
@@ -6150,6 +6319,7 @@ export type Database = {
         Returns: Json
       }
       p3d_garantir_config: { Args: { p_ws: string }; Returns: undefined }
+      p3d_gerar_alertas_interno: { Args: { p_ws: string }; Returns: number }
       p3d_gerar_producao_do_pedido: {
         Args: { p_pedido_id: string }
         Returns: number
@@ -6157,6 +6327,10 @@ export type Database = {
       p3d_iniciar_producao: {
         Args: { p_impressora_id?: string; p_producao_id: string }
         Returns: Json
+      }
+      p3d_marcar_notificacao: {
+        Args: { p_id: string; p_lida?: boolean }
+        Returns: undefined
       }
       p3d_movimentar_estoque: {
         Args: {
@@ -6195,6 +6369,10 @@ export type Database = {
         Returns: string
       }
       p3d_num: { Args: { d?: number; k: string; p: Json }; Returns: number }
+      p3d_painel: {
+        Args: { p_ate?: string; p_de?: string; p_ws: string }
+        Returns: Json
+      }
       p3d_pedido_set_status: {
         Args: {
           p_motivo: string
@@ -6247,6 +6425,18 @@ export type Database = {
           p_tipo?: string
           p_valor: number
         }
+        Returns: Json
+      }
+      p3d_relatorio_produtividade: {
+        Args: { p_ate: string; p_de: string; p_ws: string }
+        Returns: Json
+      }
+      p3d_relatorio_produtos: {
+        Args: { p_ate: string; p_de: string; p_limite?: number; p_ws: string }
+        Returns: Json
+      }
+      p3d_relatorio_vendas: {
+        Args: { p_agrupar?: string; p_ate: string; p_de: string; p_ws: string }
         Returns: Json
       }
       p3d_remover_item_orcamento: {

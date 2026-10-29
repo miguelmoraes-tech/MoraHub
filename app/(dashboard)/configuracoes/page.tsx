@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getEmpresaPainel } from "@/lib/empresa-ativa";
 import { HOME_DONO, getModuloRegistro } from "@/lib/modulos/registry";
@@ -43,6 +44,18 @@ export default async function ConfiguracoesPage() {
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
         <RenomearEmpresaForm nomeAtual={empresa.nome ?? ""} />
       </div>
+
+      {habilitados.some((c) => c.startsWith("p3d_")) && (
+        <Link
+          href="/configuracoes/nicho"
+          className="block rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
+        >
+          <p className="text-sm font-semibold text-zinc-100">Configurações do nicho</p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Precificação, alertas, integrações, módulos e equipe da Impressão 3D num só lugar.
+          </p>
+        </Link>
+      )}
 
       <FundadoresSection fundadores={fundadores} meuId={empresa.userId} />
 

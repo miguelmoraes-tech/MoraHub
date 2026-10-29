@@ -131,6 +131,24 @@ import {
 } from "@/lib/impressao-3d/validacao-operacao";
 import { RESUMO_P3D_VAZIO } from "@/lib/impressao-3d/resumo";
 import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
+import {
+  PERIODO_MAXIMO_DIAS, agrupamentoValido, atalhosPeriodo, csvCelula, gerarCsv,
+  lerPainel, lerRelatorioProdutividade, lerRelatorioProdutos, lerRelatorioVendas, nomeArquivoCsv, periodoPadrao,
+  resolverPeriodo, rotuloPeriodo, somaOuNull, validarPeriodo, type LinhaVendas,
+} from "@/lib/impressao-3d/painel";
+import {
+  INTERVALO_ATUALIZACAO_MS, COLUNAS_CONFIG_ALERTAS, agruparPorSeveridade, destinoDaReferencia, deveAtualizar, estaAberta,
+  lerConfigAlertas, lerNotificacoes, moduloDaReferencia, rotuloDoTipo, severidadeValida,
+} from "@/lib/impressao-3d/alertas";
+import {
+  CHAVE_PROIBIDA, COLUNAS_INTEGRACAO, COLUNAS_INTEGRACAO_ESTADO, INTEGRACAO_INFO, MENSAGEM_NAO_CONECTADA, TIPOS_INTEGRACAO,
+  lerIntegracoes, mesclarConfig, pareceSegredo, statusValido, validarConfigIntegracao, type TipoIntegracao,
+} from "@/lib/impressao-3d/integracoes";
+import { ConfigAlertasSchema, IntegracaoSchema } from "@/lib/impressao-3d/validacao-nicho";
+import { primeiroErro } from "@/lib/impressao-3d/validacao";
+import { configDoSino } from "@/lib/impressao-3d/sino";
+import { atalhosConfiguracaoNicho } from "@/lib/impressao-3d/configuracoes";
+import { adicionarDias, dataIsoValida, diasEntre, formatDataIso, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/impressao-3d/datas";
 
 let total = 0;
 function teste(nome: string, fn: () => void | Promise<void>) {
@@ -2681,6 +2699,609 @@ await teste("Qualidade lê os trabalhos sem exigir acesso ao módulo Produção 
   // Escrita continua só por RPC: a tela de Qualidade não grava em p3d_producao.
   const acoes = lerFonte("app/(dashboard)/impressao-3d/qualidade/actions.ts");
   assert.ok(!/\.from\("p3d_producao"\)/.test(acoes) && acoes.includes('.rpc("p3d_registrar_inspecao"'));
+});
+
+// ===========================================================================
+// Nicho Impressão 3D (Etapa C-1) — Dashboard, Relatórios, Notificações, Integrações e Configurações
+// ===========================================================================
+
+function listarFontes(dir: string): string[] {
+  return readdirSync(dir).flatMap((nome) => {
+    const caminho = `${dir}/${nome}`;
+    if (statSync(caminho).isDirectory()) return listarFontes(caminho);
+    return /\.(ts|tsx)$/.test(nome) && !nome.endsWith("database.types.ts") ? [caminho] : [];
+  });
+}
+
+console.log("\nImpressão 3D (Etapa C-1) — registro, rotas, menu e rótulos");
+const P3D_C = ["p3d_dashboard", "p3d_relatorios", "p3d_automacoes", "p3d_integracoes"];
+const ROTA_C: Record<string, string> = {
+  p3d_dashboard: "/impressao-3d/dashboard",
+  p3d_relatorios: "/impressao-3d/relatorios",
+  p3d_automacoes: "/impressao-3d/notificacoes",
+  p3d_integracoes: "/impressao-3d/integracoes",
+};
+await teste("o registro tem as 4 chaves novas, cada uma com rota, menu no grupo 'Impressão 3D' e rótulo", () => {
+  for (const chave of P3D_C) {
+    const m = MODULOS.find((x) => x.chave === chave);
+    assert.ok(m, chave);
+    assert.deepEqual(m.rotas, [ROTA_C[chave]], chave);
+    assert.equal(m.menu.length, 1, chave);
+    assert.equal(m.menu[0].grupo, "Impressão 3D", chave);
+    assert.equal(m.menu[0].href, ROTA_C[chave], chave);
+    assert.ok(m.tabelas.every((t) => t.startsWith("p3d_")), chave);
+    assert.ok(ROTULOS_PADRAO[chave], `rótulo de ${chave}`);
+    assert.ok(MODULO_ROTULO[chave], `rótulo de sócios de ${chave}`);
+  }
+  assert.deepEqual(MODULOS.find((m) => m.chave === "p3d_automacoes")!.tabelas.sort(), ["p3d_config_alertas", "p3d_notificacoes"]);
+  assert.deepEqual(MODULOS.find((m) => m.chave === "p3d_integracoes")!.tabelas, ["p3d_integracoes"]);
+  // Dashboard e Relatórios leem por RPC: sem tabela própria no registro.
+  assert.deepEqual(MODULOS.find((m) => m.chave === "p3d_dashboard")!.tabelas, []);
+  assert.deepEqual(MODULOS.find((m) => m.chave === "p3d_relatorios")!.tabelas, []);
+  const icones = lerFonte("components/modulos/icones.ts");
+  for (const chave of P3D_C) {
+    const nome = MODULOS.find((m) => m.chave === chave)!.icone;
+    assert.ok(icones.includes(nome.includes("-") ? `"${nome}":` : `${nome}:`), `ícone ${nome} sem mapeamento`);
+  }
+});
+await teste("moduloDaRota reconhece as rotas novas (inclusive /notificacoes/alertas) e módulo desligado é negado", () => {
+  for (const [chave, rota] of Object.entries(ROTA_C)) {
+    assert.equal(moduloDaRota(rota), chave, rota);
+    assert.equal(moduloDaRota(`${rota}/x`), chave, `${rota}/x`);
+    assert.equal(vaiPara(decide(rota, ok("dono"), ATUAIS)), "/leads", `desligado ${rota}`);
+    assert.equal(vaiPara(decide(rota, ok("cofundador"), [...ATUAIS, chave])), "seguir", `ligado ${rota}`);
+  }
+  assert.equal(moduloDaRota("/impressao-3d/notificacoes/alertas"), "p3d_automacoes");
+  assert.equal(vaiPara(decide("/impressao-3d/notificacoes/alertas", ok("dono"), [...ATUAIS, "p3d_dashboard"])), "/leads", "Dashboard não abre Alertas");
+  assert.equal(moduloDaRota("/impressao-3d/dashboard-antigo"), null);
+});
+await teste("menu do dono: os 4 itens entram no grupo 'Impressão 3D' só quando o módulo está ligado", () => {
+  const grupo = menuDoDono([...ATUAIS, ...P3D, ...P3D_C]).find((g) => g.titulo === "Impressão 3D");
+  assert.deepEqual(grupo?.itens.map((i) => i.href), [...P3D, ...P3D_C].map((c) => ROTA_P3D[c] ?? ROTA_C[c]));
+  assert.deepEqual(menuDoDono(["p3d_integracoes"])[0].itens.map((i) => i.href), ["/impressao-3d/integracoes"]);
+  assert.ok(menuDoDono(ATUAIS).every((g) => g.titulo !== "Impressão 3D"));
+});
+await teste("sócio/funcionário: módulos novos = ligados ∩ permissão ∩ permite_membros; vendedor nunca abre", () => {
+  const catalogo = [...CATALOGO, ...P3D, ...P3D_C];
+  const ligados = [...ATUAIS, ...P3D_C];
+  for (const papel of ["socio", "funcionario"] as const) {
+    for (const [chave, rota] of Object.entries(ROTA_C)) {
+      assert.equal(vaiPara(decide(rota, ok(papel), ligados, false, [chave], catalogo)), "seguir", `${papel} ${chave}`);
+      assert.equal(vaiPara(decide(rota, ok(papel), ligados, false, [], catalogo)), AGUARDANDO_LIBERACAO, `${papel} sem permissão ${chave}`);
+      assert.equal(vaiPara(decide(rota, ok(papel), ligados, false, [chave], CATALOGO)), AGUARDANDO_LIBERACAO, `${papel} catálogo ${chave}`);
+    }
+  }
+  for (const rota of Object.values(ROTA_C)) assert.equal(vaiPara(decide(rota, ok("comercial"), ligados)), VENDEDOR_HOME, rota);
+  assert.deepEqual(modulosOferecidos(ligados, catalogo).filter((m) => P3D_C.includes(m)), P3D_C);
+});
+await teste("extra 'custos' de Dashboard e Relatórios vem do catálogo (sem rótulo fixo no código); fundador sempre tem", () => {
+  assert.deepEqual(extrasDoCatalogo([{ nome: "Ver custos e lucro", chave: "custos" }]), [{ chave: "custos", rotulo: "Ver custos e lucro" }]);
+  const socios = lerFonte("lib/socios-shared.ts");
+  assert.ok(!socios.includes("Ver custos e lucro"));
+  for (const m of ["p3d_dashboard", "p3d_relatorios"]) {
+    const habilitados = [...P3D_C];
+    const catalogo = [...CATALOGO, ...P3D_C];
+    const com = guard(m, "socio", "leitura", { habilitados, permiteMembros: catalogo, permissoes: [perm(m, "leitura", ["custos"])] });
+    const sem = guard(m, "socio", "leitura", { habilitados, permiteMembros: catalogo, permissoes: [perm(m, "leitura")] });
+    assert.equal(podeVerCustos(com), true, m);
+    assert.equal(podeVerCustos(sem), false, m);
+    assert.equal(podeVerCustos(guard(m, "dono", "leitura", { habilitados })), true, m);
+    assert.equal(podeVerCustos(guard(m, "cofundador", "leitura", { habilitados })), true, m);
+  }
+});
+await teste("Mora Lab e vendedores intactos: nenhuma rota nova no snapshot das empresas atuais", () => {
+  for (const chave of P3D_C) {
+    const m = MODULOS.find((x) => x.chave === chave)!;
+    for (const rota of m.rotas) assert.equal(rotaPermitida(rota, ATUAIS), false, rota);
+  }
+  assert.ok(Object.keys(dourado.rotaPermitida).every((p) => !p.startsWith("/impressao-3d")));
+  assert.deepEqual(JSON.parse(JSON.stringify(menuDoDono(ATUAIS))), dourado.menu);
+  assert.equal(primeiraRotaHabilitada(ATUAIS), dourado.primeiraRota);
+  assert.equal(configDoSino(ATUAIS, true, []), null, "empresa atual não ganha o sino");
+});
+
+console.log("\nImpressão 3D (C-1) — período, painel e relatórios");
+await teste("período padrão = mês corrente em São Paulo (1º dia até hoje), inclusive na virada de UTC", () => {
+  assert.deepEqual(periodoPadrao("2026-10-29"), { de: "2026-10-01", ate: "2026-10-29" });
+  // 23h30 de 31/10 em Brasília já é 01/11 em UTC: o período continua em outubro.
+  const hoje = hojeSaoPaulo(new Date("2026-11-01T02:30:00Z"));
+  assert.equal(hoje, "2026-10-31");
+  assert.deepEqual(periodoPadrao(hoje), { de: "2026-10-01", ate: "2026-10-31" });
+  assert.deepEqual(resolverPeriodo(null, null, "2026-10-29"), { periodo: { de: "2026-10-01", ate: "2026-10-29" }, padrao: true, erro: null });
+  assert.deepEqual(resolverPeriodo("", undefined, "2026-10-29").periodo, { de: "2026-10-01", ate: "2026-10-29" });
+});
+await teste("período: valida datas reais, ordem e o máximo de 366 dias; inválido volta ao padrão com a mensagem", () => {
+  assert.equal(validarPeriodo("2026-01-01", "2026-12-31"), null);
+  assert.equal(validarPeriodo("2026-01-01", "2027-01-01"), null, "366 dias corridos (inclusive)");
+  assert.equal(validarPeriodo("2026-01-01", "2027-01-02"), `O período pode ter no máximo ${PERIODO_MAXIMO_DIAS} dias.`);
+  assert.equal(validarPeriodo("2024-01-01", "2024-12-31"), null, "2024 é bissexto: 366 dias");
+  assert.ok(validarPeriodo("2024-01-01", "2025-01-01"));
+  assert.ok(validarPeriodo("2026-02-30", "2026-03-01"), "30/02 não existe");
+  assert.ok(validarPeriodo("2026-03-10", "2026-03-09"));
+  assert.ok(validarPeriodo("2026-03-10", null));
+  assert.ok(validarPeriodo("abc", "2026-03-09"));
+  assert.ok(validarPeriodo("2026-3-1", "2026-03-09"));
+  const r = resolverPeriodo("2026-03-10", "2026-03-09", "2026-10-29");
+  assert.equal(r.padrao, true);
+  assert.ok(r.erro);
+  assert.deepEqual(r.periodo, { de: "2026-10-01", ate: "2026-10-29" });
+  const so1 = resolverPeriodo("2026-03-10", null, "2026-10-29");
+  assert.ok(so1.erro && so1.padrao);
+  const ok2 = resolverPeriodo("2026-03-01", "2026-03-31", "2026-10-29");
+  assert.deepEqual(ok2, { periodo: { de: "2026-03-01", ate: "2026-03-31" }, padrao: false, erro: null });
+});
+await teste("atalhos de período: datas reais, de ≤ ate, no máximo 366 dias, a partir de hoje em São Paulo", () => {
+  for (const hoje of ["2026-10-29", "2026-01-01", "2024-03-31", "2026-12-31"]) {
+    const atalhos = atalhosPeriodo(hoje);
+    assert.deepEqual(atalhos.map((a) => a.id), ["mes", "mes-anterior", "30d", "90d", "ano"]);
+    for (const a of atalhos) assert.equal(validarPeriodo(a.de, a.ate), null, `${hoje} ${a.id}`);
+  }
+  const a = Object.fromEntries(atalhosPeriodo("2026-03-15").map((x) => [x.id, x]));
+  assert.deepEqual([a["mes"].de, a["mes"].ate], ["2026-03-01", "2026-03-15"]);
+  assert.deepEqual([a["mes-anterior"].de, a["mes-anterior"].ate], ["2026-02-01", "2026-02-28"]);
+  assert.deepEqual([a["30d"].de, a["30d"].ate], ["2026-02-14", "2026-03-15"]);
+  assert.deepEqual([a["ano"].de, a["ano"].ate], ["2026-01-01", "2026-03-15"]);
+  assert.deepEqual(atalhosPeriodo("2026-01-10").find((x) => x.id === "mes-anterior"), { id: "mes-anterior", rotulo: "Mês anterior", de: "2025-12-01", ate: "2025-12-31" });
+});
+await teste("aritmética de datas: dias, mês bissexto e formatação sem passar por UTC", () => {
+  assert.equal(adicionarDias("2026-03-01", -1), "2026-02-28");
+  assert.equal(adicionarDias("2024-03-01", -1), "2024-02-29");
+  assert.equal(adicionarDias("2026-12-31", 1), "2027-01-01");
+  assert.equal(diasEntre("2026-01-01", "2026-01-31"), 30);
+  assert.equal(ultimoDiaDoMes("2024-02-10"), "2024-02-29");
+  assert.equal(primeiroDiaDoMes("2026-10-29"), "2026-10-01");
+  assert.equal(formatDataIso("2026-03-09"), "09/03/2026");
+  assert.equal(dataIsoValida("2026-02-29"), false);
+  assert.equal(dataIsoValida("2024-02-29"), true);
+});
+
+const PAINEL_BRUTO = {
+  periodo: { de: "2026-10-01", ate: "2026-10-29", hoje: "2026-10-29" },
+  vendas: {
+    faturamento: 1520.5, pedidos: 8, ticket_medio: 190.06, recebido_no_periodo: 900, a_receber_total: 2100.25,
+    pedidos_por_status: { novo: 2, confirmado: 0, em_producao: 3, entregue: 3 }, pedidos_abertos: 5, pedidos_atrasados: 1,
+  },
+  resultado: {
+    lucro_estimado: 600, custo_estimado: 920.5, margem_estimada: 0.3946, custo_material_real: 300,
+    custo_maquina_falhas_estimado: 40, observacao: "Lucro estimado a partir dos custos cadastrados.",
+  },
+  producao: { na_fila: 4, imprimindo: 2, concluidas_no_periodo: 10, falhas_no_periodo: 1, trabalhos_com_falha: 1, horas_reais: 42.5, taxa_falha_real: 0.0909 },
+  alertas: {
+    por_severidade: { info: 1, aviso: 2, critico: 0 },
+    estoque_baixo: [{ id: "m1", nome: "PLA preto", saldo: 100, minimo: 500, unidade: "g" }],
+    manutencao_devida: 1,
+  },
+  tipo_valores: { lucro: "estimado" },
+};
+await teste("lerPainel: lê as quatro seções do retorno e descarta contagem zero de status", () => {
+  const p = lerPainel(PAINEL_BRUTO, true)!;
+  assert.deepEqual(p.periodo, { de: "2026-10-01", ate: "2026-10-29", hoje: "2026-10-29" });
+  assert.equal(p.vendas!.faturamento, 1520.5);
+  assert.equal(p.vendas!.pedidos_atrasados, 1);
+  assert.deepEqual(p.vendas!.pedidos_por_status, [
+    { status: "novo", quantidade: 2 }, { status: "em_producao", quantidade: 3 }, { status: "entregue", quantidade: 3 },
+  ]);
+  assert.equal(p.resultado!.lucro_estimado, 600);
+  assert.equal(p.resultado!.margem_estimada, 0.3946);
+  assert.equal(p.producao!.taxa_falha_real, 0.0909);
+  assert.equal(p.alertas!.estoque_baixo[0].nome, "PLA preto");
+  assert.equal(p.alertas!.por_severidade.aviso, 2);
+});
+await teste("lerPainel sem o extra 'custos': resultado some mesmo que o banco o mande (nada de custo, lucro ou margem)", () => {
+  const p = lerPainel(PAINEL_BRUTO, false)!;
+  assert.equal(p.resultado, null);
+  assert.ok(!JSON.stringify(p).match(/lucro|margem|custo/), "nenhum campo de custo no objeto lido");
+  assert.equal(p.vendas!.faturamento, 1520.5, "vendas continuam");
+  // O banco já devolve resultado nulo sem o extra: também não quebra.
+  assert.equal(lerPainel({ ...PAINEL_BRUTO, resultado: null }, true)!.resultado, null);
+});
+await teste("lerPainel é defensivo: lixo, seções ausentes, números como texto e taxa nula (nunca vira zero inventado)", () => {
+  assert.equal(lerPainel(null, true), null);
+  assert.equal(lerPainel("x", true), null);
+  assert.equal(lerPainel([], true), null);
+  const vazio = lerPainel({}, true)!;
+  assert.deepEqual([vazio.vendas, vazio.resultado, vazio.producao, vazio.alertas, vazio.periodo], [null, null, null, null, null]);
+  const txt = lerPainel({ vendas: { faturamento: "10.5", pedidos: "abc" }, producao: { taxa_falha_real: null, horas_reais: "2" } }, true)!;
+  assert.equal(txt.vendas!.faturamento, 10.5);
+  assert.equal(txt.vendas!.pedidos, 0);
+  assert.equal(txt.producao!.taxa_falha_real, null);
+  assert.equal(txt.producao!.horas_reais, 2);
+  assert.equal(lerPainel({ resultado: { margem_estimada: null } }, true)!.resultado!.margem_estimada, null);
+  assert.equal(lerPainel({ alertas: { estoque_baixo: [{ nome: "sem id" }, null, 3] } }, true)!.alertas!.estoque_baixo.length, 0);
+});
+await teste("relatórios: leitores normalizam o retorno e cortam lucro/margem/custo sem o extra", () => {
+  const vendas = [{ periodo: "2026-10-05", pedidos: 2, faturamento: "300.5", lucro_estimado: 120 }, { periodo: "lixo", pedidos: 1 }, null];
+  assert.deepEqual(lerRelatorioVendas(vendas, true), [{ periodo: "2026-10-05", pedidos: 2, faturamento: 300.5, lucro_estimado: 120 }]);
+  assert.deepEqual(lerRelatorioVendas(vendas, false), [{ periodo: "2026-10-05", pedidos: 2, faturamento: 300.5, lucro_estimado: null }]);
+  const prod = [{ produto_id: "p1", nome: "Suporte", quantidade: 3, faturamento: 90, lucro_estimado: 40, margem_estimada: 0.44 }];
+  assert.equal(lerRelatorioProdutos(prod, true)[0].margem_estimada, 0.44);
+  const semExtra = lerRelatorioProdutos(prod, false)[0];
+  assert.deepEqual([semExtra.lucro_estimado, semExtra.margem_estimada, semExtra.faturamento], [null, null, 90]);
+  const prd = [{ impressora_id: "i1", nome: "P1S", status: "disponivel", horas_uso_total: 100, trabalhos_concluidos: 4, trabalhos_falhos: 1, horas_reais: 20, peso_g: 500, trabalhos_com_falha: 1, taxa_falha_real: 0.2, custo_falhas_estimado: 12 }];
+  assert.equal(lerRelatorioProdutividade(prd, true)[0].custo_falhas_estimado, 12);
+  assert.equal(lerRelatorioProdutividade(prd, false)[0].custo_falhas_estimado, null);
+  assert.equal(lerRelatorioProdutividade([{ ...prd[0], taxa_falha_real: null }], true)[0].taxa_falha_real, null, "sem medição = null, não 0");
+  for (const f of [lerRelatorioVendas, lerRelatorioProdutos, lerRelatorioProdutividade]) {
+    assert.deepEqual(f(null, true), []);
+    assert.deepEqual(f({}, true), []);
+    assert.deepEqual(f("x", false), []);
+  }
+});
+await teste("relatórios: agrupamento válido, rótulos do período e soma que não inventa zero", () => {
+  assert.equal(agrupamentoValido("semana"), "semana");
+  assert.equal(agrupamentoValido("ano"), "dia");
+  assert.equal(agrupamentoValido(undefined), "dia");
+  assert.equal(rotuloPeriodo("2026-10-05", "dia"), "05/10/2026");
+  assert.equal(rotuloPeriodo("2026-10-05", "semana"), "Semana de 05/10/2026");
+  assert.equal(rotuloPeriodo("2026-10-01", "mes"), "10/2026");
+  assert.equal(somaOuNull([null, null]), null);
+  assert.equal(somaOuNull([]), null);
+  assert.equal(somaOuNull([1.5, null, 2]), 3.5);
+});
+await teste("CSV: BOM, separador ';', decimal com vírgula, aspas e CRLF; texto que vira fórmula é neutralizado", () => {
+  assert.equal(csvCelula(1234.5), "1234,5");
+  assert.equal(csvCelula(-3), "-3", "número negativo não é prefixado");
+  assert.equal(csvCelula(0.1 + 0.2), "0,3");
+  assert.equal(csvCelula(null), "");
+  assert.equal(csvCelula(Number.NaN), "");
+  assert.equal(csvCelula("Suporte; grande"), '"Suporte; grande"');
+  assert.equal(csvCelula('Ele disse "oi"'), '"Ele disse ""oi"""');
+  assert.equal(csvCelula("=1+1"), "'=1+1");
+  assert.equal(csvCelula("@SOMA(A1)"), "'@SOMA(A1)");
+  assert.equal(csvCelula("-cmd"), "'-cmd");
+  assert.equal(csvCelula("+55 11"), "'+55 11");
+  const csv = gerarCsv<LinhaVendas>(
+    [
+      { titulo: "Dia", valor: (l) => rotuloPeriodo(l.periodo, "dia") },
+      { titulo: "Faturamento (R$)", valor: (l) => l.faturamento },
+    ],
+    [{ periodo: "2026-10-05", pedidos: 2, faturamento: 300.5, lucro_estimado: null }]
+  );
+  assert.ok(csv.startsWith("﻿Dia;Faturamento (R$)\r\n"));
+  assert.ok(csv.endsWith("05/10/2026;300,5\r\n"));
+  assert.equal(nomeArquivoCsv("vendas", { de: "2026-10-01", ate: "2026-10-29" }), "relatorio-vendas-2026-10-01_a_2026-10-29.csv");
+});
+await teste("o CSV é montado no cliente a partir do retorno e a tela de relatórios só mostra custo atrás de verCustos", () => {
+  const tela = lerFonte("components/impressao-3d/relatorios-board.tsx");
+  assert.ok(tela.includes("gerarCsv(") && tela.includes("new Blob(") && tela.includes("URL.createObjectURL"));
+  assert.ok(!/fetch\(|\/api\//.test(tela), "sem ida ao servidor para exportar");
+  for (const t of ["Lucro estimado", "Margem estimada", "Custo das falhas"]) {
+    const linhasComTitulo = tela.split("\n").filter((l) => l.includes(t) && /<th|titulo:/.test(l));
+    for (const l of linhasComTitulo) assert.ok(/verCustos/.test(l) || /\(l: Linha/.test(l), `coluna sem guarda: ${l.trim().slice(0, 70)}`);
+  }
+  assert.ok(tela.includes("antes do desconto do pedido"), "aviso do faturamento por item");
+  assert.ok(tela.includes("Exportar CSV"));
+  const dash = lerFonte("components/impressao-3d/dashboard-board.tsx");
+  assert.ok(dash.includes("verCustos && resultado"));
+  assert.ok(dash.includes('natureza="estimado"') && dash.includes('natureza="real"'), "rótulos Estimado e Real");
+  // Sem gráfico com número inventado: o único gráfico é a BarList alimentada pelo retorno.
+  assert.ok(dash.includes("vendas.pedidos_por_status.map"));
+});
+await teste("Dashboard e Relatórios leem só por RPC (p3d_painel / p3d_relatorio_*), com a empresa do guard e período válido", () => {
+  const dash = lerFonte("app/(dashboard)/impressao-3d/dashboard/page.tsx");
+  assert.ok(dash.includes('getAcessoModulo("p3d_dashboard")') && dash.includes('.rpc("p3d_painel"'));
+  assert.ok(dash.includes("p_ws: acesso.workspaceId") && dash.includes("resolverPeriodo("));
+  assert.ok(dash.includes("lerPainel(data, verCustos)") && dash.includes("podeVerCustos(acesso)"));
+  const rel = lerFonte("app/(dashboard)/impressao-3d/relatorios/page.tsx");
+  assert.ok(rel.includes('getAcessoModulo("p3d_relatorios")'));
+  for (const r of ["p3d_relatorio_vendas", "p3d_relatorio_produtos", "p3d_relatorio_produtividade"]) assert.ok(rel.includes(`.rpc("${r}"`), r);
+  assert.ok(rel.includes("p_ws: ws") && rel.includes("p_de: periodo.de") && rel.includes("p_ate: periodo.ate"));
+  assert.ok(rel.includes("p_agrupar: agrupar") && rel.includes("p_limite: limite"));
+  for (const arq of ["dashboard/page.tsx", "relatorios/page.tsx"]) {
+    const t = lerFonte(`app/(dashboard)/impressao-3d/${arq}`);
+    assert.ok(t.includes("mensagemRpc("), `${arq}: texto exato do erro da RPC`);
+    assert.ok(!/\.from\("/.test(t), `${arq}: sem leitura direta de tabela`);
+  }
+});
+
+console.log("\nImpressão 3D (C-1) — notificações e automações");
+await teste("severidade desconhecida vira informação; leitura de notificações é defensiva", () => {
+  assert.equal(severidadeValida("critico"), "critico");
+  assert.equal(severidadeValida("xyz"), "info");
+  assert.equal(severidadeValida(null), "info");
+  const l = lerNotificacoes([
+    { id: "n1", tipo: "estoque_baixo", severidade: "aviso", titulo: "PLA preto", mensagem: "", referencia_tipo: "material", referencia_id: "m1", lida_em: null, resolvida_em: null, created_at: "2026-10-29T10:00:00Z" },
+    { id: "n2", titulo: "sem data" },
+    null,
+    { id: 5, titulo: "id inválido", created_at: "x" },
+  ]);
+  assert.equal(l.length, 1);
+  assert.equal(l[0].mensagem, null);
+  assert.deepEqual(lerNotificacoes("x"), []);
+});
+const NOTIFS = lerNotificacoes([
+  { id: "a", tipo: "x", severidade: "info", titulo: "i1", created_at: "2026-10-01T10:00:00Z" },
+  { id: "b", tipo: "x", severidade: "critico", titulo: "c1", created_at: "2026-10-02T10:00:00Z" },
+  { id: "c", tipo: "y", severidade: "aviso", titulo: "a1", created_at: "2026-10-03T10:00:00Z" },
+  { id: "d", tipo: "y", severidade: "critico", titulo: "c2", created_at: "2026-10-04T10:00:00Z" },
+  { id: "e", tipo: "y", severidade: "aviso", titulo: "a0", created_at: "2026-10-01T10:00:00Z", resolvida_em: "2026-10-05T00:00:00Z" },
+]);
+await teste("sino: agrupa por severidade (crítico, aviso, informação), mais novas primeiro; grupo vazio some; aberta = sem resolvida_em", () => {
+  const grupos = agruparPorSeveridade(NOTIFS.filter(estaAberta));
+  assert.deepEqual(grupos.map((g) => g.severidade), ["critico", "aviso", "info"]);
+  assert.deepEqual(grupos[0].itens.map((n) => n.id), ["d", "b"]);
+  assert.deepEqual(agruparPorSeveridade(NOTIFS.filter(estaAberta).filter((n) => n.severidade !== "info")).map((g) => g.severidade), ["critico", "aviso"]);
+  assert.deepEqual(agruparPorSeveridade([]), []);
+  assert.equal(NOTIFS.filter(estaAberta).length, 4);
+  assert.equal(rotuloDoTipo("estoque_baixo"), "Estoque baixo");
+  assert.equal(rotuloDoTipo(""), "Outros");
+});
+await teste("link do item de referência: só com acesso ao módulo, id validado como UUID; sem acesso, só o título", () => {
+  const id = "123e4567-e89b-42d3-a456-426614174000";
+  const todos = ["p3d_estoque", "p3d_pedidos", "p3d_impressoras", "p3d_orcamentos", "p3d_fornecedores", "p3d_qualidade"];
+  assert.equal(destinoDaReferencia("pedido", id, todos), `/impressao-3d/pedidos/${id}`);
+  assert.equal(destinoDaReferencia("orcamento", id, todos), `/impressao-3d/orcamentos/${id}`);
+  assert.equal(destinoDaReferencia("compra", id, todos), `/impressao-3d/fornecedores/compras/${id}`);
+  assert.equal(destinoDaReferencia("material", id, todos), "/impressao-3d/estoque");
+  assert.equal(destinoDaReferencia("impressora", id, todos), "/impressao-3d/impressoras");
+  assert.equal(destinoDaReferencia("falha", id, todos), "/impressao-3d/qualidade");
+  assert.equal(destinoDaReferencia("pedido", id, ["p3d_estoque"]), null, "sem acesso a Pedidos");
+  assert.equal(destinoDaReferencia("pedido", id, []), null);
+  assert.equal(destinoDaReferencia("desconhecido", id, todos), null);
+  assert.equal(destinoDaReferencia(null, id, todos), null);
+  assert.equal(destinoDaReferencia("pedido", "../../admin", todos), "/impressao-3d/pedidos", "id fora do padrão não vira caminho");
+  assert.equal(destinoDaReferencia("pedido", null, todos), "/impressao-3d/pedidos");
+  assert.equal(moduloDaReferencia("compra"), "p3d_fornecedores");
+  assert.equal(moduloDaReferencia("x"), null);
+});
+await teste("atualização dos alertas: no máximo 1 por minuto no cliente", () => {
+  assert.equal(deveAtualizar(null, 1_000), true, "primeira vez");
+  assert.equal(deveAtualizar(1_000, 30_000), false, "29 s depois");
+  assert.equal(deveAtualizar(1_000, 60_999), false, "59,9 s depois");
+  assert.equal(deveAtualizar(1_000, 61_000), true, "60 s depois");
+  assert.equal(deveAtualizar(100_000, 50_000), true, "relógio voltou");
+  assert.equal(INTERVALO_ATUALIZACAO_MS, 60_000);
+});
+await teste("sino: só aparece com Dashboard ou Automações liberados; lista só com Automações; marcar só com edição", () => {
+  assert.equal(configDoSino([...ATUAIS], true, []), null);
+  assert.equal(configDoSino(["p3d_estoque"], true, []), null, "Estoque sozinho não dá sino");
+  const dono = configDoSino([...ATUAIS, ...P3D_C, "p3d_estoque"], true, [])!;
+  assert.deepEqual([dono.podeListar, dono.podeMarcar], [true, true]);
+  assert.ok(dono.acessiveis.includes("p3d_estoque") && !dono.acessiveis.includes("leads"));
+  const soDash = configDoSino(["p3d_dashboard"], false, [perm("p3d_dashboard", "leitura")])!;
+  assert.deepEqual([soDash.podeListar, soDash.podeMarcar], [false, false], "só Dashboard: conta, não lista");
+  const leitura = configDoSino(["p3d_automacoes"], false, [perm("p3d_automacoes", "leitura")])!;
+  assert.deepEqual([leitura.podeListar, leitura.podeMarcar], [true, false]);
+  const edicao = configDoSino(["p3d_automacoes"], false, [perm("p3d_automacoes", "edicao")])!;
+  assert.deepEqual([edicao.podeListar, edicao.podeMarcar], [true, true]);
+});
+await teste("atualizarAlertas: Automações OU Dashboard; só Automações lista; o banco decide; sem RPC fora do servidor", () => {
+  const sino = lerFonte("app/(dashboard)/impressao-3d/notificacoes/sino.ts");
+  assert.ok(sino.includes('getAcessoModulo("p3d_automacoes")') && sino.includes('getAcessoModulo("p3d_dashboard")'));
+  assert.ok(sino.includes("automacoes ?? dashboard"), "qualquer um dos dois");
+  assert.ok(sino.includes('.rpc("p3d_atualizar_alertas", { p_ws: acesso.workspaceId })'));
+  assert.ok(sino.includes("if (!automacoes) return { ok: true, total, itens: null }"), "quem só tem Dashboard não lista");
+  assert.ok(sino.includes('.from("p3d_notificacoes")') && sino.includes('.eq("workspace_id", automacoes.workspaceId)') && sino.includes('.is("resolvida_em", null)'));
+  assert.ok(!/\.(insert|update|upsert|delete)\(/.test(sino), "notificações são somente leitura");
+  assert.ok(sino.includes("mensagemRpc("), "texto exato do erro da RPC");
+  const cliente = lerFonte("components/impressao-3d/alertas-cliente.ts");
+  assert.ok(cliente.includes("deveAtualizar("), "limite de frequência no cliente");
+  assert.ok(!/\.rpc\(/.test(cliente) && !/\.rpc\(/.test(lerFonte("components/impressao-3d/sino-alertas.tsx")), "componentes não chamam RPC");
+  for (const t of ["dashboard-board.tsx", "notificacoes-board.tsx"]) assert.ok(lerFonte(`components/impressao-3d/${t}`).includes("<AtualizadorAlertas"), t);
+});
+await teste("marcar notificação: RPC p3d_marcar_notificacao com edição em Automações; nenhuma escrita direta em p3d_notificacoes no app", () => {
+  const acoes = lerFonte("app/(dashboard)/impressao-3d/notificacoes/actions.ts");
+  const marcar = acoes.slice(acoes.indexOf("export async function marcarNotificacao"), acoes.indexOf("export async function salvarConfigAlertas"));
+  assert.ok(marcar.includes('getAcessoEdicao(MODULO)') && marcar.includes('.rpc("p3d_marcar_notificacao", { p_id: id, p_lida: lida })'));
+  assert.ok(marcar.includes("UUID.test(id)"));
+  assert.ok(!/from\("p3d_notificacoes"\)/.test(acoes));
+  for (const pasta of ["app", "components", "lib"]) {
+    for (const arq of listarFontes(pasta)) {
+      const t = lerFonte(arq);
+      assert.ok(!/\.from\(\s*["'`]p3d_notificacoes["'`]\s*\)\s*\.(insert|update|upsert|delete)\(/.test(t), `${arq} escreve em p3d_notificacoes`);
+    }
+  }
+});
+await teste("o app não envia e-mail, WhatsApp nem push nesta etapa (só notificação dentro do app)", () => {
+  for (const arq of [
+    ...listarFontes("app/(dashboard)/impressao-3d/notificacoes"), ...listarFontes("lib/impressao-3d"), "components/impressao-3d/sino-alertas.tsx",
+    "components/impressao-3d/notificacoes-board.tsx",
+  ]) {
+    const t = lerFonte(arq).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    assert.ok(!/nodemailer|resend|sendgrid|twilio|graph\.facebook|web-push|Notification\.requestPermission|navigator\.serviceWorker|\bfetch\(/i.test(t), arq);
+  }
+  assert.ok(lerFonte("components/impressao-3d/notificacoes-board.tsx").includes("não envia e-mail"));
+});
+await teste("configuração dos alertas: lê as 8 colunas e só aceita os limites do contrato", () => {
+  const linha = { estoque_baixo: true, prazo_pedido_dias: 3, manutencao: true, pagamento_pendente_dias: 7, orcamento_validade: false, compra_pendente_dias: 5, falhas_recorrentes_limite: 3, falhas_recorrentes_dias: 30 };
+  assert.deepEqual(lerConfigAlertas(linha), linha);
+  assert.equal(lerConfigAlertas({ ...linha, prazo_pedido_dias: "3" }), null, "campo ilegível = sem configuração, não padrão inventado");
+  assert.equal(lerConfigAlertas(null), null);
+  assert.deepEqual(COLUNAS_CONFIG_ALERTAS.split(", ").sort(), Object.keys(linha).sort());
+  const base = { estoque_baixo: "on", prazo_pedido_dias: "3", manutencao: "on", pagamento_pendente_dias: "7", compra_pendente_dias: "5", falhas_recorrentes_limite: "3", falhas_recorrentes_dias: "30" };
+  const ok1 = ConfigAlertasSchema.safeParse(base);
+  assert.equal(ok1.success, true);
+  if (ok1.success) assert.deepEqual(ok1.data, { ...linha, orcamento_validade: false }, "desmarcado = false");
+  const limites: [string, string, boolean][] = [
+    ["prazo_pedido_dias", "0", true], ["prazo_pedido_dias", "30", true], ["prazo_pedido_dias", "31", false], ["prazo_pedido_dias", "-1", false],
+    ["pagamento_pendente_dias", "90", true], ["pagamento_pendente_dias", "91", false],
+    ["compra_pendente_dias", "60", true], ["compra_pendente_dias", "61", false],
+    ["falhas_recorrentes_limite", "1", true], ["falhas_recorrentes_limite", "0", false], ["falhas_recorrentes_limite", "50", true], ["falhas_recorrentes_limite", "51", false],
+    ["falhas_recorrentes_dias", "1", true], ["falhas_recorrentes_dias", "0", false], ["falhas_recorrentes_dias", "90", true], ["falhas_recorrentes_dias", "91", false],
+    ["prazo_pedido_dias", "2,5", false], ["prazo_pedido_dias", "abc", false], ["prazo_pedido_dias", "", false],
+  ];
+  for (const [campo, valor, esperado] of limites) {
+    assert.equal(ConfigAlertasSchema.safeParse({ ...base, [campo]: valor }).success, esperado, `${campo}=${valor}`);
+  }
+  const fora = ConfigAlertasSchema.safeParse({ ...base, prazo_pedido_dias: "99" });
+  assert.equal(fora.success, false);
+  if (!fora.success) assert.ok(primeiroErro(fora.error).includes("0 a 30"));
+});
+await teste("salvarConfigAlertas: campos forjados não passam, update só da empresa ativa e com edição em Automações", () => {
+  const forjado = ConfigAlertasSchema.safeParse({
+    estoque_baixo: "on", prazo_pedido_dias: "3", manutencao: "on", pagamento_pendente_dias: "7", compra_pendente_dias: "5",
+    falhas_recorrentes_limite: "3", falhas_recorrentes_dias: "30", workspace_id: WS_ALHEIA, updated_by: "x", id: "y",
+  });
+  assert.equal(forjado.success, true);
+  if (forjado.success) assert.deepEqual(Object.keys(forjado.data).sort(), Object.keys(COLUNAS_CONFIG_ALERTAS.split(", ").reduce((o, k) => ({ ...o, [k]: 1 }), {})).sort());
+  const acoes = lerFonte("app/(dashboard)/impressao-3d/notificacoes/actions.ts");
+  const salvar = acoes.slice(acoes.indexOf("export async function salvarConfigAlertas"));
+  assert.ok(salvar.includes("getAcessoEdicao(MODULO)") && salvar.includes('.from("p3d_config_alertas")') && salvar.includes(".update(") && salvar.includes('.eq("workspace_id", acesso.workspaceId)'));
+  assert.ok(salvar.includes("...parsed.data") && !salvar.includes("workspace_id:") && !salvar.includes("updated_by"), "nada além dos 8 campos");
+  assert.ok(salvar.includes("mensagemEscrita("));
+  const pagina = lerFonte("app/(dashboard)/impressao-3d/notificacoes/alertas/page.tsx");
+  assert.ok(pagina.includes('getAcessoModulo("p3d_automacoes")') && pagina.includes('.rpc("p3d_atualizar_alertas"'), "cria a linha pela RPC quando falta");
+  assert.ok(pagina.indexOf("ler()") < pagina.indexOf('.rpc("p3d_atualizar_alertas"'), "lê antes de chamar a RPC");
+});
+
+console.log("\nImpressão 3D (C-1) — integrações (somente estrutura)");
+await teste("seis tipos, cada um com descrição, o que habilita, o que exigirá e só campos não secretos", () => {
+  assert.deepEqual([...TIPOS_INTEGRACAO], ["whatsapp", "monitoramento_impressoras", "pagamento", "correios", "melhor_envio", "ia"]);
+  for (const t of TIPOS_INTEGRACAO) {
+    const i = INTEGRACAO_INFO[t];
+    assert.ok(i.nome && i.descricao && i.exigira && i.habilita.length > 0 && i.campos.length > 0, t);
+    for (const c of i.campos) {
+      assert.ok(!CHAVE_PROIBIDA.test(c.chave), `${t}.${c.chave} seria rejeitada pelo banco`);
+      assert.ok(!/token|senha|password|secret|segredo|chave de api|api key/i.test(c.rotulo), `${t}.${c.chave}: rótulo pede segredo`);
+    }
+  }
+  assert.equal(MENSAGEM_NAO_CONECTADA, "Depende de credenciais externas e de configuração no servidor; ainda não conectada");
+  for (const k of ["token", "access_token", "secret", "segredo_x", "senha", "Password", "api_key_x", "apikey", "Authorization", "x-authorization"]) {
+    if (k === "api_key_x") continue;
+    assert.ok(CHAVE_PROIBIDA.test(k), k);
+  }
+  assert.ok(!CHAVE_PROIBIDA.test("id_numero") && !CHAVE_PROIBIDA.test("url_base"));
+});
+await teste("config: aceita só os campos do tipo, valida URL/CEP/opções e recusa o que parece segredo", () => {
+  const ok1 = validarConfigIntegracao("monitoramento_impressoras", { software: "octoprint", url_base: "http://192.168.0.10:5000", lixo: "x", token: "abc" });
+  assert.deepEqual(ok1, { ok: true, config: { software: "octoprint", url_base: "http://192.168.0.10:5000" } });
+  assert.deepEqual(validarConfigIntegracao("ia", { provedor: "anthropic", modelo: "" }), { ok: true, config: { provedor: "anthropic" } }, "vazio = removido");
+  assert.deepEqual(validarConfigIntegracao("melhor_envio", { cep_origem: "01310-100", ambiente: "sandbox" }), { ok: true, config: { cep_origem: "01310100", ambiente: "sandbox" } });
+  const ruins: [TipoIntegracao, Record<string, string>][] = [
+    ["monitoramento_impressoras", { url_base: "ftp://x" }],
+    ["monitoramento_impressoras", { url_base: "http://user:senha@host" }],
+    ["monitoramento_impressoras", { url_base: "https://host/?apikey=abc" }],
+    ["monitoramento_impressoras", { url_base: "https://host/#frag" }],
+    ["monitoramento_impressoras", { url_base: "não é url" }],
+    ["monitoramento_impressoras", { software: "klipperzao" }],
+    ["correios", { cep_origem: "123" }],
+    ["whatsapp", { id_numero: "x".repeat(41) }],
+    ["whatsapp", { nome_conta: "a\u0000b" }],
+    ["whatsapp", { nome_conta: "EAAGm0PX4ZCpsBAKZCZBqexemplodetokenlongodemaisparaserconta123" }],
+    ["ia", { modelo: "sk-ant-api03-abcdef" }],
+    ["ia", { modelo: "Bearer abc" }],
+  ];
+  for (const [tipo, valores] of ruins) assert.equal(validarConfigIntegracao(tipo, valores).ok, false, `${tipo} ${JSON.stringify(valores)}`);
+  assert.equal(pareceSegredo("PLA Preto"), false);
+  assert.equal(pareceSegredo("123456789012345"), false, "ID numérico de número do WhatsApp");
+  assert.equal(pareceSegredo("a".repeat(40)), false, "sem dígitos não é tratado como chave");
+  assert.equal(pareceSegredo("abc123".repeat(8)), true);
+});
+await teste("mesclarConfig preserva o que o servidor pôs, troca só as chaves do tipo e nunca devolve chave proibida", () => {
+  const atual = { software: "moonraker", url_base: "http://x", extra_servidor: 7, aninhado: { a: 1 }, api_token: "NAO", senha_x: "NAO" };
+  const nova = mesclarConfig(atual, "monitoramento_impressoras", { software: "octoprint" });
+  assert.deepEqual(nova, { software: "octoprint", extra_servidor: 7, aninhado: { a: 1 } }, "url_base vazia saiu; token/senha descartados");
+  assert.deepEqual(mesclarConfig(null, "ia", { provedor: "openai" }), { provedor: "openai" });
+  assert.deepEqual(mesclarConfig([], "ia", {}), {});
+  assert.ok(Object.keys(mesclarConfig(atual, "ia", {})).every((k) => !CHAVE_PROIBIDA.test(k)));
+});
+await teste("leitura das integrações: status desconhecido vira 'não configurada'; só chaves conhecidas na config", () => {
+  assert.equal(statusValido("configurada"), "configurada");
+  assert.equal(statusValido("erro"), "erro");
+  assert.equal(statusValido("conectada"), "nao_configurada");
+  const l = lerIntegracoes([
+    { id: "1", tipo: "ia", ativo: true, config: { provedor: "openai", token: "x", numero: 3 }, status: "configurada", segredo_configurado: true, ultima_verificacao: "2026-10-29T10:00:00Z", ultimo_erro: "" },
+    { id: "2", tipo: "inexistente" },
+    null,
+  ]);
+  assert.equal(l.length, 1);
+  assert.deepEqual(l[0].config, { provedor: "openai" });
+  assert.equal(l[0].ultimo_erro, null);
+  assert.equal(l[0].status, "configurada");
+  assert.ok(!COLUNAS_INTEGRACAO_ESTADO.split(", ").includes("config") && COLUNAS_INTEGRACAO.split(", ").includes("config"));
+});
+await teste("integrações: esquema só aceita tipo e 'ativo'; status/segredo/verificação/erro nunca vão ao banco", () => {
+  assert.equal(IntegracaoSchema.safeParse({ tipo: "ia", ativo: "on" }).success, true);
+  assert.equal(IntegracaoSchema.safeParse({ tipo: "telepatia", ativo: "on" }).success, false);
+  const forjado = IntegracaoSchema.safeParse({ tipo: "ia", ativo: "on", status: "configurada", segredo_configurado: "true", ultimo_erro: "x", workspace_id: WS_ALHEIA });
+  assert.equal(forjado.success, true);
+  if (forjado.success) assert.deepEqual(Object.keys(forjado.data).sort(), ["ativo", "tipo"]);
+  const acoes = lerFonte("app/(dashboard)/impressao-3d/integracoes/actions.ts");
+  const upsert = acoes.slice(acoes.indexOf(".upsert("), acoes.indexOf("onConflict"));
+  assert.ok(upsert.includes("workspace_id: acesso.workspaceId") && upsert.includes("tipo, ativo, config"));
+  for (const campo of ["status", "segredo_configurado", "ultima_verificacao", "ultimo_erro"]) assert.ok(!new RegExp(`\\b${campo}\\b`).test(upsert), campo);
+  assert.ok(acoes.includes("acesso?.ehDono") && acoes.includes("getAcessoEdicao(MODULO)"), "só fundador/cofundador altera");
+  assert.ok(acoes.includes('onConflict: "workspace_id,tipo"'));
+  assert.ok(!/\.rpc\(|fetch\(/.test(acoes), "não conecta nem testa nada");
+});
+await teste("tela de integrações: mensagem fixa enquanto não configurada, estado do servidor só leitura, sem 'Testar'/'Conectar'", () => {
+  const tela = lerFonte("components/impressao-3d/integracoes-board.tsx");
+  assert.ok(tela.includes('status === "nao_configurada"') && tela.includes("MENSAGEM_NAO_CONECTADA"));
+  assert.ok(!/onClick/.test(tela), "nenhum manipulador de clique: só o submit do formulário de dados");
+  assert.ok(!/>\s*(Testar|Conectar|Verificar conex|Autorizar)/i.test(tela));
+  for (const campo of ["segredo_configurado", "ultima_verificacao", "ultimo_erro"]) {
+    assert.ok(tela.includes(campo), campo);
+    assert.ok(!new RegExp(`name="${campo}"`).test(tela), `${campo} não é campo editável`);
+  }
+  assert.ok(!/name="status"/.test(tela));
+  assert.ok(tela.includes("Não digite tokens, senhas nem chaves de API"));
+  assert.ok(tela.includes("Só o fundador ou cofundador altera"));
+  const pagina = lerFonte("app/(dashboard)/impressao-3d/integracoes/page.tsx");
+  assert.ok(pagina.includes("podeEditar ? COLUNAS_INTEGRACAO : COLUNAS_INTEGRACAO_ESTADO") && pagina.includes("acesso.ehDono"));
+  assert.ok(pagina.includes('.eq("workspace_id", acesso.workspaceId)'));
+});
+
+console.log("\nImpressão 3D (C-1) — Configurações do nicho, Visão Geral e dados reais");
+await teste("hub de configurações: atalhos para Precificação, Alertas, Integrações (se ligados), Módulos e Equipe; só o painel", () => {
+  const todos = atalhosConfiguracaoNicho([...P3D, ...P3D_C]).map((a) => a.href);
+  assert.deepEqual(todos, ["/impressao-3d/precificacao", "/impressao-3d/notificacoes/alertas", "/impressao-3d/integracoes", "/modulos", "/socios"]);
+  assert.deepEqual(atalhosConfiguracaoNicho([]).map((a) => a.href), ["/modulos", "/socios"], "módulo desligado não vira atalho");
+  assert.deepEqual(atalhosConfiguracaoNicho(["p3d_automacoes"]).map((a) => a.href), ["/impressao-3d/notificacoes/alertas", "/modulos", "/socios"]);
+  const hub = lerFonte("app/(dashboard)/configuracoes/nicho/page.tsx");
+  assert.ok(hub.includes("getEmpresaPainel()") && hub.includes("getModulosHabilitados(empresa.workspaceId)"));
+  assert.ok(!/\.from\(|\.rpc\(|\.(insert|update|upsert|delete)\(/.test(hub), "o hub não grava nada");
+  assert.ok(lerFonte("app/(dashboard)/configuracoes/page.tsx").includes('href="/configuracoes/nicho"'));
+  // /configuracoes é rota só do painel: a equipe não chega ao hub.
+  assert.notEqual(vaiPara(decide("/configuracoes/nicho", ok("socio"), [...ATUAIS, ...P3D_C], false, P3D_C, [...CATALOGO, ...P3D_C])), "seguir");
+  assert.equal(vaiPara(decide("/configuracoes/nicho", ok("dono"), ATUAIS)), "seguir");
+});
+await teste("Visão Geral do dono: cards dos 4 módulos novos só com o módulo ligado; resumo só consulta se ligado", () => {
+  const home = lerFonte("components/dashboard-home/dashboard-home-board.tsx");
+  for (const chave of P3D_C) assert.ok(home.includes(`com("${chave}")`), chave);
+  const resumo = lerFonte("lib/impressao-3d/resumo.ts");
+  assert.ok(resumo.includes('com("p3d_automacoes")') && resumo.includes('.from("p3d_notificacoes")'));
+  assert.equal(RESUMO_P3D_VAZIO.alertas, null);
+  assert.ok(!/preco_|custo|lucro|valor_/.test(resumo.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")), "resumo sem valores monetários");
+});
+await teste("o sino é ligado no cabeçalho e no layout, só para quem tem Dashboard ou Automações (Mora Lab não muda)", () => {
+  const layout = lerFonte("app/(dashboard)/layout.tsx");
+  assert.ok(layout.includes("configDoSino(modulosHabilitados, !!painel, permissoesProprias)") && layout.includes("sinoAlertas={sinoAlertas}"));
+  const sidebar = lerFonte("components/sidebar.tsx");
+  assert.ok(sidebar.includes("sinoAlertas && empresaAtivaId") && sidebar.includes("<SinoAlertas"));
+  assert.ok(sidebar.includes("<SolicitacoesBell />"), "o sino de solicitações continua");
+  assert.ok(lerFonte("components/impressao-3d/sino-alertas.tsx").includes("Ver histórico de notificações"));
+});
+await teste("sem dados fictícios: nenhum valor de exemplo nas telas novas e 'hoje' sempre em São Paulo", () => {
+  const arquivos = [
+    "components/impressao-3d/dashboard-board.tsx", "components/impressao-3d/relatorios-board.tsx", "components/impressao-3d/notificacoes-board.tsx",
+    "components/impressao-3d/integracoes-board.tsx", "components/impressao-3d/alertas-config-board.tsx", "components/impressao-3d/sino-alertas.tsx",
+    "lib/impressao-3d/painel.ts", "lib/impressao-3d/alertas.ts", "lib/impressao-3d/integracoes.ts", "lib/impressao-3d/datas.ts",
+    "app/(dashboard)/impressao-3d/dashboard/page.tsx", "app/(dashboard)/impressao-3d/relatorios/page.tsx",
+  ];
+  for (const arq of arquivos) {
+    const t = lerFonte(arq).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    assert.ok(!/Math\.random|faker|lorem|mock|exemplo de dados/i.test(t), `${arq} tem dado inventado`);
+    assert.ok(!/todayISO|toISOString\(\)\.(slice\(0,\s*10\)|split\(["']T["']\)\[0\])/.test(t), `${arq} calcula 'hoje' em UTC`);
+  }
+  assert.ok(lerFonte("lib/impressao-3d/painel.ts").includes("hojeSaoPaulo"));
+  // Números e moeda em pt-BR/BRL.
+  assert.equal(formatMoeda(1520.5).replace(/\s/g, " "), "R$ 1.520,50");
+  assert.equal(formatPercentualFracao(0.3946), "39,5%");
+});
+await teste("escritas protegidas da Etapa C-1: o schema de formulário não aceita status/segredo nem campos de notificação", () => {
+  const sch = lerFonte("lib/impressao-3d/validacao-nicho.ts");
+  for (const campo of ["status", "segredo_configurado", "ultima_verificacao", "ultimo_erro", "lida_em", "resolvida_em", "workspace_id"]) {
+    assert.ok(!new RegExp(`\\b${campo}:`).test(sch), `validacao-nicho aceita ${campo}`);
+  }
+});
+await teste("documentação: docs/nicho-impressao-3d.md descreve a Etapa C-1, as integrações e o que não foi implementado", () => {
+  const doc = lerFonte("docs/nicho-impressao-3d.md");
+  for (const trecho of [
+    "Etapa C-1", "p3d_dashboard", "p3d_relatorios", "p3d_automacoes", "p3d_integracoes", "p3d_painel", "p3d_atualizar_alertas",
+    "WhatsApp Cloud API", "OctoPrint", "Moonraker", "Bambu", "Melhor Envio", "Correios", "ainda não conectada", "Estimado", "Real",
+  ]) {
+    assert.ok(doc.includes(trecho), `doc sem "${trecho}"`);
+  }
 });
 
 console.log(`\n${total} testes`);

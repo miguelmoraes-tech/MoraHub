@@ -54,7 +54,11 @@ export type IconeNome =
   | "shopping-cart"
   | "clipboard-list"
   | "factory"
-  | "truck";
+  | "truck"
+  | "gauge"
+  | "bar-chart-3"
+  | "bell"
+  | "plug";
 
 export interface ItemMenu {
   label: string;
@@ -348,6 +352,39 @@ export const MODULOS: ModuloRegistro[] = [
     icone: "truck",
     tabelas: ["p3d_envios"],
     menu: [{ label: "Expedição", href: "/impressao-3d/expedicao", icone: "truck", grupo: "Impressão 3D" }],
+  },
+  // --- Nicho Impressão 3D (Etapa C-1). Dashboard e Relatórios têm o extra "custos" (custo, lucro e
+  // margem só de tela). Automações: notificações dentro do app (sem e-mail/WhatsApp/push).
+  // Integrações: só estrutura, sem conexão real.
+  {
+    chave: "p3d_dashboard",
+    rotas: ["/impressao-3d/dashboard"],
+    icone: "gauge",
+    // Sem tabela própria: lê por RPC (p3d_painel) e dispara p3d_atualizar_alertas.
+    tabelas: [],
+    menu: [{ label: "Dashboard 3D", href: "/impressao-3d/dashboard", icone: "gauge", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_relatorios",
+    rotas: ["/impressao-3d/relatorios"],
+    icone: "bar-chart-3",
+    // Sem tabela própria: só RPCs de leitura (p3d_relatorio_*).
+    tabelas: [],
+    menu: [{ label: "Relatórios 3D", href: "/impressao-3d/relatorios", icone: "bar-chart-3", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_automacoes",
+    rotas: ["/impressao-3d/notificacoes"],
+    icone: "bell",
+    tabelas: ["p3d_notificacoes", "p3d_config_alertas"],
+    menu: [{ label: "Notificações e alertas", href: "/impressao-3d/notificacoes", icone: "bell", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_integracoes",
+    rotas: ["/impressao-3d/integracoes"],
+    icone: "plug",
+    tabelas: ["p3d_integracoes"],
+    menu: [{ label: "Integrações", href: "/impressao-3d/integracoes", icone: "plug", grupo: "Impressão 3D" }],
   },
 ];
 

@@ -52,6 +52,10 @@ export const MODULO_ROTULO: Record<string, string> = {
   p3d_producao: "Produção",
   p3d_qualidade: "Qualidade",
   p3d_expedicao: "Expedição",
+  p3d_dashboard: "Dashboard 3D",
+  p3d_relatorios: "Relatórios 3D",
+  p3d_automacoes: "Notificações e automações",
+  p3d_integracoes: "Integrações (Impressão 3D)",
 };
 
 export const NIVEL_ROTULO: Record<NivelPermissao, string> = {

@@ -1,4 +1,4 @@
-# Nicho Impressão 3D (Etapas A e B)
+# Nicho Impressão 3D (Etapas A, B e C-1)
 
 Impressoras, Estoque, Produtos e catálogo, Precificação e Orçamentos para quem
 trabalha com impressão 3D sob demanda, loja de produtos ou print farm. Usa o
@@ -177,7 +177,7 @@ Os textos de erro das RPCs (em português) são mostrados ao usuário como viera
 
 ## Como ativar numa empresa
 
-1. Conferir no catálogo `modulos` as 10 chaves `p3d_*` (Etapas A e B; hoje `ativo = false`).
+1. Conferir no catálogo `modulos` as 14 chaves `p3d_*` (Etapas A, B e C-1; hoje `ativo = false`).
 2. Quando as telas estiverem validadas: `update modulos set ativo = true where chave like 'p3d\_%'`.
 3. Aplicar o nicho `impressao_3d` (e um modelo: `sob_demanda`, `loja_produtos`,
    `print_farm`) em **Configurações → Nicho e modelo** da empresa de teste, ou
@@ -400,3 +400,124 @@ contagem, produtividade, leitura defensiva dos retornos das RPCs, validações, 
 forjados, extra `custos` de Pedidos, permissões cruzadas (Estoque, Financeiro, Pedidos,
 Produção/Qualidade), registro/menu/matriz de sócios e o snapshot das empresas atuais.
 **Não cobre** fluxo logado contra o banco real: ver o relatório de entrega.
+
+
+---
+
+# Etapa C-1: Dashboard, Relatórios, Notificações e automações, Integrações e Configurações
+
+Quatro módulos novos no mesmo sistema de módulos (registro, `workspace_modulos`, guard por módulo) e um
+hub de configurações. O catálogo `modulos.ativo` segue `false` até a ativação manual.
+
+| Chave do módulo | Rota | Extra de tela | Banco |
+| --- | --- | --- | --- |
+| `p3d_dashboard` | `/impressao-3d/dashboard` | `custos` | RPC `p3d_painel` |
+| `p3d_relatorios` | `/impressao-3d/relatorios` | `custos` | RPCs `p3d_relatorio_vendas`, `p3d_relatorio_produtos`, `p3d_relatorio_produtividade` |
+| `p3d_automacoes` | `/impressao-3d/notificacoes` (e `/alertas`) | — | `p3d_notificacoes` (leitura), `p3d_config_alertas`, RPCs `p3d_atualizar_alertas`, `p3d_marcar_notificacao` |
+| `p3d_integracoes` | `/impressao-3d/integracoes` | — | `p3d_integracoes` |
+
+Hub **Configurações do nicho**: `/configuracoes/nicho` (rota do painel, só fundador/cofundador), com atalhos
+para Parâmetros de precificação, Alertas, Integrações, Módulos da empresa e Equipe e permissões. Aparece como
+cartão em `/configuracoes` quando há módulo `p3d_*` ligado. Não grava nada.
+
+## Dashboard (`p3d_dashboard`)
+
+Um único retorno de `p3d_painel(p_ws, p_de, p_ate)` com seletor de período (formulário GET: `de` e `ate` na URL,
+atalhos "Mês atual", "Mês anterior", "Últimos 30/90 dias", "Ano até hoje"). Sem período na URL o banco assume o
+mês corrente em **America/Sao_Paulo** (`hojeSaoPaulo()` para os atalhos e os padrões). Período inválido (datas
+inexistentes, inicial depois da final, mais de **366 dias**) volta ao padrão com a mensagem.
+
+Cada número leva o rótulo da natureza:
+
+| Número | Natureza |
+| --- | --- |
+| Faturamento (pedidos não cancelados), pedidos, ticket médio, recebido no período, a receber, abertos, atrasados | **Real** |
+| Produção: fila, imprimindo, concluídas, falhas, trabalhos com falha, horas reais, taxa de falha | **Real** (taxa "—" quando não há trabalho medido) |
+| Custo de material (pelas baixas de estoque) | **Real** |
+| Lucro, custo e margem estimados; custo de máquina das falhas | **Estimado** (custos cadastrados na Precificação) |
+
+- A seção **Resultado** só existe com o extra `custos`: o banco devolve `resultado = null` sem ele, e o leitor
+  (`lerPainel(bruto, verCustos)`) ainda descarta a seção se vier. Sem o extra não aparece custo, lucro nem margem.
+- O único gráfico é "Pedidos por status" (barras com `pedidos_por_status` do retorno). Sem série inventada.
+- Alertas do painel levam aos itens: severidades → notificações (se há acesso a Automações), materiais abaixo do
+  mínimo → Estoque, manutenção devida → Impressoras (cada link só com acesso ao módulo de destino).
+- O campo `tipo_valores` do retorno não é usado: a natureza de cada número é fixa na tela, conforme a tabela acima.
+- Abrir o Dashboard pede a atualização dos alertas (ver abaixo).
+
+## Relatórios (`p3d_relatorios`)
+
+Três abas, uma RPC por aba, filtro de período (máximo de 366 dias; sem período vale o mês corrente) e exportação
+**CSV gerada no cliente** a partir do retorno (BOM UTF-8, separador `;`, decimal com vírgula, datas dd/mm/aaaa).
+Texto que começa com `=`, `+`, `-` ou `@` recebe um apóstrofo para não virar fórmula na planilha.
+
+- **Vendas** (`p_agrupar` = dia, semana ou mês): pedidos, faturamento e, com `custos`, lucro estimado. Total do período.
+- **Produtos** (`p_limite` 10/20/50/100): quantidade, faturamento e, com `custos`, lucro e margem estimados. O faturamento por item
+  é **antes do desconto do pedido** (a tela avisa); a lista vem ordenada por lucro (com custos) ou por faturamento.
+- **Produtividade**: por impressora, horas de uso, concluídos, falhos, horas e peso reais, trabalhos com falha, taxa
+  de falha real ("—" sem medição) e, com `custos`, custo estimado das falhas.
+- Sem o extra `custos` as colunas e o CSV não têm lucro, margem nem custo.
+
+## Notificações e automações (`p3d_automacoes`)
+
+- `p3d_notificacoes` é **somente leitura** para o app (a auditoria falha em escrita direta). O banco gera e resolve
+  os alertas em `p3d_atualizar_alertas(p_ws)`; o app só chama essa RPC e `p3d_marcar_notificacao(p_id, p_lida)`.
+- **Atualização**: o sino, o Dashboard e a tela de notificações pedem a atualização ao abrir, com limite de
+  frequência **no cliente** (no máximo 1 por minuto por empresa). Quem tem leitura em Automações **ou** no Dashboard
+  pode disparar; quem só tem o Dashboard vê o total no sino mas não a lista.
+- **Sino** no cabeçalho (só aparece com Dashboard ou Automações liberados): contador de alertas abertos, lista agrupada
+  por severidade (crítico, aviso, informação), link para o item de referência (material, pedido, impressora,
+  orçamento, compra ou falha) **somente se a pessoa abre o módulo de destino**; sem acesso, só o título. O id da
+  referência só entra no caminho se for um UUID.
+- **Histórico** (`/impressao-3d/notificacoes`): abertas e resolvidas, filtros por situação, tipo (os tipos que existem
+  nos dados) e severidade; últimas 500. "Marcar como lida" exige edição em Automações.
+- **Configurar alertas** (`/impressao-3d/notificacoes/alertas`): `estoque_baixo`, `manutencao`, `orcamento_validade`
+  (liga/desliga) e `prazo_pedido_dias` (0–30), `pagamento_pendente_dias` (0–90), `compra_pendente_dias` (0–60),
+  `falhas_recorrentes_limite` (1–50), `falhas_recorrentes_dias` (1–90). A linha é criada pelo banco na primeira
+  atualização; se não existir, a tela chama `p3d_atualizar_alertas` e lê de novo. Update direto só dos 8 campos, filtrado
+  pela empresa ativa, com edição em Automações.
+- **Esta etapa NÃO envia e-mail, WhatsApp nem push**: são só notificações dentro do app. O envio externo depende das
+  integrações (abaixo) e de infraestrutura no servidor.
+
+## Integrações (`p3d_integracoes`): somente estrutura
+
+Tipos: `whatsapp`, `monitoramento_impressoras`, `pagamento`, `correios`, `melhor_envio`, `ia`. Um cartão por tipo
+com descrição, o que vai habilitar e o estado. **Nada é conectado, testado nem simulado**: não há botão "Testar
+conexão" nem "Conectar" (a auditoria falha se surgir).
+
+- `status`, `segredo_configurado`, `ultima_verificacao` e `ultimo_erro` pertencem ao servidor e são exibidos como
+  **somente leitura**; o app nunca os envia (o banco os ignoraria). Enquanto `status = nao_configurada` a tela mostra a
+  mensagem fixa **"Depende de credenciais externas e de configuração no servidor; ainda não conectada"**.
+- Editável: `ativo` ("marcar como ativa", só registra a intenção) e `config` com **dados não secretos**, por upsert direto
+  (`workspace_id,tipo`), mesclando com o que já houver na config. O banco rejeita chaves com token/secret/segredo/senha/
+  password/apikey/authorization; a tela nunca pede nem guarda segredo, recusa valores que parecem token e URLs com
+  usuário, senha ou parâmetros.
+- Só fundador/cofundador altera e vê a configuração; quem tem leitura vê apenas o status (o servidor nem seleciona `config`).
+
+| Tipo | Campos de `config` (não secretos) | O que exigirá quando for implementada |
+| --- | --- | --- |
+| WhatsApp | `id_numero`, `numero_exibicao`, `nome_conta` | **WhatsApp Cloud API**: número verificado e token de acesso no cofre do servidor |
+| Monitoramento de impressoras | `software` (OctoPrint, Moonraker/Klipper, Bambu, outro), `url_base` | URL/endpoint **por impressora** e a chave de acesso de cada uma, no servidor (OctoPrint, Moonraker, Bambu) |
+| Pagamento | `provedor`, `nome_conta` | Conta no provedor, chave de API e segredo do webhook no cofre |
+| Correios | `contrato`, `cep_origem`, `nome_conta` | Contrato com os Correios e as credenciais do contrato, no servidor |
+| Melhor Envio | `nome_conta`, `cep_origem`, `ambiente` | Conta no Melhor Envio e token OAuth no cofre |
+| IA | `provedor`, `modelo` | Chave de API do provedor, no cofre |
+
+## Regras de escrita (Etapa C-1): o banco barra, o código nunca tenta
+
+- `p3d_notificacoes`: somente leitura. Alteração só por `p3d_marcar_notificacao`.
+- `p3d_integracoes`: nunca enviar `status`, `segredo_configurado`, `ultima_verificacao`, `ultimo_erro`.
+- `p3d_config_alertas`: só os 8 campos de limite (não enviar `updated_by`).
+- `scripts/auditar-isolamento.mts` **falha** em: escrita direta em `p3d_notificacoes`; campo protegido de integração
+  (também nos schemas de formulário); select de custo/lucro/margem sem `podeVerCustos`; leitura de Dashboard/Relatórios
+  sem `verCustos`; coluna de custo fora de `verCustos` nos Relatórios; "hoje" em UTC; botão de conexão/teste; `onClick`
+  na tela de integrações; `config` selecionada sem restringir a quem edita; e RPC sem guarda.
+
+## Limitações da Etapa C-1
+
+- Nada de envio externo (e-mail, WhatsApp, push) e nenhuma integração conectada.
+- O significado do valor `0` nos limites de dias é definido pelo banco; a tela só exibe a faixa permitida.
+- "Marcar como lida" exige edição em Automações (o contrato não define o nível; o banco decide e a mensagem dele aparece).
+- Os tipos de notificação (`tipo`) são os que o banco gerar; o filtro lista os existentes nos dados.
+- O Dashboard não usa `tipo_valores`; "Real" e "Estimado" são fixos por métrica.
+- O catálogo `modulos` (linhas das 4 chaves, `permissoes_extras` com `custos`, `permite_membros`) é dado do banco e não foi
+  verificado por este código; sem as linhas os módulos não aparecem para sócios.

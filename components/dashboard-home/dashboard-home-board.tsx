@@ -21,6 +21,10 @@ import {
   Factory,
   ShieldCheck,
   Truck,
+  Gauge,
+  BarChart3,
+  Bell,
+  Plug,
 } from "lucide-react";
 import { SetorResumoCard } from "@/components/dashboard-executivo/setor-resumo-card";
 import type { DashboardHomeOverview } from "@/lib/dashboard-home/get-overview";
@@ -63,6 +67,10 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
     "p3d_producao",
     "p3d_qualidade",
     "p3d_expedicao",
+    "p3d_dashboard",
+    "p3d_relatorios",
+    "p3d_automacoes",
+    "p3d_integracoes",
   ].some(com);
 
   return (
@@ -404,6 +412,53 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
             titulo={rotulos.plural("p3d_expedicao")}
             href="/impressao-3d/expedicao"
             stats={[{ label: "envios em aberto", value: String(impressao3d.expedicao.emAberto), tone: impressao3d.expedicao.emAberto > 0 ? "copper" : "zinc" }]}
+          />
+        )}
+
+        {/* Etapa C-1: só contagens. Os valores (faturamento, lucro) ficam no Dashboard, atrás do extra "custos". */}
+        {com("p3d_dashboard") && (
+          <SetorResumoCard
+            icon={Gauge}
+            titulo={rotulos.plural("p3d_dashboard")}
+            href="/impressao-3d/dashboard"
+            stats={
+              com("p3d_pedidos")
+                ? [
+                    { label: "pedidos abertos", value: String(impressao3d.pedidos.abertos) },
+                    { label: "pedidos atrasados", value: String(impressao3d.pedidos.prazoVencido), tone: impressao3d.pedidos.prazoVencido > 0 ? "rose" : "emerald" },
+                  ]
+                : [{ label: "vendas, produção e alertas", value: "Abrir" }]
+            }
+          />
+        )}
+
+        {com("p3d_relatorios") && (
+          <SetorResumoCard
+            icon={BarChart3}
+            titulo={rotulos.plural("p3d_relatorios")}
+            href="/impressao-3d/relatorios"
+            stats={[{ label: "vendas, produtos e produtividade", value: "Abrir" }]}
+          />
+        )}
+
+        {com("p3d_automacoes") && (
+          <SetorResumoCard
+            icon={Bell}
+            titulo={rotulos.plural("p3d_automacoes")}
+            href="/impressao-3d/notificacoes"
+            stats={[
+              { label: "alertas abertos", value: String(impressao3d.alertas?.abertos ?? 0), tone: (impressao3d.alertas?.abertos ?? 0) > 0 ? "amber" : "emerald" },
+              { label: "críticos", value: String(impressao3d.alertas?.criticos ?? 0), tone: (impressao3d.alertas?.criticos ?? 0) > 0 ? "rose" : "zinc" },
+            ]}
+          />
+        )}
+
+        {com("p3d_integracoes") && (
+          <SetorResumoCard
+            icon={Plug}
+            titulo={rotulos.plural("p3d_integracoes")}
+            href="/impressao-3d/integracoes"
+            stats={[{ label: "estrutura pronta, sem conexão externa", value: "Ver" }]}
           />
         )}
       </div>

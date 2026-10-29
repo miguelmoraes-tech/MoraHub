@@ -45,6 +45,8 @@ const MODULOS_NOVOS: Record<string, string[]> = {
     "p3d_fornecedores", "p3d_compras", "p3d_compra_itens", "p3d_pedidos", "p3d_pedido_itens",
     "p3d_pedido_pagamentos", "p3d_pedido_historico", "p3d_producao", "p3d_inspecoes", "p3d_falhas",
     "p3d_envios",
+    // Etapa C-1: alertas, notificacoes e integracoes.
+    "p3d_config_alertas", "p3d_notificacoes", "p3d_integracoes",
   ],
 };
 const ESTRITAS = Object.values(MODULOS_NOVOS).flat();
@@ -186,6 +188,8 @@ const ACTIONS_COM_GUARDA = [
   "app/(dashboard)/impressao-3d/producao/actions.ts",
   "app/(dashboard)/impressao-3d/qualidade/actions.ts",
   "app/(dashboard)/impressao-3d/expedicao/actions.ts",
+  "app/(dashboard)/impressao-3d/notificacoes/actions.ts",
+  "app/(dashboard)/impressao-3d/integracoes/actions.ts",
 ];
 const semGuarda: string[] = [];
 let actionsVerificadas = 0;
@@ -310,12 +314,16 @@ const MODULO_DA_PASTA: Record<string, string> = {
   producao: "p3d_producao",
   qualidade: "p3d_qualidade",
   expedicao: "p3d_expedicao",
+  dashboard: "p3d_dashboard",
+  relatorios: "p3d_relatorios",
+  notificacoes: "p3d_automacoes",
+  integracoes: "p3d_integracoes",
 };
 const p3dSemGuard: string[] = [];
 let p3dArquivos = 0;
 for (const arq of arquivos(join(raiz, "app/(dashboard)/impressao-3d"))) {
   const rel = relative(raiz, arq).replace(/\\/g, "/");
-  if (!/(page|actions|simulacao|arquivos-leitura)\.tsx?$/.test(arq)) continue;
+  if (!/(page|actions|simulacao|arquivos-leitura|sino)\.tsx?$/.test(arq)) continue;
   const pasta = rel.split("/")[3];
   const modulo = MODULO_DA_PASTA[pasta];
   p3dArquivos++;
@@ -355,11 +363,16 @@ const PROTEGIDOS: Record<string, string[]> = {
     "consumo_registrado_em", "reimpressao_de",
   ],
   p3d_envios: ["status", "postado_em", "entregue_em", "recebedor"],
+  // Etapa C-1: estado da integracao e do servidor (o banco ignora, o app nunca envia).
+  p3d_integracoes: ["status", "segredo_configurado", "ultima_verificacao", "ultimo_erro"],
+  p3d_config_alertas: ["updated_by"],
 };
 const SOMENTE_LEITURA = [
   "p3d_orcamento_itens", "p3d_movimentos_estoque",
   // Etapa B: somente leitura (escrita so por RPC).
   "p3d_pedido_pagamentos", "p3d_pedido_historico", "p3d_inspecoes", "p3d_falhas",
+  // Etapa C-1: notificacoes sao geradas pelo banco (p3d_atualizar_alertas); so lida_em muda, por RPC.
+  "p3d_notificacoes",
 ];
 const escritasProtegidas: string[] = [];
 let escritasP3d = 0;
@@ -402,7 +415,8 @@ for (const pasta of ["app", "components", "lib"]) {
 // Os schemas que alimentam esses payloads (spread de parsed.data) também não podem ter o campo.
 const schemas =
   readFileSync(join(raiz, "lib/impressao-3d/validacao.ts"), "utf8") + "\n" +
-  readFileSync(join(raiz, "lib/impressao-3d/validacao-operacao.ts"), "utf8");
+  readFileSync(join(raiz, "lib/impressao-3d/validacao-operacao.ts"), "utf8") + "\n" +
+  readFileSync(join(raiz, "lib/impressao-3d/validacao-nicho.ts"), "utf8");
 const SCHEMA_DA_TABELA: Record<string, string[]> = {
   p3d_materiais: ["MaterialSchema"],
   p3d_orcamentos: ["OrcamentoSchema"],
@@ -412,6 +426,8 @@ const SCHEMA_DA_TABELA: Record<string, string[]> = {
   p3d_pedido_itens: ["PedidoItemSchema"],
   p3d_producao: ["TrabalhoSchema", "TrabalhoLimitadoSchema"],
   p3d_envios: ["EnvioSchema"],
+  p3d_integracoes: ["IntegracaoSchema"],
+  p3d_config_alertas: ["ConfigAlertasSchema"],
 };
 for (const [tabela, campos] of Object.entries(PROTEGIDOS)) {
   for (const nomeSchema of SCHEMA_DA_TABELA[tabela] ?? []) {
@@ -535,9 +551,106 @@ const dataEmUtc: string[] = [];
 for (const pasta of ["app/(dashboard)/impressao-3d", "components/impressao-3d", "lib/impressao-3d"]) {
   for (const arq of arquivos(join(raiz, pasta))) {
     const rel = relative(raiz, arq).replace(/\\/g, "/");
-    if (/todayISO|toISOString\(\)\.slice\(0,\s*10\)/.test(readFileSync(arq, "utf8"))) dataEmUtc.push(`${rel} calcula "hoje" em UTC (use hojeSaoPaulo)`);
+    if (/todayISO|toISOString\(\)\.(slice\(0,\s*10\)|split\(["']T["']\)\[0\])/.test(readFileSync(arq, "utf8"))) dataEmUtc.push(`${rel} calcula "hoje" em UTC (use hojeSaoPaulo)`);
   }
 }
 console.log(`\nImpressão 3D: "hoje" calculado em UTC: ${dataEmUtc.length}`);
 for (const s of dataEmUtc) console.log("  ! " + s);
 if (dataEmUtc.length) process.exitCode = 1;
+
+// --- Nicho Impressão 3D (Etapa C-1): custo, lucro e margem só com o extra "custos" -----------------
+// Dashboard e Relatórios leem por RPC; o banco já devolve custo/lucro nulos sem o extra, e o app
+// ainda recusa mostrar. Regras: (1) nenhum select direto de coluna de custo/lucro/margem nessas
+// telas sem podeVerCustos no arquivo; (2) as páginas passam verCustos aos leitores (lerPainel /
+// lerRelatorio*); (3) a seção "resultado" do Dashboard só existe atrás de `verCustos && resultado`;
+// (4) toda linha de tabela/CSV de lucro, margem ou custo dos Relatórios fica atrás de verCustos.
+const custoSemExtra: string[] = [];
+const ARQ_C1_PAGINAS = [
+  "app/(dashboard)/impressao-3d/dashboard/page.tsx",
+  "app/(dashboard)/impressao-3d/relatorios/page.tsx",
+];
+const ARQ_C1_PASTAS = ["app/(dashboard)/impressao-3d/dashboard", "app/(dashboard)/impressao-3d/relatorios"];
+for (const pasta of ARQ_C1_PASTAS) {
+  for (const arq of arquivos(join(raiz, pasta))) {
+    const rel = relative(raiz, arq).replace(/\\/g, "/");
+    const texto = readFileSync(arq, "utf8").replace(/\r\n/g, "\n");
+    const re = /\.from\(\s*["'`]p3d_[a-z_]+["'`]\s*\)\s*\.select\(/g;
+    for (let m = re.exec(texto); m; m = re.exec(texto)) {
+      const linha = texto.slice(0, m.index).split("\n").length;
+      if (/custo|lucro|margem|markup/.test(argumentos(texto, m.index + m[0].length)) && !/podeVerCustos\(/.test(texto)) {
+        custoSemExtra.push(`${rel}:${linha} select de custo/lucro/margem sem podeVerCustos`);
+      }
+    }
+  }
+}
+for (const rel of ARQ_C1_PAGINAS) {
+  const texto = readFileSync(join(raiz, rel), "utf8");
+  if (!/podeVerCustos\(acesso\)/.test(texto)) custoSemExtra.push(`${rel} não confere o extra com podeVerCustos(acesso)`);
+  for (const m of texto.matchAll(/\b(lerPainel|lerRelatorio[A-Za-z]+)\(([^)]*)\)/g)) {
+    if (!/verCustos/.test(m[2])) custoSemExtra.push(`${rel}: ${m[1]}(...) sem passar verCustos`);
+  }
+  if (!/\b(lerPainel|lerRelatorio[A-Za-z]+)\(/.test(texto)) custoSemExtra.push(`${rel} não lê o retorno por lerPainel/lerRelatorio*`);
+}
+{
+  const rel = "components/impressao-3d/dashboard-board.tsx";
+  const texto = readFileSync(join(raiz, rel), "utf8").replace(/\r\n/g, "\n");
+  const guarda = texto.indexOf("verCustos && resultado");
+  if (guarda === -1) custoSemExtra.push(`${rel} sem a guarda 'verCustos && resultado'`);
+  for (const m of texto.matchAll(/\bresultado\./g)) {
+    if (guarda === -1 || (m.index ?? 0) < guarda) custoSemExtra.push(`${rel}: 'resultado.' usado fora da guarda verCustos`);
+  }
+}
+{
+  const rel = "components/impressao-3d/relatorios-board.tsx";
+  const linhasTela = readFileSync(join(raiz, rel), "utf8").replace(/\r\n/g, "\n").split("\n");
+  linhasTela.forEach((linha, i) => {
+    if (!/lucro_estimado|margem_estimada|custo_falhas_estimado/.test(linha)) return;
+    if (/^\s*(\/\/|\*)/.test(linha)) return;
+    if (!linhasTela.slice(Math.max(0, i - 4), i + 1).some((l) => /verCustos/.test(l))) {
+      custoSemExtra.push(`${rel}:${i + 1} coluna de custo/lucro/margem fora de verCustos`);
+    }
+  });
+}
+{
+  // O leitor nunca repassa custo/lucro/margem sem o extra, mesmo que o banco mande.
+  const painel = readFileSync(join(raiz, "lib/impressao-3d/painel.ts"), "utf8");
+  for (const campo of ["lucro_estimado", "margem_estimada", "custo_falhas_estimado"]) {
+    const usos = [...painel.matchAll(new RegExp(`${campo}: [^\n]*`, "g"))].map((m) => m[0]).filter((l) => /numOuNull\(l\./.test(l));
+    for (const u of usos) if (!/verCustos \?/.test(u)) custoSemExtra.push(`lib/impressao-3d/painel.ts: ${campo} lido sem verCustos`);
+  }
+}
+console.log(`\nImpressão 3D (C-1): custo/lucro/margem fora do extra "custos": ${custoSemExtra.length}`);
+for (const s of custoSemExtra) console.log("  ! " + s);
+if (custoSemExtra.length) process.exitCode = 1;
+
+// --- Nicho Impressão 3D (Etapa C-1): integrações sem conexão simulada ---------------------------------
+// A etapa só tem estrutura: nenhuma tela do nicho tem botão "Testar conexão"/"Conectar", nenhum
+// onClick na tela de integrações (só o submit do formulário de dados não secretos), nenhuma escrita
+// de status e a coluna `config` só é selecionada atrás de `podeEditar` (fundador/cofundador).
+const integracaoSimulada: string[] = [];
+const BOTAO_CONEXAO = />\s*(Testar( a)? conex[aã]o|Verificar conex[aã]o|Conectar( agora| conta)?|Autorizar|Reconectar|Sincronizar agora)\s*</i;
+for (const pasta of ["app/(dashboard)/impressao-3d", "components/impressao-3d"]) {
+  for (const arq of arquivos(join(raiz, pasta))) {
+    const rel = relative(raiz, arq).replace(/\\/g, "/");
+    const texto = readFileSync(arq, "utf8");
+    if (BOTAO_CONEXAO.test(texto)) integracaoSimulada.push(`${rel} tem botão de conexão/teste`);
+    if (/Conex[aã]o (estabelecida|ok|bem[- ]sucedida)|Conectado com sucesso/i.test(texto)) {
+      integracaoSimulada.push(`${rel} afirma uma conexão que não existe`);
+    }
+  }
+}
+{
+  const tela = readFileSync(join(raiz, "components/impressao-3d/integracoes-board.tsx"), "utf8");
+  if (/onClick/.test(tela)) integracaoSimulada.push("components/impressao-3d/integracoes-board.tsx tem onClick (só formulário de dados)");
+  if (!tela.includes("MENSAGEM_NAO_CONECTADA")) integracaoSimulada.push("integracoes-board.tsx sem a mensagem fixa de não conectada");
+  const pagina = readFileSync(join(raiz, "app/(dashboard)/impressao-3d/integracoes/page.tsx"), "utf8");
+  if (!/podeEditar \? COLUNAS_INTEGRACAO : COLUNAS_INTEGRACAO_ESTADO/.test(pagina)) {
+    integracaoSimulada.push("integracoes/page.tsx seleciona config sem restringir a quem edita");
+  }
+  const acoes = readFileSync(join(raiz, "app/(dashboard)/impressao-3d/integracoes/actions.ts"), "utf8");
+  if (!/acesso\?\.ehDono/.test(acoes)) integracaoSimulada.push("integracoes/actions.ts não restringe a escrita a fundador/cofundador");
+  if (/\.rpc\(/.test(acoes)) integracaoSimulada.push("integracoes/actions.ts chama RPC (não há verificação de conexão nesta etapa)");
+}
+console.log(`\nImpressão 3D (C-1): integração com conexão simulada ou sem restrição: ${integracaoSimulada.length}`);
+for (const s of integracaoSimulada) console.log("  ! " + s);
+if (integracaoSimulada.length) process.exitCode = 1;
