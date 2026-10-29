@@ -6,6 +6,7 @@ import { listarEmpresas } from "@/lib/empresas";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { exigeAprovacao } from "@/lib/aprovacoes";
 import { ACESSO_VENDEDOR_AGUARDANDO, VENDEDOR_HOME } from "@/lib/vendedor-access";
 import {
   CODIGO_ACESSO_MIN,
@@ -97,7 +98,8 @@ export async function entrarSeAprovado(): Promise<void> {
 
 // --- Gestor (dono) side ---
 
-export type CodigoState = { codigo: string } | { error: string };
+/** `pendente: true` = 2+ fundadores: o código novo só nasce depois da aprovação (aparece em Aprovações). */
+export type CodigoState = { codigo: string } | { pendente: true } | { error: string };
 
 export async function regenerarCodigoVendedor(): Promise<CodigoState> {
   const supabase = await createClient();
@@ -112,8 +114,11 @@ export async function regenerarCodigoVendedor(): Promise<CodigoState> {
   const { data, error } = await supabase.rpc("regenerar_codigo_vendedor", {
     p_workspace_id: workspaceId,
   });
-  if (error || typeof data !== "string") {
-    return { error: gestorErrorMessage(error?.message) };
+  if (error) return { error: gestorErrorMessage(error.message) };
+  // NULL = enviado para aprovação (2+ fundadores): ainda não há código novo.
+  if (typeof data !== "string" || !data) {
+    revalidatePath("/aprovacoes");
+    return { pendente: true };
   }
   return { codigo: data };
 }
@@ -127,6 +132,9 @@ export async function responderSolicitacaoAcesso(
   aprovar: boolean
 ): Promise<NonNullable<ActionState>> {
   const supabase = await createClient();
+  // Com 2+ fundadores, responder um pedido de acesso também vira um pedido de aprovação.
+  const workspaceId = await getWorkspaceIdAtivo();
+  const pendente = workspaceId ? await exigeAprovacao(supabase, workspaceId) : false;
   const { error } = await supabase.rpc("responder_solicitacao_acesso", {
     p_id: id,
     p_aprovar: aprovar,
@@ -135,7 +143,8 @@ export async function responderSolicitacaoAcesso(
 
   revalidatePath("/vendedores");
   revalidatePath("/socios");
-  return { ok: true };
+  revalidatePath("/aprovacoes");
+  return pendente ? { ok: true, pendente: true } : { ok: true };
 }
 
 export async function responderSolicitacaoVendedor(
@@ -143,6 +152,8 @@ export async function responderSolicitacaoVendedor(
   aprovar: boolean
 ): Promise<NonNullable<ActionState>> {
   const supabase = await createClient();
+  const workspaceId = await getWorkspaceIdAtivo();
+  const pendente = workspaceId ? await exigeAprovacao(supabase, workspaceId) : false;
   const { error } = await supabase.rpc("responder_solicitacao_vendedor", {
     p_id: id,
     p_aprovar: aprovar,
@@ -150,5 +161,6 @@ export async function responderSolicitacaoVendedor(
   if (error) return { error: gestorErrorMessage(error.message) };
 
   revalidatePath("/vendedores");
-  return { ok: true };
+  revalidatePath("/aprovacoes");
+  return pendente ? { ok: true, pendente: true } : { ok: true };
 }

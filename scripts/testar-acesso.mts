@@ -45,6 +45,37 @@ import {
   type MapaRotulos,
 } from "@/lib/rotulos-shared";
 import { erroDeNicho, resumoModulos } from "@/lib/nichos-shared";
+import { sanearPermissoes, sociosErrorMessage } from "@/lib/socios-shared";
+import {
+  AVISO_ATIVE_FINANCEIRO,
+  AVISO_SEM_FINANCEIRO,
+  EXTRA_SALARIOS,
+  SEM_PERMISSAO_SALARIOS,
+  erroValorSemPermissao,
+  motivoNegarFolha,
+  podeVerSalarios,
+} from "@/lib/rh/salarios";
+import {
+  AVISO_ENVIADO,
+  ROTA_APROVACOES,
+  contarMinhasPendencias,
+  deveReler,
+  erroDaFalha,
+  erroDeAprovacao,
+  fraseDaRegra,
+  historico,
+  lerAprovacoes,
+  lerResultado,
+  lerVotos,
+  mensagemDoVoto,
+  nomesDeFaltantes,
+  pendentes,
+  podeCancelar,
+  podeVotar,
+  precisaAprovacao,
+  statusExibido,
+  textoDoResultado,
+} from "@/lib/aprovacoes-shared";
 
 let total = 0;
 function teste(nome: string, fn: () => void | Promise<void>) {
@@ -70,8 +101,8 @@ const ok = (papel: Papel, corrigirCookie = false): ResolucaoEmpresa => ({
   corrigirCookie,
 });
 
-// modulos.permite_membros = true hoje (rh e vendedores = false).
-const CATALOGO = ["leads", "renegados", "clientes", "agenda", "marketing", "financeiro", "juridico"];
+// modulos.permite_membros = true hoje (só vendedores = false; o RH passou a aceitar equipe na Fase 5).
+const CATALOGO = ["leads", "renegados", "clientes", "agenda", "marketing", "financeiro", "juridico", "rh"];
 
 function decide(
   path: string,
@@ -353,10 +384,12 @@ await teste("permissão em módulo que a empresa DESLIGOU não vale", () => {
   assert.equal(vaiPara(decide("/leads", ok("socio"), ["clientes"], false, ["leads"])), AGUARDANDO_LIBERACAO);
   assert.equal(vaiPara(decide("/leads", ok("socio"), ["clientes"], false, ["leads", "clientes"])), "/clientes");
 });
-await teste("módulo com permite_membros=false (rh, vendedores) nunca libera rota, mesmo com permissão gravada", () => {
-  assert.deepEqual(modulosVisiveis(["financeiro", "rh", "leads"], ["rh", "vendedores"], CATALOGO), []);
-  assert.equal(vaiPara(decide("/rh", ok("funcionario"), ["rh"], false, ["rh"])), AGUARDANDO_LIBERACAO);
+await teste("módulo com permite_membros=false (vendedores) nunca libera rota, mesmo com permissão gravada", () => {
+  assert.deepEqual(modulosVisiveis(["financeiro", "leads"], ["vendedores"], CATALOGO), []);
   assert.equal(vaiPara(decide("/vendedores", ok("socio"), ["vendedores"], false, ["vendedores"])), AGUARDANDO_LIBERACAO);
+  // Se o catálogo marcar o RH como permite_membros=false, ele volta a ser só do fundador.
+  const semRh = CATALOGO.filter((m) => m !== "rh");
+  assert.equal(vaiPara(decide("/rh", ok("funcionario"), ["rh"], false, ["rh"], semRh)), AGUARDANDO_LIBERACAO);
 });
 await teste("sem o catálogo (falha de leitura) o sócio não abre módulo nenhum", () => {
   assert.deepEqual(modulosVisiveis(["leads"], ["leads"]), []);
@@ -536,18 +569,19 @@ await teste("sócio com permissão em marketing/financeiro/juridico abre; sem pe
     }
   }
 });
-await teste("RH é negado a sócio e funcionário (permite_membros=false), mesmo ligado e com permissão", () => {
+await teste("RH é por pessoa: sócio e funcionário abrem com permissão em rh e são negados sem ela", () => {
   for (const papel of ["socio", "funcionario"] as const)
     for (const p of ["/rh", "/rh/folha", "/rh/funcionarios", "/rh/ponto"]) {
-      assert.equal(vaiPara(decide(p, ok(papel), TODOS, false, ["rh", "leads"])), "/leads", `${papel} ${p}`);
+      assert.equal(vaiPara(decide(p, ok(papel), TODOS, false, ["rh", "leads"])), "seguir", `${papel} ${p}`);
+      assert.equal(vaiPara(decide(p, ok(papel), TODOS, false, ["leads"])), "/leads", `${papel} sem permissão ${p}`);
     }
 });
 await teste("a matriz (modulosOferecidos) só traz módulos ligados E com permite_membros=true", () => {
   assert.deepEqual(
     modulosOferecidos(TODOS, CATALOGO),
-    ["leads", "renegados", "clientes", "agenda", "marketing", "financeiro", "juridico"]
+    ["leads", "renegados", "clientes", "agenda", "marketing", "financeiro", "juridico", "rh"]
   );
-  assert.ok(!modulosOferecidos(TODOS, CATALOGO).includes("rh"));
+  assert.ok(modulosOferecidos(TODOS, CATALOGO).includes("rh"));
   assert.ok(!modulosOferecidos(TODOS, CATALOGO).includes("vendedores"));
   assert.deepEqual(modulosOferecidos(ATUAIS, CATALOGO), ["leads", "renegados", "clientes", "agenda"]);
   assert.deepEqual(modulosOferecidos(TODOS, []), []);
@@ -632,10 +666,11 @@ await teste("sócio sem permissão no módulo (ou com permissão só em outro) �
     assert.equal(guard("marketing", papel, "leitura", { permissoes: [perm("leads", "edicao")] }), null);
   }
 });
-await teste("RH negado a sócio/funcionário (permite_membros=false) mesmo com permissão gravada", () => {
+await teste("RH negado a sócio/funcionário só se o catálogo marcar permite_membros=false", () => {
+  const semRh = CATALOGO.filter((m) => m !== "rh");
   for (const papel of ["socio", "funcionario"]) {
-    assert.equal(guard("rh", papel, "leitura", { permissoes: [perm("rh", "edicao")] }), null, papel);
-    assert.equal(guard("rh", papel, "edicao", { permissoes: [perm("rh", "edicao")] }), null, papel);
+    assert.equal(guard("rh", papel, "leitura", { permiteMembros: semRh, permissoes: [perm("rh", "edicao")] }), null, papel);
+    assert.equal(guard("rh", papel, "edicao", { permiteMembros: semRh, permissoes: [perm("rh", "edicao")] }), null, papel);
   }
   assert.equal(guard("marketing", "socio", "leitura", { permiteMembros: [], permissoes: [perm("marketing", "edicao")] }), null);
 });
@@ -957,6 +992,388 @@ await teste("nenhuma combinação papel x rota de Fase 4 entra em loop (termina 
         const r = seguirRedirects(p, ok(papel), hab, ["leads", "clientes"]);
         assert.ok(r.final !== null && r.visitados.length <= 3, `${papel} ${p} [${hab.length}]: ${r.visitados.join(" -> ")}`);
       }
+});
+
+// ===========================================================================
+// Fase 5 — RH por pessoa, extra de salários e aprovações entre fundadores
+// ===========================================================================
+
+console.log("\nFase 5 — RH por pessoa: leitura / edição / sem acesso / desligado");
+const RH_ROTAS = ["/rh", "/rh/funcionarios", "/rh/folha", "/rh/ponto", "/rh/recrutamento", "/rh/avaliacoes"];
+await teste("fundador e cofundador abrem o RH quando ligado; desligado volta à 1ª rota ligada", () => {
+  for (const papel of ["dono", "cofundador"] as const)
+    for (const p of RH_ROTAS) {
+      assert.equal(vaiPara(decide(p, ok(papel), TODOS)), "seguir", `${papel} ${p}`);
+      assert.equal(vaiPara(decide(p, ok(papel), ATUAIS)), "/leads", `${papel} RH desligado ${p}`);
+    }
+});
+await teste("sócio/funcionário: com permissão em rh abre; sem permissão ou com RH desligado é negado", () => {
+  for (const papel of ["socio", "funcionario"] as const)
+    for (const p of RH_ROTAS) {
+      assert.equal(vaiPara(decide(p, ok(papel), TODOS, false, ["rh"])), "seguir", `${papel} ${p}`);
+      assert.equal(vaiPara(decide(p, ok(papel), TODOS, false, ["leads"])), "/leads", `${papel} sem permissão ${p}`);
+      assert.equal(vaiPara(decide(p, ok(papel), ATUAIS, false, ["rh", "leads"])), "/leads", `${papel} RH desligado ${p}`);
+    }
+});
+await teste("guard: leitura lê e não escreve; edição faz os dois; sem permissão e RH desligado negam", () => {
+  for (const papel of ["socio", "funcionario"]) {
+    const leitura = [perm("rh", "leitura")];
+    assert.equal(guard("rh", papel, "leitura", { permissoes: leitura })?.nivel, "leitura", `${papel} lê`);
+    assert.equal(guard("rh", papel, "edicao", { permissoes: leitura }), null, `${papel} não escreve com leitura`);
+    const edicao = [perm("rh", "edicao")];
+    assert.equal(guard("rh", papel, "leitura", { permissoes: edicao })?.nivel, "edicao");
+    assert.equal(guard("rh", papel, "edicao", { permissoes: edicao })?.nivel, "edicao");
+    assert.equal(guard("rh", papel, "leitura", { permissoes: [] }), null, `${papel} sem permissão`);
+    assert.equal(guard("rh", papel, "leitura", { permissoes: edicao, habilitados: ATUAIS }), null, `${papel} RH desligado`);
+  }
+  for (const papel of ["dono", "cofundador"])
+    assert.equal(guard("rh", papel, "edicao", { habilitados: ATUAIS }), null, `${papel} RH desligado`);
+});
+await teste("menu: o RH só aparece para quem tem acesso E o módulo está ligado", () => {
+  const grupos = (hab: string[]) => menuDoDono(hab).map((g) => g.titulo);
+  assert.ok(grupos(TODOS).includes("RH"), "dono com RH ligado");
+  assert.ok(!grupos(ATUAIS).includes("RH"), "dono com RH desligado");
+  // Sócio: o layout monta habilitados ∩ permissões ∩ permite_membros.
+  const visiveis = (hab: string[], permitidos: string[]) => modulosVisiveis(hab, permitidos, CATALOGO);
+  assert.ok(grupos(visiveis(TODOS, ["rh"])).includes("RH"), "sócio com permissão");
+  assert.ok(!grupos(visiveis(TODOS, ["leads"])).includes("RH"), "sócio sem permissão");
+  assert.ok(!grupos(visiveis(ATUAIS, ["rh"])).includes("RH"), "RH desligado");
+});
+await teste("RH aparece na matriz de permissões e nos setores, com o extra 'Ver salários e folha'", () => {
+  assert.ok(modulosOferecidos(TODOS, CATALOGO).includes("rh"));
+  assert.ok(!modulosOferecidos(ATUAIS, CATALOGO).includes("rh"), "desligado não é oferecido");
+  assert.deepEqual(extrasDoCatalogo([{ chave: "salarios", nome: "Ver salários e folha" }]), [
+    { chave: "salarios", rotulo: "Ver salários e folha" },
+  ]);
+  // O servidor aceita o extra na matriz (sanearPermissoes preserva extras curtos).
+  const p = sanearPermissoes([{ modulo: "rh", nivel: "edicao", extras: ["salarios"] }]);
+  assert.deepEqual(p, [{ modulo: "rh", nivel: "edicao", extras: ["salarios"] }]);
+});
+
+console.log("\nFase 5 — RH: extra 'salarios' esconde e bloqueia valores");
+await teste("podeVerSalarios: fundador/cofundador sempre; sócio/funcionário só com o extra", () => {
+  assert.equal(podeVerSalarios({ ehDono: true, extras: [] }), true);
+  assert.equal(podeVerSalarios({ ehDono: false, extras: [] }), false);
+  assert.equal(podeVerSalarios({ ehDono: false, extras: ["outro"] }), false);
+  assert.equal(podeVerSalarios({ ehDono: false, extras: [EXTRA_SALARIOS] }), true);
+  const r = guard("rh", "socio", "edicao", { permissoes: [perm("rh", "edicao", ["salarios"])] });
+  assert.ok(r && podeVerSalarios(r));
+  const sem = guard("rh", "socio", "edicao", { permissoes: [perm("rh", "edicao")] });
+  assert.ok(sem && !podeVerSalarios(sem));
+});
+await teste("sem o extra, enviar salário/valor/salário previsto é recusado; vazio passa; com o extra passa", () => {
+  const sem = { ehDono: false, extras: [] as string[] };
+  for (const v of [1500, "1500.50", 0])
+    assert.equal(erroValorSemPermissao(sem, v), SEM_PERMISSAO_SALARIOS, String(v));
+  for (const v of [undefined, null, ""]) assert.equal(erroValorSemPermissao(sem, v), null, String(v));
+  assert.equal(erroValorSemPermissao({ ehDono: false, extras: ["salarios"] }, 1500), null);
+  assert.equal(erroValorSemPermissao({ ehDono: true, extras: [] }, 1500), null);
+});
+await teste("as actions de RH com valores consultam o extra e não tocam o valor gravado sem ele", () => {
+  const ler = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+  const casos: [arquivo: string, campo: string][] = [
+    ["app/(dashboard)/rh/funcionarios/actions.ts", "salario"],
+    ["app/(dashboard)/rh/beneficios/actions.ts", "valor"],
+    ["app/(dashboard)/rh/recrutamento/actions.ts", "salario_previsto"],
+  ];
+  for (const [arq, campo] of casos) {
+    const t = ler(arq);
+    assert.ok(t.includes("erroValorSemPermissao(acesso"), `${arq}: sem checagem do extra`);
+    assert.ok(
+      t.includes(`...(podeVerSalarios(acesso) ? { ${campo}:`),
+      `${arq}: o update grava ${campo} mesmo sem o extra`
+    );
+    // Criar e editar: duas checagens (a de vagas/funcionários/benefícios tem create + update).
+    assert.ok(t.split("erroValorSemPermissao(acesso").length - 1 >= 2, `${arq}: falta checar em create ou update`);
+  }
+});
+await teste("RH somente leitura: o layout lê o nível e todo board com ação esconde os botões sem edição", () => {
+  const layout = readFileSync("app/(dashboard)/rh/layout.tsx", "utf8");
+  assert.ok(layout.includes('getAcessoModulo("rh")') && layout.includes('acesso?.nivel === "edicao"'));
+  for (const b of ["avaliacoes", "beneficios", "departamentos", "ferias", "folha-pagamento", "funcionarios", "vagas", "ponto"])
+    assert.ok(readFileSync(`components/rh/${b}-board.tsx`, "utf8").includes("usePodeEditarRh()"), b);
+  assert.ok(readFileSync("components/rh/candidatos-kanban.tsx", "utf8").includes("usePodeEditarRh()"));
+});
+await teste("as páginas do RH com valores zeram o dado no servidor quando falta o extra", () => {
+  const ler = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+  for (const arq of [
+    "app/(dashboard)/rh/funcionarios/page.tsx",
+    "app/(dashboard)/rh/beneficios/page.tsx",
+    "app/(dashboard)/rh/recrutamento/page.tsx",
+    "app/(dashboard)/rh/recrutamento/[vagaId]/page.tsx",
+    "app/(dashboard)/rh/page.tsx",
+    "app/(dashboard)/rh/folha/page.tsx",
+  ])
+    assert.ok(ler(arq).includes("podeVerSalarios(acesso)"), arq);
+});
+
+console.log("\nFase 5 — folha: exige edição no RH E no Financeiro (ligado), sem gerar parcialmente");
+const rhEdicao = { ehDono: false, extras: ["salarios"] };
+const financeiroOk = { nivel: "edicao" };
+await teste("motivoNegarFolha: cada falta tem mensagem própria; só passa com os dois", () => {
+  const base = { rh: rhEdicao, financeiroLigado: true, financeiroEdicao: financeiroOk, tocaContasPagar: true };
+  assert.equal(motivoNegarFolha(base), null, "tudo certo");
+  assert.equal(motivoNegarFolha({ ...base, rh: null }), "Você não tem permissão para fazer isso.");
+  assert.equal(motivoNegarFolha({ ...base, rh: { ehDono: false, extras: [] } }), SEM_PERMISSAO_SALARIOS);
+  assert.equal(motivoNegarFolha({ ...base, financeiroLigado: false, financeiroEdicao: null }), AVISO_ATIVE_FINANCEIRO);
+  assert.equal(motivoNegarFolha({ ...base, financeiroEdicao: null }), AVISO_SEM_FINANCEIRO);
+  assert.equal(motivoNegarFolha({ ...base, rh: { ehDono: true, extras: [] } }), null, "fundador");
+  // Folha sem conta a pagar vinculada não precisa do Financeiro.
+  assert.equal(motivoNegarFolha({ ...base, financeiroEdicao: null, financeiroLigado: false, tocaContasPagar: false }), null);
+});
+await teste("quem tem edição no RH mas leitura no Financeiro (ou nada) não gera folha", () => {
+  const financeiroLeitura = guard("financeiro", "socio", "edicao", { permissoes: [perm("financeiro", "leitura", ["valores"])] });
+  assert.equal(financeiroLeitura, null);
+  assert.equal(motivoNegarFolha({ rh: rhEdicao, financeiroLigado: true, financeiroEdicao: financeiroLeitura, tocaContasPagar: true }), AVISO_SEM_FINANCEIRO);
+  const financeiroEdit = guard("financeiro", "socio", "edicao", { permissoes: [perm("financeiro", "edicao", ["valores"])] });
+  assert.ok(financeiroEdit);
+  assert.equal(motivoNegarFolha({ rh: rhEdicao, financeiroLigado: true, financeiroEdicao: financeiroEdit, tocaContasPagar: true }), null);
+  // Financeiro desligado na empresa: o guard nega até ao dono.
+  assert.equal(guard("financeiro", "dono", "edicao", { habilitados: ATUAIS }), null);
+});
+await teste("gerarFolhaMes checa tudo ANTES de gerar (nunca grava parcialmente)", () => {
+  const t = readFileSync("app/(dashboard)/rh/folha/actions.ts", "utf8").replace(/\r\n/g, "\n");
+  const gerar = t.slice(t.indexOf("export async function gerarFolhaMes"), t.indexOf("function parseForm"));
+  assert.ok(gerar.includes("acessoFolha(true)"), "usa a guarda da folha");
+  assert.ok(gerar.indexOf("acessoFolha(true)") < gerar.indexOf("gerarFolhaDoMes("), "a guarda vem antes de gravar");
+  assert.ok(t.includes("getAcessoFinanceiroEdicao") && t.includes('getAcessoEdicao("rh")'));
+});
+await teste("gerarFolhaDoMes sem nada a gerar não grava: lista de funcionários vazia", async () => {
+  const chamadas: string[] = [];
+  const cliente = {
+    from(tabela: string) {
+      chamadas.push(tabela);
+      const q: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "insert"]) q[m] = () => q;
+      q.then = (res: (v: { data: unknown[] }) => void) => res({ data: [] });
+      return q;
+    },
+  };
+  const { gerarFolhaDoMes } = await import("@/lib/rh/folha-sync");
+  const r = await gerarFolhaDoMes(cliente as never, { workspaceId: WS_A, donoId: "dono" }, "2026-10-01", 5);
+  assert.equal(r.criados, 0);
+});
+
+console.log("\nFase 5 — aprovações: regra, estados da interface e textos");
+const AGORA = new Date("2026-10-28T12:00:00Z");
+const hora = (h: number) => new Date(AGORA.getTime() + h * 3600_000).toISOString();
+const dia = (d: number) => hora(d * 24);
+const linha = (o: Record<string, unknown>) => ({
+  id: "id-" + Math.random().toString(36).slice(2),
+  tipo: "definir_modulo",
+  resumo: "Ligar o módulo Marketing",
+  status: "pendente",
+  proposto_por: "u-ana",
+  proposto_por_nome: "Ana",
+  created_at: hora(-2),
+  expira_em: hora(70),
+  decidido_em: null,
+  erro: null,
+  resultado: null,
+  votos: [],
+  faltam: [],
+  eu_posso_votar: true,
+  ...o,
+});
+await teste("precisaAprovacao: 1 fundador executa na hora; 2 ou mais ficam pendentes", () => {
+  assert.equal(precisaAprovacao(0), false);
+  assert.equal(precisaAprovacao(1), false);
+  assert.equal(precisaAprovacao(2), true);
+  assert.equal(precisaAprovacao(5), true);
+  assert.equal(fraseDaRegra(1), null);
+  assert.ok(fraseDaRegra(2)?.includes("todos os fundadores"));
+});
+await teste("exigeAprovacao decide ANTES de chamar: 1 fundador = não; 2+ = sim; falha = sim (nunca otimista)", async () => {
+  const { exigeAprovacao, listarFundadores } = await import("@/lib/aprovacoes-shared");
+  const quem = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ user_id: "u" + i, nome: "F" + i, email: "f" + i + "@x.com", papel: i === 0 ? "dono" : "cofundador" }));
+  const cliente = (resp: () => Promise<{ data: unknown; error: unknown }>) => ({
+    rpc: async (nome: string, args: Record<string, unknown>) => {
+      assert.equal(nome, "fundadores_da_empresa");
+      assert.deepEqual(args, { p_workspace_id: WS_A });
+      return resp();
+    },
+  });
+  assert.equal(await exigeAprovacao(cliente(async () => ({ data: quem(1), error: null })) as never, WS_A), false);
+  assert.equal(await exigeAprovacao(cliente(async () => ({ data: quem(2), error: null })) as never, WS_A), true);
+  assert.equal(await exigeAprovacao(cliente(async () => ({ data: quem(3), error: null })) as never, WS_A), true);
+  assert.equal(await exigeAprovacao(cliente(async () => ({ data: null, error: { message: "x" } })) as never, WS_A), true);
+  assert.equal(await exigeAprovacao(cliente(async () => { throw new Error("rede"); }) as never, WS_A), true);
+  assert.equal(await listarFundadores(cliente(async () => ({ data: null, error: { message: "x" } })) as never, WS_A), null);
+});
+await teste("toda função com porta de aprovação é chamada por uma action que consulta os fundadores antes", () => {
+  const ler = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
+  const arquivos = [
+    "app/(dashboard)/socios/actions.ts", "lib/actions/empresa.ts", "lib/actions/modulos.ts",
+    "lib/actions/nichos.ts", "lib/actions/vendedor-codigo.ts",
+  ];
+  const gated = [
+    "renomear_empresa", "definir_modulo", "aplicar_nicho", "salvar_rotulos", "convidar_membro",
+    "cancelar_convite_empresa", "atualizar_permissoes_membro", "remover_membro", "criar_perfil_acesso",
+    "atualizar_perfil_acesso", "regenerar_codigo_perfil_acesso", "regenerar_codigo_vendedor",
+    "responder_solicitacao_acesso", "responder_solicitacao_vendedor",
+  ];
+  const textos = arquivos.map((a) => [a, ler(a)] as const);
+  // Retornam NULL quando enviadas para aprovação: a action precisa tratar o NULL.
+  const retornamNull = ["convidar_membro", "criar_perfil_acesso", "regenerar_codigo_perfil_acesso", "regenerar_codigo_vendedor"];
+  for (const rpc of gated) {
+    const donos = textos.filter(([, t]) => t.includes(`.rpc("${rpc}"`));
+    assert.ok(donos.length >= 1, `${rpc}: nenhuma action chama`);
+    for (const [arq, t] of donos) {
+      // criarEmpresa reaplica o nicho numa empresa recém-criada: só há um fundador, não há o que aprovar.
+      if (arq === "lib/actions/empresa.ts" && rpc === "aplicar_nicho") continue;
+      const trecho = t.slice(t.indexOf(`.rpc("${rpc}"`) - 900, t.indexOf(`.rpc("${rpc}"`) + 900);
+      if (retornamNull.includes(rpc)) {
+        assert.ok(/ENVIADO|pendente: true/.test(trecho), `${arq} ${rpc}: não trata o retorno NULL`);
+      } else {
+        assert.ok(/exigeAprovacao\(/.test(trecho), `${arq} ${rpc}: não consulta os fundadores antes`);
+      }
+    }
+  }
+});
+await teste("o badge conta só pendências em que EU posso votar e que não venceram", () => {
+  const lista = lerAprovacoes([
+    linha({}),                                          // conta
+    linha({ eu_posso_votar: false }),                   // já votei / sou o proponente
+    linha({ expira_em: hora(-1) }),                     // venceu
+    linha({ status: "aprovada", decidido_em: hora(-5) }),
+    linha({ status: "recusada", decidido_em: hora(-5) }),
+    { status: "lixo", id: "x" },                        // status desconhecido: descartado
+    null,
+  ]);
+  assert.equal(lista.length, 5);
+  assert.equal(contarMinhasPendencias(lista, AGORA), 1);
+  assert.equal(pendentes(lista, AGORA).length, 2, "o vencido sai das pendentes");
+  assert.equal(contarMinhasPendencias([], AGORA), 0);
+});
+await teste("estados: votar, recusar e cancelar mudam o que a tela oferece", () => {
+  const [p] = lerAprovacoes([linha({ proposto_por: "u-ana", eu_posso_votar: true })]);
+  assert.equal(podeVotar(p, AGORA), true, "pendente e posso votar");
+  assert.equal(podeCancelar(p, "u-ana", AGORA), true, "quem propôs cancela");
+  assert.equal(podeCancelar(p, "u-bia", AGORA), false, "outro fundador não cancela");
+  for (const status of ["aprovada", "recusada", "expirada", "cancelada", "falhou"] as const) {
+    const [d] = lerAprovacoes([linha({ status, decidido_em: hora(-1) })]);
+    assert.equal(podeVotar(d, AGORA), false, status);
+    assert.equal(podeCancelar(d, "u-ana", AGORA), false, status);
+    assert.ok(historico([d], AGORA).length === 1, `${status} entra no histórico`);
+  }
+  const [venc] = lerAprovacoes([linha({ expira_em: hora(-1) })]);
+  assert.equal(podeVotar(venc, AGORA), false);
+  assert.equal(statusExibido(venc, AGORA), "expirada");
+});
+await teste("histórico: só os últimos 30 dias, mais recente primeiro, sem pendentes", () => {
+  const lista = lerAprovacoes([
+    linha({ status: "aprovada", decidido_em: dia(-1), resumo: "ontem" }),
+    linha({ status: "recusada", decidido_em: dia(-29), resumo: "29 dias" }),
+    linha({ status: "falhou", decidido_em: dia(-31), resumo: "31 dias" }),
+    linha({ status: "cancelada", decidido_em: dia(-3), resumo: "3 dias" }),
+    linha({ resumo: "aberta" }),
+  ]);
+  assert.deepEqual(historico(lista, AGORA).map((a) => a.resumo), ["ontem", "3 dias", "29 dias"]);
+});
+await teste("resultado: convite vira /convite/<token>, código aparece, só em pedido aprovado", () => {
+  assert.deepEqual(lerResultado({ token: "abc123" }, "aprovada"), { tipo: "convite", token: "abc123", caminho: "/convite/abc123" });
+  assert.deepEqual(lerResultado({ codigo: "K7M2Q9XA" }, "aprovada"), { tipo: "codigo", codigo: "K7M2Q9XA" });
+  assert.deepEqual(lerResultado("ZZ99", "aprovada"), { tipo: "codigo", codigo: "ZZ99" });
+  assert.equal(lerResultado({ token: "abc" }, "recusada"), null);
+  assert.equal(lerResultado({ token: "abc" }, "falhou"), null);
+  assert.equal(lerResultado(null, "aprovada"), null);
+  assert.equal(lerResultado({}, "aprovada"), null);
+  assert.equal(lerResultado({ token: "a/b?x" }, "aprovada")?.tipo, "convite");
+  assert.equal((lerResultado({ token: "a/b?x" }, "aprovada") as { caminho: string }).caminho, "/convite/a%2Fb%3Fx");
+});
+await teste("votos e faltantes: aceita lista de nomes, de objetos e mapa por usuário", () => {
+  assert.deepEqual(nomesDeFaltantes(["Bia", "Caio"]), ["Bia", "Caio"]);
+  assert.deepEqual(nomesDeFaltantes([{ nome: "Bia", user_id: "u" }, { email: "c@x.com" }]), ["Bia", "c@x.com"]);
+  assert.deepEqual(lerVotos([{ nome: "Ana", aprovou: true }, { nome: "Bia", voto: "recusou" }, "Caio"]), [
+    { nome: "Ana", aprovou: true },
+    { nome: "Bia", aprovou: false },
+    { nome: "Caio", aprovou: null },
+  ]);
+  assert.deepEqual(lerVotos({ "u-1": { nome: "Ana", aprovou: false } }), [{ nome: "Ana", aprovou: false }]);
+  assert.deepEqual(lerVotos(null), []);
+  assert.deepEqual(nomesDeFaltantes("texto"), []);
+});
+await teste("mensagem do voto cobre pendente, aprovada, recusada, expirada e falhou", () => {
+  assert.equal(mensagemDoVoto("pendente", true).tom, "info");
+  assert.match(mensagemDoVoto("pendente", true).texto, /Aguardando/);
+  assert.equal(mensagemDoVoto("aprovada", true).tom, "ok");
+  assert.equal(mensagemDoVoto("recusada", false).tom, "ok");
+  assert.equal(mensagemDoVoto("expirada", true).tom, "erro");
+  assert.equal(mensagemDoVoto("falhou", true).tom, "erro");
+  assert.match(mensagemDoVoto("falhou", true).texto, /histórico/);
+  assert.equal(mensagemDoVoto("qualquer", true).tom, "erro");
+});
+await teste("erros por trecho: aprovar/cancelar e motivo de pedido que falhou", () => {
+  assert.equal(erroDeAprovacao("Pedido expirou"), "Este pedido expirou e não pode mais ser votado.");
+  assert.equal(erroDeAprovacao("Você já votou"), "Você já votou neste pedido.");
+  assert.equal(erroDeAprovacao("Pedido não encontrado"), "Pedido não encontrado.");
+  assert.equal(erroDeAprovacao("not_authenticated"), "Sessão expirada. Faça login novamente.");
+  assert.equal(erroDeAprovacao("Sem permissão"), "Sem permissão para esta ação.");
+  assert.equal(erroDeAprovacao("boom"), "Não foi possível concluir. Tente novamente.");
+  assert.equal(erroDeAprovacao(undefined), "Não foi possível concluir. Tente novamente.");
+  assert.match(erroDaFalha("Nicho inválido"), /tipo de negócio/);
+  assert.match(erroDaFalha("o módulo depende de clientes"), /depende/);
+  assert.match(erroDaFalha("Esta pessoa já faz parte"), /já faz parte/);
+  assert.equal(erroDaFalha(null), "A alteração não pôde ser aplicada.");
+  assert.equal(erroDaFalha("xyz"), "A alteração não pôde ser aplicada.");
+});
+await teste("avisos: texto fixo do envio e link para /aprovacoes", () => {
+  assert.equal(AVISO_ENVIADO, "Enviado para aprovação dos outros fundadores");
+  assert.equal(ROTA_APROVACOES, "/aprovacoes");
+  assert.equal(textoDoResultado(true, "Salvo."), AVISO_ENVIADO);
+  assert.equal(textoDoResultado(false, "Salvo."), "Salvo.");
+});
+await teste("refetch sem laço: foco só relê com a aba visível e leitura antiga (>= 5 s)", () => {
+  assert.equal(deveReler(10_000, 0, true), true);
+  assert.equal(deveReler(10_000, 7_000, true), false, "leitura recente");
+  assert.equal(deveReler(10_000, 5_000, true), true, "exatamente no intervalo");
+  assert.equal(deveReler(10_000, 0, false), false, "aba oculta");
+  // foco + visibilidade no mesmo instante: a 1ª leitura atualiza o relógio e a 2ª é barrada.
+  let ultima = 0;
+  let leituras = 0;
+  for (const t of [20_000, 20_001, 20_002]) {
+    if (deveReler(t, ultima, true)) {
+      leituras++;
+      ultima = t;
+    }
+  }
+  assert.equal(leituras, 1);
+  const p = readFileSync("components/aprovacoes/aprovacoes-provider.tsx", "utf8");
+  assert.ok(p.includes("filter: `workspace_id=eq.${workspaceId}`"), "realtime filtrado por empresa");
+  assert.ok(p.includes("emAndamento.current"), "leituras simultâneas se juntam");
+});
+
+console.log("\nFase 5 — /aprovacoes: só fundador e cofundador; locks de cofundador removidos");
+await teste("fundador e cofundador abrem /aprovacoes; sócio, funcionário e vendedor não", () => {
+  for (const papel of ["dono", "cofundador"] as const)
+    assert.equal(vaiPara(decide("/aprovacoes", ok(papel), ATUAIS)), "seguir", papel);
+  for (const papel of ["socio", "funcionario"] as const)
+    assert.notEqual(vaiPara(decide("/aprovacoes", ok(papel), ATUAIS, false, ["leads"])), "seguir", papel);
+  assert.notEqual(vaiPara(decide("/aprovacoes", ok("comercial"), ATUAIS)), "seguir", "vendedor");
+  assert.ok(rotaPermitida("/aprovacoes", []), "não depende de módulo ligado");
+});
+await teste("nenhuma combinação papel x rota de Fase 5 entra em loop", () => {
+  for (const papel of ["dono", "cofundador", "socio", "funcionario", "comercial"] as const)
+    for (const hab of [[], ATUAIS, TODOS])
+      for (const p of ["/aprovacoes", ...RH_ROTAS]) {
+        const r = seguirRedirects(p, ok(papel), hab, ["rh", "leads"]);
+        assert.ok(r.final !== null && r.visitados.length <= 3, `${papel} ${p} [${hab.length}]: ${r.visitados.join(" -> ")}`);
+      }
+});
+await teste("a interface não trava mais cofundador: sem 'ehFundador' e sem checagem de dono original", () => {
+  const ler = (p: string) => readFileSync(p, "utf8");
+  for (const arq of ["components/socios/convidar-membro.tsx", "components/socios/equipe-section.tsx", "components/socios/socios-board.tsx", "app/(dashboard)/socios/page.tsx"])
+    assert.ok(!ler(arq).includes("ehFundador"), arq);
+  const acoes = ler("app/(dashboard)/socios/actions.ts");
+  assert.ok(!acoes.includes('empresa.papel !== "dono"'), "a action não exige ser o fundador original");
+  assert.ok(!sociosErrorMessage("Só cofundador").includes("Só o fundador pode"));
+});
+await teste("adicionar recomendados avisa quantos pedidos foram criados (um por módulo)", () => {
+  const t = readFileSync("lib/actions/nichos.ts", "utf8");
+  assert.ok(t.includes("enviados += 1") && t.includes("concluir(pendente, pendente ? enviados : undefined)"));
+  const ui = readFileSync("components/modulos/modulos-board.tsx", "utf8");
+  assert.ok(ui.includes("um por módulo"));
 });
 
 console.log(`\n${total} testes`);

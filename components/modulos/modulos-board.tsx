@@ -49,7 +49,9 @@ export function ModulosBoard({
         toast.error(resultado.error);
         return;
       }
-      toast.success(habilitado ? "Módulo adicionado." : "Módulo removido. Os dados foram preservados.");
+      // Pendente: o módulo só liga/desliga depois da aprovação; a lista segue como está.
+      if (resultado.pendente) toast.aprovacao();
+      else toast.success(habilitado ? "Módulo adicionado." : "Módulo removido. Os dados foram preservados.");
     });
   }
 
@@ -69,6 +71,15 @@ export function ModulosBoard({
       setEmAndamento(null);
       if ("error" in resultado) {
         toast.error(resultado.error);
+        return;
+      }
+      if (resultado.pendente) {
+        const n = resultado.pedidos ?? 0;
+        toast.aprovacao(
+          n > 1
+            ? `Foram criados ${n} pedidos, um por módulo; cada um precisa ser aprovado.`
+            : undefined
+        );
         return;
       }
       toast.success("Módulos recomendados adicionados.");

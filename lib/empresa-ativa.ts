@@ -186,7 +186,7 @@ export async function getAcessoEdicao(modulo: string): Promise<AcessoModulo | nu
 }
 
 /**
- * Módulos só do fundador/cofundador (RH): além do guard, exige ser dono. Mesmo
+ * Módulos só do fundador/cofundador: além do guard, exige ser dono. Mesmo
  * que o catálogo mude, a equipe nunca passa por aqui.
  */
 export async function getAcessoSoDono(modulo: string): Promise<AcessoModulo | null> {

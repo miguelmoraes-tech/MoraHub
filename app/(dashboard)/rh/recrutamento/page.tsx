@@ -1,12 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
-import { getAcessoSoDono } from "@/lib/empresa-ativa";
+import { getAcessoModulo } from "@/lib/empresa-ativa";
+import { podeVerSalarios } from "@/lib/rh/salarios";
 import { VagasBoard } from "@/components/rh/vagas-board";
 import type { Candidato, Departamento, Vaga } from "@/lib/types";
 
 export default async function RecrutamentoPage() {
-  // RH é só do fundador/cofundador: sócio e funcionário nunca chegam aqui.
-  const acesso = await getAcessoSoDono("rh");
+  // RH por pessoa: fundador/cofundador ou quem tem permissão de leitura (o proxy já barra o resto).
+  const acesso = await getAcessoModulo("rh");
   const workspaceId = acesso?.workspaceId ?? null;
+  // Salários são do extra "salarios" (só de tela, ver lib/rh/salarios.ts): sem ele os valores
+  // nem saem do servidor.
+  const ver = acesso ? podeVerSalarios(acesso) : false;
   const supabase = await createClient();
 
   const [{ data: vagas }, { data: departamentos }, { data: candidatos }] = workspaceId
@@ -29,11 +33,7 @@ export default async function RecrutamentoPage() {
       ])
     : [{ data: [] as Vaga[] }, { data: [] as Departamento[] }, { data: [] as Candidato[] }];
 
-  return (
-    <VagasBoard
-      vagas={vagas ?? []}
-      departamentos={departamentos ?? []}
-      candidatos={candidatos ?? []}
-    />
-  );
+  const lista = (vagas ?? []).map((v) => (ver ? v : { ...v, salario_previsto: null }));
+
+  return <VagasBoard vagas={lista} departamentos={departamentos ?? []} candidatos={candidatos ?? []} />;
 }

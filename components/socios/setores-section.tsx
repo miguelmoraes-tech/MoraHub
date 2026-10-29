@@ -148,7 +148,8 @@ export function SetoresSection({
         return;
       }
       setCriando(false);
-      toast.success("Setor criado.");
+      if (r.pendente) toast.aprovacao();
+      else toast.success("Setor criado.");
     });
   }
 
@@ -163,7 +164,8 @@ export function SetoresSection({
         return;
       }
       setEditandoId(null);
-      toast.success("Setor atualizado.");
+      if (r.pendente) toast.aprovacao();
+      else toast.success("Setor atualizado.");
     });
   }
 
@@ -174,7 +176,8 @@ export function SetoresSection({
         toast.error(r.error);
         return;
       }
-      toast.success(s.ativo ? "Setor desativado." : "Setor ativado.");
+      if (r.pendente) toast.aprovacao();
+      else toast.success(s.ativo ? "Setor desativado." : "Setor ativado.");
     });
   }
 
@@ -186,7 +189,9 @@ export function SetoresSection({
         toast.error(r.error);
         return;
       }
-      toast.success("Novo código gerado. O anterior deixou de valer.");
+      // Pendente: o código novo só nasce depois da aprovação (aparece em Aprovações).
+      if (r.pendente) toast.aprovacao();
+      else toast.success("Novo código gerado. O anterior deixou de valer.");
     });
   }
 

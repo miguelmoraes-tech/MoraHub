@@ -68,7 +68,8 @@ values
 - `ativo = false` mostra "Em breve" em **Módulos** e impede ligar. Vire `true`
   só quando **todas** as tabelas isolam por empresa (item 1).
 - `permite_membros = true` faz o módulo aparecer na matriz de permissões de
-  sócios/setores. RH e Vendedores são `false` de propósito (só fundador/cofundador).
+  sócios/setores. Vendedores é `false` de propósito (só fundador/cofundador); o RH é `true`
+  e tem o extra `salarios` (esconde salários e valores na tela; ver `lib/rh/salarios.ts`).
 - `permissoes_extras` são interruptores de **tela** (esconder um valor); não são
   barreira de segurança.
 - `depende_de` é validado por `definir_modulo` e também por `aplicar_nicho`

@@ -29,13 +29,11 @@ export function EquipeSection({
   modulos,
   membros,
   convites,
-  ehFundador,
   userId,
 }: {
   modulos: ModuloPermissivel[];
   membros: MembroEquipe[];
   convites: ConviteEquipe[];
-  ehFundador: boolean;
   userId: string;
 }) {
   const toast = useToast();
@@ -58,7 +56,8 @@ export function EquipeSection({
         return;
       }
       setEditandoId(null);
-      toast.success("Permissões atualizadas.");
+      if (r.pendente) toast.aprovacao();
+      else toast.success("Permissões atualizadas.");
     });
   }
 
@@ -70,7 +69,8 @@ export function EquipeSection({
         toast.error(r.error);
         return;
       }
-      toast.success("Acesso removido.");
+      if (r.pendente) toast.aprovacao();
+      else toast.success("Acesso removido.");
     });
   }
 
@@ -81,13 +81,14 @@ export function EquipeSection({
         toast.error(r.error);
         return;
       }
-      toast.success("Convite cancelado.");
+      if (r.pendente) toast.aprovacao();
+      else toast.success("Convite cancelado.");
     });
   }
 
   return (
     <div className="space-y-6">
-      <ConvidarMembro modulos={modulos} ehFundador={ehFundador} />
+      <ConvidarMembro modulos={modulos} />
 
       <section className="space-y-2">
         <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-600">
@@ -100,10 +101,11 @@ export function EquipeSection({
         ) : (
           membros.map((m) => {
             const restrito = m.papel === "socio" || m.papel === "funcionario";
-            // Remover cofundador é só do fundador; o vendedor se gerencia em /vendedores.
+            // Fundador e cofundador têm o mesmo nível: qualquer um pede a remoção de
+            // sócio, funcionário ou cofundador (com 2+ fundadores, todos precisam aprovar).
+            // O vendedor se gerencia em /vendedores.
             const podeRemover =
-              m.membroId !== userId &&
-              (restrito || (m.papel === "cofundador" && ehFundador));
+              m.membroId !== userId && (restrito || m.papel === "cofundador");
             const editando = editandoId === m.membroId;
             return (
               <div

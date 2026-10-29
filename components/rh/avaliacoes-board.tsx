@@ -11,6 +11,7 @@ import {
 import { formatDate } from "@/lib/format";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { StatusChip } from "@/components/status-chip";
+import { usePodeEditarRh } from "@/components/rh/salarios-context";
 import { NotaEvolucaoChart } from "@/components/rh/nota-evolucao-chart";
 
 function Fields({
@@ -133,6 +134,7 @@ function NewForm({
   funcionarioFixo?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(createAvaliacao, undefined);
 
@@ -143,6 +145,7 @@ function NewForm({
   }, [open]);
 
   if (!open) {
+    if (!podeEditar) return null;
     return (
       <button
         type="button"
@@ -185,6 +188,7 @@ function NewForm({
 
 function Row({ item, funcionarios }: { item: AvaliacaoDesempenho; funcionarios: Funcionario[] }) {
   const [editing, setEditing] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const action = updateAvaliacao.bind(null, item.id);
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -247,23 +251,25 @@ function Row({ item, funcionarios }: { item: AvaliacaoDesempenho; funcionarios: 
             </p>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <form action={deleteAvaliacao.bind(null, item.id)}>
+        {podeEditar && (
+          <div className="flex shrink-0 items-center gap-1">
             <button
-              type="submit"
-              className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Pencil className="h-3.5 w-3.5" />
             </button>
-          </form>
-        </div>
+            <form action={deleteAvaliacao.bind(null, item.id)}>
+              <button
+                type="submit"
+                className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );

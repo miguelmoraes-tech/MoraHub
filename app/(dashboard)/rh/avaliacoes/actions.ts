@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAcessoSoDono } from "@/lib/empresa-ativa";
+import { getAcessoEdicao } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { AvaliacaoDesempenhoSchema } from "@/lib/validations/avaliacao-desempenho";
 import type { ActionState } from "@/lib/actions/types";
@@ -36,8 +36,8 @@ export async function createAvaliacao(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  // RH é só do fundador/cofundador.
-  const acesso = await getAcessoSoDono("rh");
+  // RH por pessoa: exige permissão de edição.
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
@@ -70,7 +70,7 @@ export async function updateAvaliacao(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
@@ -96,7 +96,7 @@ export async function updateAvaliacao(
 }
 
 export async function deleteAvaliacao(avaliacaoId: string) {
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return;
 
   const supabase = await createClient();

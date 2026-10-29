@@ -13,18 +13,14 @@ import {
 import type { PermissaoModulo } from "@/lib/modulos/permissoes";
 
 /**
- * Convite de sócio, funcionário ou (só o fundador) cofundador. O app não envia
+ * Convite de sócio, funcionário ou cofundador. Com 2+ fundadores o convite
+ * fica pendente de aprovação: não há link ainda (ele aparece em Aprovações
+ * depois que todos aprovarem). O app não envia
  * e-mail: mostra o link /convite/<token> para a pessoa receber por onde o
  * fundador preferir. O token só existe neste momento — depois, o convite
  * pendente só pode ser cancelado e refeito.
  */
-export function ConvidarMembro({
-  modulos,
-  ehFundador,
-}: {
-  modulos: ModuloPermissivel[];
-  ehFundador: boolean;
-}) {
+export function ConvidarMembro({ modulos }: { modulos: ModuloPermissivel[] }) {
   const toast = useToast();
   const [aberto, setAberto] = useState(false);
   const [email, setEmail] = useState("");
@@ -35,9 +31,7 @@ export function ConvidarMembro({
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, startEnviar] = useTransition();
 
-  const papeis: PapelConvidavel[] = ehFundador
-    ? ["socio", "funcionario", "cofundador"]
-    : ["socio", "funcionario"];
+  const papeis: PapelConvidavel[] = ["socio", "funcionario", "cofundador"];
 
   function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -48,9 +42,15 @@ export function ConvidarMembro({
         setErro(r.error);
         return;
       }
-      setLink(`${window.location.origin}/convite/${r.token}`);
       setEmail("");
       setPermissoes([]);
+      if (r.pendente) {
+        // Nada foi criado ainda: sem link. Releia/acompanhe em /aprovacoes.
+        setLink(null);
+        toast.aprovacao();
+        return;
+      }
+      setLink(`${window.location.origin}/convite/${r.token}`);
       toast.success("Convite criado. Copie o link e envie para a pessoa.");
     });
   }

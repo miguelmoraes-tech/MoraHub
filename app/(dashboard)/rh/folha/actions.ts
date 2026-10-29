@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAcessoSoDono } from "@/lib/empresa-ativa";
+import { getAcessoEdicao, type AcessoModulo } from "@/lib/empresa-ativa";
+import { getAcessoFinanceiroEdicao } from "@/lib/financeiro/acesso";
+import { motivoNegarFolha } from "@/lib/rh/salarios";
 import { getModulosHabilitados } from "@/lib/modulos/habilitados";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -19,7 +21,21 @@ function textOrNull(value: FormDataEntryValue | null) {
 }
 
 const SEM_PERMISSAO = "Você não tem permissão para fazer isso.";
-const AVISO_ATIVE_FINANCEIRO = "Ative o módulo Financeiro para gerar folha.";
+
+/**
+ * A folha escreve em contas_pagar: exige edição no RH (com o extra de salários)
+ * E edição no Financeiro, com o módulo ligado. Se faltar um, nada é gravado.
+ */
+async function acessoFolha(
+  tocaContasPagar: boolean
+): Promise<{ erro: string } | { acesso: AcessoModulo }> {
+  const rh = await getAcessoEdicao("rh");
+  if (!rh) return { erro: SEM_PERMISSAO };
+  const financeiroLigado = (await getModulosHabilitados(rh.workspaceId)).includes("financeiro");
+  const financeiroEdicao = financeiroLigado ? await getAcessoFinanceiroEdicao() : null;
+  const erro = motivoNegarFolha({ rh, financeiroLigado, financeiroEdicao, tocaContasPagar });
+  return erro ? { erro } : { acesso: rh };
+}
 
 function revalidateFolha() {
   revalidatePath("/rh/folha");
@@ -41,13 +57,9 @@ export async function gerarFolhaMes(
     return { error: "Informe um dia de vencimento válido (1 a 28)." };
   }
 
-  // RH é só do fundador/cofundador.
-  const acesso = await getAcessoSoDono("rh");
-  if (!acesso) return { error: SEM_PERMISSAO };
-  // A folha vira contas a pagar: sem o Financeiro ligado não se grava nada às cegas.
-  if (!(await getModulosHabilitados(acesso.workspaceId)).includes("financeiro")) {
-    return { error: AVISO_ATIVE_FINANCEIRO };
-  }
+  const guarda = await acessoFolha(true);
+  if ("erro" in guarda) return { error: guarda.erro };
+  const acesso = guarda.acesso;
 
   const supabase = await createClient();
   const mesReferenciaISO = `${mesReferencia}-01`;
@@ -87,8 +99,9 @@ export async function updateFolhaPagamento(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const acesso = await getAcessoSoDono("rh");
-  if (!acesso) return { error: SEM_PERMISSAO };
+  const guarda = await acessoFolha(contaPagarId != null);
+  if ("erro" in guarda) return { error: guarda.erro };
+  const acesso = guarda.acesso;
 
   const supabase = await createClient();
   const status: FolhaPagamentoStatus = parsed.data.status;
@@ -115,8 +128,9 @@ export async function updateFolhaPagamento(
 }
 
 export async function deleteFolhaPagamento(folhaId: string, contaPagarId: string | null) {
-  const acesso = await getAcessoSoDono("rh");
-  if (!acesso) return;
+  const guarda = await acessoFolha(contaPagarId != null);
+  if ("erro" in guarda) return;
+  const acesso = guarda.acesso;
 
   const supabase = await createClient();
   await supabase

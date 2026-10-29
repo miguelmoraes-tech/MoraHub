@@ -41,6 +41,7 @@ export const MODULO_ROTULO: Record<string, string> = {
   marketing: "Marketing",
   financeiro: "Financeiro",
   juridico: "Jurídico",
+  rh: "RH",
 };
 
 export const NIVEL_ROTULO: Record<NivelPermissao, string> = {
@@ -172,7 +173,7 @@ export function sanearPermissoes(bruto: unknown): PermissaoModulo[] {
 
 /**
  * Módulos que um formulário pode oferecer: habilitados na empresa E com
- * `permite_membros = true` no catálogo (RH e Vendedores nunca aparecem).
+ * `permite_membros = true` no catálogo (Vendedores nunca aparece; RH aparece, com o extra de salários).
  */
 export function modulosOferecidos(
   habilitados: readonly string[],
@@ -190,8 +191,7 @@ export function filtrarPermissoesOferecidas(
 }
 
 const SOCIOS_MENSAGENS: [trecho: string, texto: string][] = [
-  ["cofundador", "Só o fundador pode convidar ou remover um cofundador."],
-  ["fundador", "Só o fundador pode fazer isso."],
+  ["fundador", "Só os fundadores da empresa podem fazer isso."],
   ["permiss", "Sem permissão para esta ação."],
   ["already", "Esta pessoa já faz parte da empresa ou já tem um convite pendente."],
   ["já ", "Esta pessoa já faz parte da empresa ou já tem um convite pendente."],

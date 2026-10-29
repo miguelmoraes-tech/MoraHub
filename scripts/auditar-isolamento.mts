@@ -137,7 +137,7 @@ if (insertsSemWorkspace.length) process.exitCode = 1;
 // Toda action exportada dos módulos que sócio/funcionário podem editar precisa
 // passar por uma guarda de edição (fundador/cofundador OU tem_permissao). A
 // barreira real é o RLS; isto pega uma action nova esquecida sem guarda.
-const GUARDAS = ["getAcessoEdicao", "getAcessoJuridicoEdicaoComClientes", "getWorkspaceIdAtivo", "getAcessoFinanceiroEdicao", "getAcessoSoDono", "podeEditarProposta", "getEmpresaPainel"];
+const GUARDAS = ["getAcessoEdicao", "getAcessoJuridicoEdicaoComClientes", "getWorkspaceIdAtivo", "getAcessoFinanceiroEdicao", "getAcessoSoDono", "podeEditarProposta", "getEmpresaPainel", "acessoFolha"];
 const ACTIONS_COM_GUARDA = [
   "app/(dashboard)/leads/actions.ts",
   "app/(dashboard)/renegados/actions.ts",
@@ -224,17 +224,21 @@ console.log(`\nCódigo antigo de dono em módulos concluídos: ${legado.length}`
 for (const s of legado) console.log("  ! " + s);
 if (legado.length) process.exitCode = 1;
 
-// --- RH: só fundador/cofundador ---------------------------------------------
-// Toda página e action de RH passa por getAcessoSoDono("rh"); nenhuma usa o guard
-// genérico (que, se o catálogo mudar, poderia deixar a equipe entrar).
+// --- RH por pessoa -----------------------------------------------------------
+// Toda página de RH passa por getAcessoModulo("rh") (leitura) e toda action por
+// getAcessoEdicao("rh") (edição); ninguém volta a getAcessoSoDono. A folha também
+// exige edição no Financeiro (acessoFolha) e os campos de valor passam pelo extra
+// "salarios" (lib/rh/salarios.ts).
 const rhSemGuard: string[] = [];
 for (const arq of arquivos(join(raiz, "app/(dashboard)/rh"))) {
   if (!/(page|actions)\.tsx?$/.test(arq)) continue;
   const rel = relative(raiz, arq);
   const texto = readFileSync(arq, "utf8");
-  if (!texto.includes('getAcessoSoDono("rh")')) rhSemGuard.push(rel);
-  if (/getAcessoModulo|getAcessoEdicao/.test(texto)) rhSemGuard.push(`${rel} usa guard genérico`);
+  const ehAction = /actions.tsx?$/.test(arq);
+  const esperado = ehAction ? 'getAcessoEdicao("rh")' : 'getAcessoModulo("rh")';
+  if (!texto.includes(esperado)) rhSemGuard.push(`${rel} sem ${esperado}`);
+  if (texto.includes("getAcessoSoDono")) rhSemGuard.push(`${rel} ainda usa getAcessoSoDono`);
 }
-console.log(`\nRH sem getAcessoSoDono: ${rhSemGuard.length}`);
+console.log(`\nRH sem guard por pessoa: ${rhSemGuard.length}`);
 for (const s of rhSemGuard) console.log("  ! " + s);
 if (rhSemGuard.length) process.exitCode = 1;

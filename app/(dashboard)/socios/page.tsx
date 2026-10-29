@@ -87,7 +87,6 @@ export default async function SociosPage() {
           convites={paraConvites(convites)}
           setores={paraSetores(setores)}
           codigoVendedor={typeof codigoVendedor === "string" ? codigoVendedor : null}
-          ehFundador={empresa.papel === "dono"}
           userId={empresa.userId}
         />
       </div>

@@ -19,6 +19,7 @@ import {
   FileText,
   Scale,
   UsersRound,
+  ShieldCheck,
   LogOut,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
@@ -28,6 +29,7 @@ import { GlobalSearch } from "@/components/global-search";
 import { GlobalChatBadge } from "@/components/chat/global-chat-badge";
 import { SolicitacoesBell } from "@/components/vendedor/solicitacoes-bell";
 import { useSolicitacoes } from "@/components/vendedor/solicitacoes-provider";
+import { useAprovacoes } from "@/components/aprovacoes/aprovacoes-provider";
 import type { AccountType } from "@/lib/hub-mode";
 import type { EmpresaVinculo } from "@/lib/empresas";
 import { iconeDe } from "@/components/modulos/icones";
@@ -40,7 +42,7 @@ type NavItem = {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   /** Counter shown at the end of the item (live, from a provider). */
-  badge?: "solicitacoes";
+  badge?: "solicitacoes" | "aprovacoes";
 };
 
 type Accent = "copper" | "petrol";
@@ -53,6 +55,7 @@ const VISAO_GERAL: NavItem = { label: "Visão Geral", href: "/dashboard", icon: 
 const EMPRESA_ITEMS: NavItem[] = [
   { label: "Módulos", href: "/modulos", icon: Blocks },
   { label: "Sócios", href: "/socios", icon: UsersRound },
+  { label: "Aprovações", href: "/aprovacoes", icon: ShieldCheck, badge: "aprovacoes" },
   { label: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
@@ -99,6 +102,7 @@ function NavGroup({
 }) {
   const pathname = usePathname();
   const solicitacoes = useSolicitacoes();
+  const aprovacoes = useAprovacoes();
 
   const visiveis = items.filter((item) => rotaPermitida(item.href, habilitados));
   if (visiveis.length === 0) return null;
@@ -139,6 +143,14 @@ function NavGroup({
                         : solicitacoes.pendentes.length}
                     </span>
                   )}
+                {item.badge === "aprovacoes" && aprovacoes && aprovacoes.minhas > 0 && (
+                  <span
+                    className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-copper-600 px-1 text-[10px] font-semibold text-white"
+                    aria-label={`${aprovacoes.minhas} aprovação(ões) esperando seu voto`}
+                  >
+                    {aprovacoes.minhas > 99 ? "99+" : aprovacoes.minhas}
+                  </span>
+                )}
               </Link>
             </li>
           );

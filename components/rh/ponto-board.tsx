@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/format";
 import { todayISO } from "@/lib/vencimentos/dates";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
+import { usePodeEditarRh } from "@/components/rh/salarios-context";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -204,6 +205,7 @@ export function PontoBoard({
   registros: ControlePonto[];
   funcionarios: Funcionario[];
 }) {
+  const podeEditar = usePodeEditarRh();
   const [funcionarioId, setFuncionarioId] = useState(funcionarios[0]?.id ?? "");
   const hoje = useMemo(() => todayISO(), []);
   const [cursor, setCursor] = useState(() => {
@@ -237,6 +239,8 @@ export function PontoBoard({
     setCursor((c) => (c.month === 11 ? { year: c.year + 1, month: 0 } : { year: c.year, month: c.month + 1 }));
   }
   function openDay(iso: string) {
+    // Sem edição no RH o dia não abre o formulário de registro (a action também recusa).
+    if (!podeEditar) return;
     setSelectedDate(iso);
     dialogRef.current?.showModal();
   }
@@ -303,7 +307,7 @@ export function PontoBoard({
               </div>
               <div className="flex items-center gap-1.5 text-xs text-zinc-500">
                 <Clock className="h-3.5 w-3.5" />
-                Clique em um dia para registrar
+                {podeEditar ? "Clique em um dia para registrar" : "Somente leitura"}
               </div>
             </div>
 

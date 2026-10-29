@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Users, Banknote, Palmtree, Briefcase, ClipboardCheck } from "lucide-react";
 import { VisaoGeralCards, type VisaoGeralCard } from "@/components/juridico/visao-geral-cards";
 import { formatCurrency } from "@/lib/format";
+import { useVerSalarios } from "@/components/rh/salarios-context";
 import type { RHOverview } from "@/lib/rh/get-overview";
 
 const CANDIDATO_STATUS_LABEL: Record<string, string> = {
@@ -14,6 +15,7 @@ const CANDIDATO_STATUS_LABEL: Record<string, string> = {
 };
 
 export function VisaoGeralRH({ overview }: { overview: RHOverview }) {
+  const verSalarios = useVerSalarios();
   const folhaCompleta =
     overview.folhaMes.totalFuncionarios > 0 &&
     overview.folhaMes.pagos === overview.folhaMes.totalFuncionarios;
@@ -32,7 +34,7 @@ export function VisaoGeralRH({ overview }: { overview: RHOverview }) {
         overview.folhaMes.totalFuncionarios > 0
           ? `${overview.folhaMes.pagos} de ${overview.folhaMes.totalFuncionarios} pagos`
           : "não gerada",
-      hint: formatCurrency(overview.folhaMes.valorTotal),
+      hint: verSalarios ? formatCurrency(overview.folhaMes.valorTotal) : undefined,
       tone: overview.folhaMes.totalFuncionarios === 0 ? "zinc" : folhaCompleta ? "emerald" : "amber",
       href: "/rh/folha",
     },

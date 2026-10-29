@@ -14,6 +14,7 @@ import {
   deleteFuncionario,
 } from "@/app/(dashboard)/rh/funcionarios/actions";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { usePodeEditarRh, useVerSalarios } from "@/components/rh/salarios-context";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
 import { SegmentFilter } from "@/components/segment-filter";
@@ -47,6 +48,7 @@ function Fields({
   departamentos: Departamento[];
   funcionarios: Funcionario[];
 }) {
+  const verSalarios = useVerSalarios();
   const gestorOpcoes = funcionarios.filter((f) => f.id !== item?.id);
 
   return (
@@ -125,17 +127,19 @@ function Fields({
           ))}
         </select>
       </div>
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-zinc-400">Salário</label>
-        <input
-          name="salario"
-          type="number"
-          step="0.01"
-          min="0"
-          defaultValue={item?.salario ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
-        />
-      </div>
+      {verSalarios && (
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-zinc-400">Salário</label>
+          <input
+            name="salario"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue={item?.salario ?? ""}
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+          />
+        </div>
+      )}
       <div className="space-y-1">
         <label className="text-xs font-medium text-zinc-400">Status</label>
         <select
@@ -201,6 +205,7 @@ function NewForm({
   funcionarios: Funcionario[];
 }) {
   const [open, setOpen] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(createFuncionario, undefined);
 
@@ -211,6 +216,7 @@ function NewForm({
   }, [open]);
 
   if (!open) {
+    if (!podeEditar) return null;
     return (
       <button
         type="button"
@@ -260,7 +266,9 @@ function Row({
   departamentos: Departamento[];
   funcionarios: Funcionario[];
 }) {
+  const verSalarios = useVerSalarios();
   const [editing, setEditing] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const action = updateFuncionario.bind(null, item.id);
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -309,26 +317,30 @@ function Row({
           {item.cargo ?? "Sem cargo"}
           {departamento && ` · ${departamento.nome}`}
           {gestor && ` · reporta a ${gestor.nome}`}
-          {item.salario != null && ` · ${formatCurrency(item.salario)}`}
+          {verSalarios && item.salario != null && ` · ${formatCurrency(item.salario)}`}
           {item.data_admissao && ` · admitido em ${formatDate(item.data_admissao)}`}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteFuncionario.bind(null, item.id)}>
-          <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </form>
+        {podeEditar && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <form action={deleteFuncionario.bind(null, item.id)}>
+              <button
+                type="submit"
+                className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

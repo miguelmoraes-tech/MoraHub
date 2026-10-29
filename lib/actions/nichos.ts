@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getEmpresaPainel } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
+import { exigeAprovacao } from "@/lib/aprovacoes";
 import { getConfigEmpresa } from "@/lib/rotulos";
 import { erroDeNicho } from "@/lib/nichos-shared";
 import {
@@ -29,10 +30,11 @@ async function empresaDoPainel() {
   return empresa ? { workspaceId: empresa.workspaceId, supabase: await createClient() } : null;
 }
 
-function concluir(): Resultado {
+function concluir(pendente = false, pedidos?: number): Resultado {
   // Menu, títulos e módulos ligados dependem da configuração da empresa.
   revalidatePath("/", "layout");
-  return { ok: true };
+  if (!pendente) return { ok: true };
+  return pedidos === undefined ? { ok: true, pendente: true } : { ok: true, pendente: true, pedidos };
 }
 
 /** Troca o nicho (e o modelo, opcional): liga os recomendados e grava os nomes do nicho+modelo. */
@@ -44,13 +46,14 @@ export async function aplicarNichoDaEmpresa(
   if (!ctx) return { error: "Só o dono ou cofundador da empresa pode fazer isso." };
   if (!nicho) return { error: "Escolha um tipo de negócio." };
 
+  const pendente = await exigeAprovacao(ctx.supabase, ctx.workspaceId);
   const { error } = await ctx.supabase.rpc("aplicar_nicho", {
     p_workspace_id: ctx.workspaceId,
     p_nicho: nicho,
     p_modelo: modelo || null,
   });
   if (error) return { error: erroDeNicho(error.message) };
-  return concluir();
+  return concluir(pendente);
 }
 
 /**
@@ -71,12 +74,13 @@ export async function salvarNomesDasTelas(
   }
 
   const atual = (await getConfigEmpresa()).mapa;
+  const pendente = await exigeAprovacao(ctx.supabase, ctx.workspaceId);
   const { error } = await ctx.supabase.rpc("salvar_rotulos", {
     p_workspace_id: ctx.workspaceId,
     p_rotulos: mesclarRotulos(atual, edicoes),
   });
   if (error) return { error: erroDeNicho(error.message) };
-  return concluir();
+  return concluir(pendente);
 }
 
 /**
@@ -90,12 +94,13 @@ export async function restaurarPadraoDoNicho(): Promise<Resultado> {
 
   const config = await getConfigEmpresa();
   if (!config.nichoChave) {
+    const pendente = await exigeAprovacao(ctx.supabase, ctx.workspaceId);
     const { error } = await ctx.supabase.rpc("salvar_rotulos", {
       p_workspace_id: ctx.workspaceId,
       p_rotulos: {},
     });
     if (error) return { error: erroDeNicho(error.message) };
-    return concluir();
+    return concluir(pendente);
   }
 
   let modeloChave: string | null = null;
@@ -149,6 +154,10 @@ export async function adicionarRecomendados(): Promise<Resultado> {
     ((ligados.data ?? []) as { modulo_chave: string }[]).map((l) => l.modulo_chave)
   );
 
+  // Com 2+ fundadores, cada definir_modulo vira UM pedido de aprovação (um por
+  // módulo): a tela avisa quantos foram enviados e nada é ligado ainda.
+  const pendente = await exigeAprovacao(ctx.supabase, ctx.workspaceId);
+  let enviados = 0;
   for (const chave of ordem) {
     const { error } = await ctx.supabase.rpc("definir_modulo", {
       p_workspace_id: ctx.workspaceId,
@@ -157,13 +166,15 @@ export async function adicionarRecomendados(): Promise<Resultado> {
     });
     if (error) {
       revalidatePath("/", "layout");
+      const motivo =
+        error.code === "P0001" && error.message
+          ? error.message
+          : "Não foi possível adicionar todos os módulos. Tente novamente.";
       return {
-        error:
-          error.code === "P0001" && error.message
-            ? error.message
-            : "Não foi possível adicionar todos os módulos. Tente novamente.",
+        error: pendente && enviados > 0 ? `${motivo} (${enviados} pedido(s) já enviado(s) para aprovação.)` : motivo,
       };
     }
+    enviados += 1;
   }
-  return concluir();
+  return concluir(pendente, pendente ? enviados : undefined);
 }

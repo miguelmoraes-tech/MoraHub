@@ -4,6 +4,7 @@ import * as z from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getEmpresaPainel } from "@/lib/empresa-ativa";
+import { exigeAprovacao } from "@/lib/aprovacoes";
 import { getModulosPermiteMembros } from "@/lib/modulos/habilitados";
 import {
   sanearPermissoes,
@@ -16,7 +17,29 @@ import type { PermissaoModulo } from "@/lib/modulos/permissoes";
 // actions só conferem que quem chama é fundador/cofundador da empresa ATIVA
 // (vinda do servidor, nunca do cliente), validam a entrada e traduzem erros.
 
-export type ResultadoSocios<T = object> = ({ ok: true } & T) | { error: string };
+/**
+ * `pendente: true` = a empresa tem 2+ fundadores: a alteração foi enviada para
+ * aprovação e NADA mudou ainda (a tela avisa e relê o servidor; não há token,
+ * id nem código para mostrar).
+ */
+export type ResultadoSocios<T = object> =
+  | ({ ok: true; pendente?: false } & T)
+  | { ok: true; pendente: true }
+  | { error: string };
+
+const ENVIADO = { ok: true, pendente: true } as const;
+
+function aposEscrita(): void {
+  revalidatePath("/socios");
+  // O badge e a lista de aprovações também mudam quando algo fica pendente.
+  revalidatePath("/aprovacoes");
+}
+
+/** Resposta de uma RPC void: imediata (1 fundador) ou pendente (2+). */
+function concluido(pendente: boolean): ResultadoSocios {
+  aposEscrita();
+  return pendente ? ENVIADO : { ok: true };
+}
 
 const SEM_PAINEL = "Só o fundador e os cofundadores podem gerenciar a equipe.";
 
@@ -61,10 +84,8 @@ export async function convidarMembro(entrada: {
 
   const empresa = await getEmpresaPainel();
   if (!empresa) return { error: SEM_PAINEL };
-  // Só o fundador convida cofundador (a RPC confere de novo).
-  if (papel === "cofundador" && empresa.papel !== "dono") {
-    return { error: "Só o fundador pode convidar um cofundador." };
-  }
+  // Fundador e cofundador têm o mesmo nível: convidar cofundador também exige a
+  // aprovação de todos os fundadores (regra do banco), não ser o fundador original.
 
   // Cofundador tem o mesmo nível do fundador: não leva matriz.
   const permissoes = papel === "cofundador" ? [] : await lerPermissoes(entrada.permissoes);
@@ -77,11 +98,11 @@ export async function convidarMembro(entrada: {
     p_papel: papel,
     p_permissoes: permissoes,
   });
-  if (error || typeof data !== "string" || !data) {
-    return { error: sociosErrorMessage(error?.message) };
-  }
+  if (error) return { error: sociosErrorMessage(error.message) };
 
-  revalidatePath("/socios");
+  aposEscrita();
+  // NULL = enviado para aprovação (2+ fundadores): ainda não há convite nem link.
+  if (typeof data !== "string" || !data) return ENVIADO;
   return { ok: true, token: data };
 }
 
@@ -90,11 +111,11 @@ export async function cancelarConvite(conviteId: string): Promise<ResultadoSocio
   if (!empresa) return { error: SEM_PAINEL };
 
   const supabase = await createClient();
+  const pendente = await exigeAprovacao(supabase, empresa.workspaceId);
   const { error } = await supabase.rpc("cancelar_convite_empresa", { p_id: conviteId });
   if (error) return { error: sociosErrorMessage(error.message) };
 
-  revalidatePath("/socios");
-  return { ok: true };
+  return concluido(pendente);
 }
 
 export async function atualizarPermissoesMembro(
@@ -107,6 +128,7 @@ export async function atualizarPermissoesMembro(
   if (!limpas) return { error: "Permissões inválidas." };
 
   const supabase = await createClient();
+  const pendente = await exigeAprovacao(supabase, empresa.workspaceId);
   const { error } = await supabase.rpc("atualizar_permissoes_membro", {
     p_workspace_id: empresa.workspaceId,
     p_membro_id: membroId,
@@ -114,8 +136,7 @@ export async function atualizarPermissoesMembro(
   });
   if (error) return { error: sociosErrorMessage(error.message) };
 
-  revalidatePath("/socios");
-  return { ok: true };
+  return concluido(pendente);
 }
 
 export async function removerMembro(membroId: string): Promise<ResultadoSocios> {
@@ -123,14 +144,14 @@ export async function removerMembro(membroId: string): Promise<ResultadoSocios> 
   if (!empresa) return { error: SEM_PAINEL };
 
   const supabase = await createClient();
+  const pendente = await exigeAprovacao(supabase, empresa.workspaceId);
   const { error } = await supabase.rpc("remover_membro", {
     p_workspace_id: empresa.workspaceId,
     p_membro_id: membroId,
   });
   if (error) return { error: sociosErrorMessage(error.message) };
 
-  revalidatePath("/socios");
-  return { ok: true };
+  return concluido(pendente);
 }
 
 // --- Setores (perfis_acesso) ---
@@ -168,9 +189,11 @@ export async function criarSetor(entrada: {
     p_descricao: validado.data.descricao || null,
     p_permissoes: permissoes,
   });
-  if (error || typeof data !== "string") return { error: sociosErrorMessage(error?.message) };
+  if (error) return { error: sociosErrorMessage(error.message) };
 
-  revalidatePath("/socios");
+  aposEscrita();
+  // NULL = enviado para aprovação (2+ fundadores): o setor ainda não existe.
+  if (typeof data !== "string" || !data) return ENVIADO;
   return { ok: true, id: data };
 }
 
@@ -210,6 +233,7 @@ export async function atualizarSetor(
   }
 
   const supabase = await createClient();
+  const pendente = await exigeAprovacao(supabase, empresa.workspaceId);
   const { error } = await supabase.rpc("atualizar_perfil_acesso", {
     p_id: id,
     p_nome: nome,
@@ -219,8 +243,7 @@ export async function atualizarSetor(
   });
   if (error) return { error: sociosErrorMessage(error.message) };
 
-  revalidatePath("/socios");
-  return { ok: true };
+  return concluido(pendente);
 }
 
 export async function regenerarCodigoSetor(id: string): Promise<ResultadoSocios<{ codigo: string }>> {
@@ -229,8 +252,10 @@ export async function regenerarCodigoSetor(id: string): Promise<ResultadoSocios<
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("regenerar_codigo_perfil_acesso", { p_id: id });
-  if (error || typeof data !== "string") return { error: sociosErrorMessage(error?.message) };
+  if (error) return { error: sociosErrorMessage(error.message) };
 
-  revalidatePath("/socios");
+  aposEscrita();
+  // NULL = enviado para aprovação: o código novo só aparece depois (em Aprovações).
+  if (typeof data !== "string" || !data) return ENVIADO;
   return { ok: true, codigo: data };
 }

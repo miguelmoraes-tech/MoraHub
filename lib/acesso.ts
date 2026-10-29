@@ -30,7 +30,7 @@ import {
 export const AGUARDANDO_LIBERACAO = "/sem-acesso?aguardando=1";
 
 /** Telas de gestão da empresa: só o painel completo (fundador/cofundador). */
-const ROTAS_SO_PAINEL = ["/modulos", "/socios", "/configuracoes"];
+const ROTAS_SO_PAINEL = ["/modulos", "/socios", "/configuracoes", "/aprovacoes"];
 
 function casa(path: string, prefixo: string) {
   return path === prefixo || path.startsWith(`${prefixo}/`);

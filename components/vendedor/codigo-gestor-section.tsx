@@ -48,6 +48,11 @@ export function CodigoGestorSection({
         toast.error(resultado.error);
         return;
       }
+      // 2+ fundadores: o código novo só nasce depois da aprovação; o atual segue valendo.
+      if ("pendente" in resultado) {
+        toast.aprovacao();
+        return;
+      }
       setCodigo(resultado.codigo);
       toast.success("Novo código gerado. O anterior deixou de valer.");
     });
@@ -62,7 +67,8 @@ export function CodigoGestorSection({
         toast.error(resultado.error);
         return;
       }
-      toast.success(aprovar ? "Vendedor aprovado." : "Solicitação recusada.");
+      if (resultado.pendente) toast.aprovacao();
+      else toast.success(aprovar ? "Vendedor aprovado." : "Solicitação recusada.");
     });
   }
 

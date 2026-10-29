@@ -19,6 +19,8 @@ import { getEmpresaAtiva, getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 import { ToastProvider } from "@/components/toast";
 import { RotulosProvider } from "@/components/rotulos-provider";
 import { getConfigEmpresa } from "@/lib/rotulos";
+import { getAprovacoes } from "@/lib/aprovacoes";
+import { AprovacoesProvider } from "@/components/aprovacoes/aprovacoes-provider";
 import {
   SolicitacoesVendedorProvider,
   type SolicitacaoPendente,
@@ -98,6 +100,9 @@ export default async function DashboardLayout({
     );
   }
 
+  // Aprovações entre fundadores: só o painel completo lê (a tabela é de fundadores).
+  const aprovacoesIniciais = workspacePedidosId ? await getAprovacoes(workspacePedidosId) : [];
+
   const conteudo = (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
@@ -124,13 +129,15 @@ export default async function DashboardLayout({
     <ToastProvider>
       <RotulosProvider mapa={configEmpresa.mapa}>
       {workspacePedidosId ? (
-        <SolicitacoesVendedorProvider
-          workspaceId={workspacePedidosId}
-          initialPendentes={solicitacoesPendentes}
-          initialSetores={setoresNomes}
-        >
-          {conteudo}
-        </SolicitacoesVendedorProvider>
+        <AprovacoesProvider workspaceId={workspacePedidosId} inicial={aprovacoesIniciais}>
+          <SolicitacoesVendedorProvider
+            workspaceId={workspacePedidosId}
+            initialPendentes={solicitacoesPendentes}
+            initialSetores={setoresNomes}
+          >
+            {conteudo}
+          </SolicitacoesVendedorProvider>
+        </AprovacoesProvider>
       ) : (
         conteudo
       )}

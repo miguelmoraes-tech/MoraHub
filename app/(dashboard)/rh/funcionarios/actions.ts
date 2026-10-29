@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAcessoSoDono } from "@/lib/empresa-ativa";
+import { getAcessoEdicao } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
+import { erroValorSemPermissao, podeVerSalarios } from "@/lib/rh/salarios";
 import { FuncionarioSchema } from "@/lib/validations/funcionario";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -41,9 +42,11 @@ export async function createFuncionario(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  // RH é só do fundador/cofundador.
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return { error: SEM_PERMISSAO };
+  // Salário é do extra "salarios" (só de tela: ver lib/rh/salarios.ts).
+  const erroSalario = erroValorSemPermissao(acesso, parsed.data.salario);
+  if (erroSalario) return { error: erroSalario };
 
   const supabase = await createClient();
   const { error } = await supabase.from("funcionarios").insert({
@@ -83,8 +86,10 @@ export async function updateFuncionario(
     return { error: "Um funcionário não pode ser seu próprio gestor." };
   }
 
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return { error: SEM_PERMISSAO };
+  const erroSalario = erroValorSemPermissao(acesso, parsed.data.salario);
+  if (erroSalario) return { error: erroSalario };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -98,7 +103,8 @@ export async function updateFuncionario(
       data_admissao: parsed.data.data_admissao ?? null,
       data_desligamento: parsed.data.data_desligamento ?? null,
       tipo_contrato: parsed.data.tipo_contrato,
-      salario: parsed.data.salario ?? null,
+      // Sem o extra, o salário gravado não é tocado (a tela nem mostra o campo).
+      ...(podeVerSalarios(acesso) ? { salario: parsed.data.salario ?? null } : {}),
       status: parsed.data.status,
       observacoes: parsed.data.observacoes ?? null,
       departamento_id: parsed.data.departamento_id ?? null,
@@ -114,7 +120,7 @@ export async function updateFuncionario(
 }
 
 export async function deleteFuncionario(funcionarioId: string) {
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return;
 
   const supabase = await createClient();

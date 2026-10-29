@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
-import { getAcessoSoDono } from "@/lib/empresa-ativa";
+import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { getClienteArquivoSignedUrls } from "@/lib/supabase/storage";
+import { podeVerSalarios } from "@/lib/rh/salarios";
 import { CandidatosKanban } from "@/components/rh/candidatos-kanban";
 import type { Candidato, Vaga } from "@/lib/types";
 
@@ -11,7 +12,7 @@ export default async function VagaCandidatosPage({
   params: Promise<{ vagaId: string }>;
 }) {
   const { vagaId } = await params;
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoModulo("rh");
   if (!acesso) notFound();
 
   const supabase = await createClient();
@@ -22,6 +23,8 @@ export default async function VagaCandidatosPage({
     .eq("workspace_id", acesso.workspaceId)
     .single()) as { data: Vaga | null };
   if (!vaga) notFound();
+  // Sem o extra "salarios" o salário previsto não sai do servidor (só de tela).
+  if (!podeVerSalarios(acesso)) vaga.salario_previsto = null;
 
   const { data: candidatos } = (await supabase
     .from("candidatos")

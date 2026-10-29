@@ -18,7 +18,6 @@ export function SociosBoard({
   convites,
   setores,
   codigoVendedor,
-  ehFundador,
   userId,
 }: {
   modulos: ModuloPermissivel[];
@@ -26,8 +25,6 @@ export function SociosBoard({
   convites: ConviteEquipe[];
   setores: SetorAcesso[];
   codigoVendedor: string | null;
-  /** Só o fundador convida e remove cofundador. */
-  ehFundador: boolean;
   userId: string;
 }) {
   const [aba, setAba] = useState<Aba>("equipe");
@@ -59,7 +56,6 @@ export function SociosBoard({
           modulos={modulos}
           membros={membros}
           convites={convites}
-          ehFundador={ehFundador}
           userId={userId}
         />
       ) : (

@@ -12,6 +12,7 @@ import { listarEmpresas } from "@/lib/empresas";
 import { getEmpresaPainel, gravarEmpresaAtiva } from "@/lib/empresa-ativa";
 import { garantirPerfil } from "@/lib/perfil";
 import { erroDeNicho } from "@/lib/nichos-shared";
+import { exigeAprovacao } from "@/lib/aprovacoes";
 import type { ActionState } from "@/lib/actions/types";
 
 function validarNome(bruto: FormDataEntryValue | null): { nome: string } | { error: string } {
@@ -136,6 +137,7 @@ export async function renomearEmpresa(
   if (!empresa) return { error: "Só o dono da empresa pode renomeá-la." };
 
   const supabase = await createClient();
+  const pendente = await exigeAprovacao(supabase, empresa.workspaceId);
   const { error } = await supabase.rpc("renomear_empresa", {
     p_workspace_id: empresa.workspaceId,
     p_nome: validado.nome,
@@ -143,5 +145,5 @@ export async function renomearEmpresa(
   if (error) return { error: erroDaEmpresa(error.message) };
 
   revalidatePath("/", "layout");
-  return { ok: true };
+  return pendente ? { ok: true, pendente: true } : { ok: true };
 }

@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAcessoSoDono } from "@/lib/empresa-ativa";
+import { getAcessoEdicao } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
+import { erroValorSemPermissao, podeVerSalarios } from "@/lib/rh/salarios";
 import {
   uploadCandidatoCurriculo,
   removeClienteArquivo,
@@ -49,9 +50,11 @@ export async function createVaga(_prevState: ActionState, formData: FormData): P
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  // RH é só do fundador/cofundador.
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return { error: SEM_PERMISSAO };
+  // Salário previsto é do extra "salarios" (só de tela: ver lib/rh/salarios.ts).
+  const erroSalario = erroValorSemPermissao(acesso, parsed.data.salario_previsto);
+  if (erroSalario) return { error: erroSalario };
 
   const supabase = await createClient();
   const { error } = await supabase.from("vagas").insert({
@@ -81,8 +84,10 @@ export async function updateVaga(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return { error: SEM_PERMISSAO };
+  const erroSalario = erroValorSemPermissao(acesso, parsed.data.salario_previsto);
+  if (erroSalario) return { error: erroSalario };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -93,7 +98,8 @@ export async function updateVaga(
       status: parsed.data.status,
       descricao: parsed.data.descricao ?? null,
       requisitos: parsed.data.requisitos ?? null,
-      salario_previsto: parsed.data.salario_previsto ?? null,
+      // Sem o extra, o salário previsto gravado não é tocado.
+      ...(podeVerSalarios(acesso) ? { salario_previsto: parsed.data.salario_previsto ?? null } : {}),
       tipo_contrato: parsed.data.tipo_contrato,
     })
     .eq("id", vagaId)
@@ -105,7 +111,7 @@ export async function updateVaga(
 }
 
 export async function deleteVaga(vagaId: string) {
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return;
 
   const supabase = await createClient();
@@ -138,8 +144,8 @@ export async function createCandidato(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  // RH é só do fundador/cofundador.
-  const acesso = await getAcessoSoDono("rh");
+  // RH por pessoa: exige permissão de edição.
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
@@ -186,7 +192,7 @@ export async function updateCandidato(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();
@@ -210,7 +216,7 @@ export async function updateCandidato(
 }
 
 export async function moveCandidato(candidatoId: string, vagaId: string, status: CandidatoStatus) {
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return;
 
   const supabase = await createClient();
@@ -223,7 +229,7 @@ export async function moveCandidato(candidatoId: string, vagaId: string, status:
 }
 
 export async function deleteCandidato(candidatoId: string, vagaId: string) {
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return;
 
   const supabase = await createClient();
@@ -251,8 +257,8 @@ export async function contratarCandidato(
   candidatoId: string,
   vagaId: string
 ): Promise<ActionState> {
-  // RH é só do fundador/cofundador.
-  const acesso = await getAcessoSoDono("rh");
+  // RH por pessoa: exige permissão de edição.
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return { error: SEM_PERMISSAO };
 
   const supabase = await createClient();

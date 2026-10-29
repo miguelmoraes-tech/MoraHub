@@ -5,7 +5,9 @@ import { Bell, Volume2, VolumeX } from "lucide-react";
 import { responderSolicitacaoAcesso } from "@/lib/actions/vendedor-codigo";
 import { formatDate } from "@/lib/format";
 import { useToast } from "@/components/toast";
+import Link from "next/link";
 import { useSolicitacoes } from "@/components/vendedor/solicitacoes-provider";
+import { useAprovacoes } from "@/components/aprovacoes/aprovacoes-provider";
 
 /**
  * Bell with the pending vendedor access requests (dono). Hidden when there is
@@ -14,6 +16,7 @@ import { useSolicitacoes } from "@/components/vendedor/solicitacoes-provider";
  */
 export function SolicitacoesBell() {
   const solicitacoes = useSolicitacoes();
+  const aprovacoes = useAprovacoes();
   const toast = useToast();
   const [aberto, setAberto] = useState(false);
   const [respondendoId, setRespondendoId] = useState<string | null>(null);
@@ -38,7 +41,9 @@ export function SolicitacoesBell() {
 
   if (!solicitacoes) return null;
   const { pendentes, setores, remover, somAtivo, setSomAtivo } = solicitacoes;
-  const total = pendentes.length;
+  // Pedidos de acesso + aprovações entre fundadores esperando o MEU voto.
+  const aprovacoesMinhas = aprovacoes?.minhas ?? 0;
+  const total = pendentes.length + aprovacoesMinhas;
 
   function responder(id: string, aprovar: boolean) {
     setRespondendoId(id);
@@ -47,6 +52,11 @@ export function SolicitacoesBell() {
       setRespondendoId(null);
       if ("error" in resultado) {
         toast.error(resultado.error);
+        return;
+      }
+      // Pendente (2+ fundadores): nada mudou ainda, então o pedido segue na lista.
+      if (resultado.pendente) {
+        toast.aprovacao();
         return;
       }
       remover(id);
@@ -61,7 +71,7 @@ export function SolicitacoesBell() {
         onClick={() => setAberto((v) => !v)}
         aria-label={
           total > 0
-            ? `Notificações: ${total} pedido${total > 1 ? "s" : ""} de acesso pendente${total > 1 ? "s" : ""}`
+            ? `Notificações: ${total} pendência${total > 1 ? "s" : ""}`
             : "Notificações"
         }
         aria-expanded={aberto}
@@ -102,7 +112,19 @@ export function SolicitacoesBell() {
           </div>
 
           <div className="max-h-80 space-y-2 overflow-y-auto p-3">
-            {total === 0 ? (
+            {aprovacoesMinhas > 0 && (
+              <Link
+                href="/aprovacoes"
+                onClick={() => setAberto(false)}
+                className="block rounded-lg border border-copper-600/40 bg-copper-600/10 px-3 py-2.5 text-sm text-copper-200 hover:bg-copper-600/20"
+              >
+                {aprovacoesMinhas === 1
+                  ? "1 aprovação esperando seu voto"
+                  : `${aprovacoesMinhas} aprovações esperando seu voto`}
+                <span className="ml-1 text-xs text-copper-300">Ver →</span>
+              </Link>
+            )}
+            {pendentes.length === 0 && aprovacoesMinhas === 0 ? (
               <p className="px-1 py-3 text-center text-xs text-zinc-600">
                 Nenhum pedido pendente.
               </p>

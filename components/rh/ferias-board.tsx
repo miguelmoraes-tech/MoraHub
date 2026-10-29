@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/format";
 import { todayISO, diffInDays } from "@/lib/vencimentos/dates";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
+import { usePodeEditarRh } from "@/components/rh/salarios-context";
 
 const STATUS_LABEL: Record<FeriasStatus, string> = {
   pendente: "Pendente",
@@ -131,6 +132,7 @@ function Fields({ item, funcionarios }: { item?: Feria; funcionarios: Funcionari
 
 function NewForm({ funcionarios }: { funcionarios: Funcionario[] }) {
   const [open, setOpen] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(createFerias, undefined);
 
@@ -141,6 +143,7 @@ function NewForm({ funcionarios }: { funcionarios: Funcionario[] }) {
   }, [open]);
 
   if (!open) {
+    if (!podeEditar) return null;
     return (
       <button
         type="button"
@@ -191,6 +194,7 @@ function Row({
   hoje: string;
 }) {
   const [editing, setEditing] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const action = updateFerias.bind(null, item.id);
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -258,21 +262,25 @@ function Row({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteFerias.bind(null, item.id)}>
-          <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </form>
+        {podeEditar && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <form action={deleteFerias.bind(null, item.id)}>
+              <button
+                type="submit"
+                className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

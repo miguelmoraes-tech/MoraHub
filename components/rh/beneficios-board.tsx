@@ -9,6 +9,7 @@ import {
   deleteBeneficio,
 } from "@/app/(dashboard)/rh/beneficios/actions";
 import { formatCurrency } from "@/lib/format";
+import { usePodeEditarRh, useVerSalarios } from "@/components/rh/salarios-context";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import { StatusChip } from "@/components/status-chip";
 
@@ -22,6 +23,7 @@ const TIPO_LABEL: Record<BeneficioTipo, string> = {
 };
 
 function Fields({ item, funcionarios }: { item?: Beneficio; funcionarios: Funcionario[] }) {
+  const verSalarios = useVerSalarios();
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <div className="col-span-2 space-y-1">
@@ -56,17 +58,19 @@ function Fields({ item, funcionarios }: { item?: Beneficio; funcionarios: Funcio
           ))}
         </select>
       </div>
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-zinc-400">Valor</label>
-        <input
-          name="valor"
-          type="number"
-          step="0.01"
-          min="0"
-          defaultValue={item?.valor ?? ""}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
-        />
-      </div>
+      {verSalarios && (
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-zinc-400">Valor</label>
+          <input
+            name="valor"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue={item?.valor ?? ""}
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm outline-none focus:border-copper-500 focus:ring-1 focus:ring-copper-500"
+          />
+        </div>
+      )}
       <div className="col-span-2 space-y-1 sm:col-span-4">
         <label className="text-xs font-medium text-zinc-400">Observações</label>
         <textarea
@@ -82,6 +86,7 @@ function Fields({ item, funcionarios }: { item?: Beneficio; funcionarios: Funcio
 
 function NewForm({ funcionarios }: { funcionarios: Funcionario[] }) {
   const [open, setOpen] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(createBeneficio, undefined);
 
@@ -92,6 +97,7 @@ function NewForm({ funcionarios }: { funcionarios: Funcionario[] }) {
   }, [open]);
 
   if (!open) {
+    if (!podeEditar) return null;
     return (
       <button
         type="button"
@@ -133,7 +139,9 @@ function NewForm({ funcionarios }: { funcionarios: Funcionario[] }) {
 }
 
 function Row({ item, funcionarios }: { item: Beneficio; funcionarios: Funcionario[] }) {
+  const verSalarios = useVerSalarios();
   const [editing, setEditing] = useState(false);
+  const podeEditar = usePodeEditarRh();
   const action = updateBeneficio.bind(null, item.id);
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -177,26 +185,30 @@ function Row({ item, funcionarios }: { item: Beneficio; funcionarios: Funcionari
           <StatusChip tone="copper">{TIPO_LABEL[item.tipo]}</StatusChip>
         </p>
         <p className="truncate text-xs text-zinc-500">
-          {item.valor != null ? formatCurrency(item.valor) : "sem valor definido"}
-          {item.observacoes && ` · ${item.observacoes}`}
+          {verSalarios && (item.valor != null ? formatCurrency(item.valor) : "sem valor definido")}
+          {item.observacoes && `${verSalarios ? " · " : ""}${item.observacoes}`}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <form action={deleteBeneficio.bind(null, item.id)}>
-          <button
-            type="submit"
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </form>
+        {podeEditar && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <form action={deleteBeneficio.bind(null, item.id)}>
+              <button
+                type="submit"
+                className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

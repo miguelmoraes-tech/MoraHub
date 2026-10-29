@@ -284,6 +284,7 @@ const ROTAS_LIVRES_PREFIXOS = [
   "/modulos",
   "/socios",
   "/configuracoes",
+  "/aprovacoes",
   "/pessoal",
   "/api/pessoal",
   "/api/auth",

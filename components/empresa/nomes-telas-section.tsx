@@ -68,7 +68,8 @@ export function NomesTelasSection({
         toast.error(resultado.error);
         return;
       }
-      toast.success("Nomes das telas atualizados.");
+      if (resultado.pendente) toast.aprovacao();
+      else toast.success("Nomes das telas atualizados.");
     });
   }
 
@@ -80,7 +81,8 @@ export function NomesTelasSection({
         toast.error(resultado.error);
         return;
       }
-      toast.success(temNicho ? "Nomes restaurados para o padrão do nicho." : "Nomes restaurados.");
+      if (resultado.pendente) toast.aprovacao();
+      else toast.success(temNicho ? "Nomes restaurados para o padrão do nicho." : "Nomes restaurados.");
     });
   }
 

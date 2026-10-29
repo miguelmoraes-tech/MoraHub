@@ -41,7 +41,8 @@ export function NichoModeloSection({
         toast.error(resultado.error);
         return;
       }
-      toast.success("Tipo de negócio atualizado.");
+      if (resultado.pendente) toast.aprovacao();
+      else toast.success("Tipo de negócio atualizado.");
       setTrocando(false);
       setConfirmando(false);
     });

@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAcessoSoDono } from "@/lib/empresa-ativa";
+import { getAcessoEdicao } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
+import { erroValorSemPermissao, podeVerSalarios } from "@/lib/rh/salarios";
 import { BeneficioSchema } from "@/lib/validations/beneficio";
 import type { ActionState } from "@/lib/actions/types";
 
@@ -32,9 +33,11 @@ export async function createBeneficio(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  // RH é só do fundador/cofundador.
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return { error: SEM_PERMISSAO };
+  // Valor do benefício é do extra "salarios" (só de tela: ver lib/rh/salarios.ts).
+  const erroValor = erroValorSemPermissao(acesso, parsed.data.valor);
+  if (erroValor) return { error: erroValor };
 
   const supabase = await createClient();
   const { error } = await supabase.from("beneficios").insert({
@@ -62,8 +65,10 @@ export async function updateBeneficio(
     return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   }
 
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return { error: SEM_PERMISSAO };
+  const erroValor = erroValorSemPermissao(acesso, parsed.data.valor);
+  if (erroValor) return { error: erroValor };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -71,7 +76,8 @@ export async function updateBeneficio(
     .update({
       funcionario_id: parsed.data.funcionario_id,
       tipo: parsed.data.tipo,
-      valor: parsed.data.valor ?? null,
+      // Sem o extra, o valor gravado não é tocado.
+      ...(podeVerSalarios(acesso) ? { valor: parsed.data.valor ?? null } : {}),
       observacoes: parsed.data.observacoes ?? null,
     })
     .eq("id", beneficioId)
@@ -84,7 +90,7 @@ export async function updateBeneficio(
 }
 
 export async function deleteBeneficio(beneficioId: string) {
-  const acesso = await getAcessoSoDono("rh");
+  const acesso = await getAcessoEdicao("rh");
   if (!acesso) return;
 
   const supabase = await createClient();

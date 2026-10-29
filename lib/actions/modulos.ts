@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getWorkspaceIdAtivo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
+import { exigeAprovacao } from "@/lib/aprovacoes";
 import type { ActionState } from "@/lib/actions/types";
 
 /**
@@ -24,6 +25,7 @@ export async function definirModulo(
   const workspaceId = await getWorkspaceIdAtivo();
   if (!workspaceId) return { error: "Empresa não encontrada." };
 
+  const pendente = await exigeAprovacao(supabase, workspaceId);
   const { error } = await supabase.rpc("definir_modulo", {
     p_workspace_id: workspaceId,
     p_chave: chave,
@@ -41,5 +43,5 @@ export async function definirModulo(
 
   // Menu, home e proxy dependem dos módulos ligados.
   revalidatePath("/", "layout");
-  return { ok: true };
+  return pendente ? { ok: true, pendente: true } : { ok: true };
 }

@@ -26,7 +26,9 @@ export function useActionToast(
       toast.error(state.error);
       return;
     }
-    if (latest.current.success) toast.success(latest.current.success);
+    // Pendente (2+ fundadores): nada mudou ainda, então não há "sucesso" a anunciar.
+    if (state.pendente) toast.aprovacao();
+    else if (latest.current.success) toast.success(latest.current.success);
     latest.current.onSuccess?.();
   }, [state, toast]);
 }

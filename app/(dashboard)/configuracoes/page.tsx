@@ -5,6 +5,8 @@ import { getModulosHabilitados } from "@/lib/modulos/habilitados";
 import { createClient } from "@/lib/supabase/server";
 import { getNichosDoCatalogo } from "@/lib/nichos";
 import { getConfigEmpresa } from "@/lib/rotulos";
+import { getFundadores } from "@/lib/aprovacoes";
+import { FundadoresSection } from "@/components/empresa/fundadores-section";
 import { RenomearEmpresaForm } from "@/components/empresa/renomear-empresa-form";
 import { NichoModeloSection } from "@/components/empresa/nicho-modelo-section";
 import { NomesTelasSection } from "@/components/empresa/nomes-telas-section";
@@ -16,13 +18,14 @@ export default async function ConfiguracoesPage() {
 
   const supabase = await createClient();
   const config = await getConfigEmpresa();
-  const [nichos, habilitados, modelo, catalogo] = await Promise.all([
+  const [nichos, habilitados, modelo, catalogo, fundadores] = await Promise.all([
     getNichosDoCatalogo(),
     getModulosHabilitados(empresa.workspaceId),
     config.modeloId
       ? supabase.from("modelos").select("chave").eq("id", config.modeloId).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("modulos").select("chave, nome").order("ordem"),
+    getFundadores(empresa.workspaceId),
   ]);
 
   // Só os módulos ligados têm nome de tela para editar, na ordem do catálogo.
@@ -40,6 +43,8 @@ export default async function ConfiguracoesPage() {
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
         <RenomearEmpresaForm nomeAtual={empresa.nome ?? ""} />
       </div>
+
+      <FundadoresSection fundadores={fundadores} meuId={empresa.userId} />
 
       <NichoModeloSection
         key={`${config.nichoChave}|${config.modeloId}`}

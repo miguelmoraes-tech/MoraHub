@@ -8,15 +8,23 @@ import {
   useRef,
   useState,
 } from "react";
+import Link from "next/link";
 import { CheckCircle2, AlertCircle, Bell, X } from "lucide-react";
+import { AVISO_ENVIADO, ROTA_APROVACOES } from "@/lib/aprovacoes-shared";
 
 type ToastTone = "success" | "error" | "info";
-type ToastItem = { id: number; tone: ToastTone; message: string };
+type ToastLink = { href: string; label: string };
+type ToastItem = { id: number; tone: ToastTone; message: string; link?: ToastLink };
 
 type ToastApi = {
   success: (message: string) => void;
   error: (message: string) => void;
   info: (message: string) => void;
+  /**
+   * "Enviado para aprovação dos outros fundadores", com link para /aprovacoes.
+   * Use no lugar do sucesso quando a ação voltou `pendente` (2+ fundadores).
+   */
+  aprovacao: (detalhe?: string) => void;
 };
 
 const TOAST_DURATION_MS = 5000;
@@ -38,9 +46,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const push = useCallback(
-    (tone: ToastTone, message: string) => {
+    (tone: ToastTone, message: string, link?: ToastLink) => {
       const id = nextId.current++;
-      setToasts((current) => [...current, { id, tone, message }]);
+      setToasts((current) => [...current, { id, tone, message, link }]);
       setTimeout(() => dismiss(id), TOAST_DURATION_MS);
     },
     [dismiss]
@@ -51,6 +59,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       success: (message) => push("success", message),
       error: (message) => push("error", message),
       info: (message) => push("info", message),
+      aprovacao: (detalhe) =>
+        push("info", detalhe ? `${AVISO_ENVIADO}. ${detalhe}` : AVISO_ENVIADO, {
+          href: ROTA_APROVACOES,
+          label: "Ver aprovações",
+        }),
     }),
     [push]
   );
@@ -81,7 +94,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             ) : (
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
             )}
-            <p className="min-w-0 flex-1 break-words">{t.message}</p>
+            <p className="min-w-0 flex-1 break-words">
+              {t.message}
+              {t.link && (
+                <>
+                  {" "}
+                  <Link
+                    href={t.link.href}
+                    onClick={() => dismiss(t.id)}
+                    className="font-medium underline underline-offset-2 hover:opacity-80"
+                  >
+                    {t.link.label}
+                  </Link>
+                </>
+              )}
+            </p>
             <button
               type="button"
               onClick={() => dismiss(t.id)}
