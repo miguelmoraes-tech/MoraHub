@@ -163,6 +163,7 @@ export const MaterialSchema = z.object({
   preco_compra: numOpc("Preço de compra", { min: 0 }),
   estoque_minimo: numPadrao("Estoque mínimo", 0),
   localizacao: textoOpc(120),
+  fornecedor_id: uuidOpc(),
 });
 
 export const ProdutoSchema = z.object({

@@ -263,3 +263,38 @@ export async function usarSimulacaoEmOrcamento(entrada: {
   revalidatePath(`${ROTA}/${orcamentoId}`);
   return { orcamentoId };
 }
+
+export type ResultadoConverterOrcamento = { pedidoId: string } | { error: string };
+
+/**
+ * "Converter em pedido" (p3d_criar_pedido_de_orcamento): o orçamento precisa estar aprovado
+ * e vira "convertido". Exige edição em Pedidos E em Orçamentos; a RPC confere de novo.
+ * Devolve o id do pedido para a tela levar a pessoa até ele.
+ */
+export async function converterOrcamentoEmPedido(
+  orcamentoId: string,
+  prazo: string | null,
+  prioridade: string
+): Promise<ResultadoConverterOrcamento> {
+  const acesso = await getAcessoEdicao(MODULO);
+  if (!acesso) return { error: SEM_PERMISSAO };
+  if (!(await getAcessoEdicao("p3d_pedidos"))) {
+    return { error: "Converter em pedido exige permissão de edição em Pedidos." };
+  }
+  if (!["baixa", "normal", "alta", "urgente"].includes(prioridade)) return { error: "Prioridade inválida." };
+  if (prazo && !/^\d{4}-\d{2}-\d{2}$/.test(prazo)) return { error: "Prazo de entrega: data inválida." };
+
+  const { data, error } = await (await createClient()).rpc("p3d_criar_pedido_de_orcamento", {
+    p_orcamento_id: orcamentoId,
+    p_prioridade: prioridade,
+    ...(prazo ? { p_prazo: prazo } : {}),
+  });
+  if (error || typeof data !== "string") {
+    return { error: mensagemRpc(error, "Não foi possível converter o orçamento em pedido.") };
+  }
+
+  revalidatePath(ROTA);
+  revalidatePath(`${ROTA}/${orcamentoId}`);
+  revalidatePath("/impressao-3d/pedidos");
+  return { pedidoId: data };
+}

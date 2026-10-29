@@ -1,4 +1,4 @@
-# Nicho Impressão 3D (Etapa A)
+# Nicho Impressão 3D (Etapas A e B)
 
 Impressoras, Estoque, Produtos e catálogo, Precificação e Orçamentos para quem
 trabalha com impressão 3D sob demanda, loja de produtos ou print farm. Usa o
@@ -7,8 +7,9 @@ sistema de nichos e módulos que já existe (registro em `lib/modulos/registry.t
 sistema paralelo e não há `if` por nicho no código. O nicho `impressao_3d` e os
 módulos `p3d_*` são **dados** no banco (`nichos`, `nicho_modulos`, `modulos`).
 
-> Produção, pedidos e a conversão de orçamento aprovado em pedido são da
-> **Etapa B** e não existem aqui.
+> A **Etapa A** (impressoras, estoque, produtos, precificação, orçamentos) está nas
+> seções abaixo. A **Etapa B** (fornecedores e compras, pedidos, produção, qualidade,
+> expedição) está na seção [Etapa B](#etapa-b-fornecedores-pedidos-produção-qualidade-e-expedição).
 
 ## Módulos, rotas e permissões
 
@@ -19,6 +20,11 @@ módulos `p3d_*` são **dados** no banco (`nichos`, `nicho_modulos`, `modulos`).
 | `p3d_produtos` | `/impressao-3d/produtos` (e `/[id]`) | — | — |
 | `p3d_precificacao` | `/impressao-3d/precificacao` | — | `p3d_impressoras`, `p3d_estoque` |
 | `p3d_orcamentos` | `/impressao-3d/orcamentos` (e `/[id]`) | `custos` | `clientes`, `p3d_precificacao` |
+| `p3d_fornecedores` | `/impressao-3d/fornecedores` (e `/compras/[id]`) | — | — |
+| `p3d_pedidos` | `/impressao-3d/pedidos` (e `/[id]`) | `custos` | — |
+| `p3d_producao` | `/impressao-3d/producao` | — | — |
+| `p3d_qualidade` | `/impressao-3d/qualidade` | — | — |
+| `p3d_expedicao` | `/impressao-3d/expedicao` | — | — |
 
 - Menu, proxy e Visão Geral seguem **registro ∩ `workspace_modulos` ∩ permissão**.
   Módulo desligado = rota bloqueada pelo proxy e fora do menu.
@@ -40,8 +46,8 @@ módulos `p3d_*` são **dados** no banco (`nichos`, `nicho_modulos`, `modulos`).
 | Preço, custo, lucro, margem, markup, composição (simulador e itens de orçamento) | **Estimado** — vem de parâmetros cadastrados, não de produção medida. A tela rotula "Estimado". |
 | Depreciação e desgaste por hora na lista de impressoras | **Estimado** (fórmula do cadastro). |
 | Saldo de estoque, custo médio, histórico de movimentos | **Real do registro**: só mudam por entrada/ajuste/perda e pelo histórico. |
-| Horas de uso da impressora | Informadas à mão. A Etapa B (produção) passa a alimentá-las. |
-| Produtividade real, taxa de falha medida, consumo real | **Não existem** na Etapa A (dependem da produção). A tela não mostra gráficos disso. |
+| Horas de uso da impressora | Informadas à mão **e** somadas ao concluir um trabalho em Produção (Etapa B). |
+| Produtividade real, taxa de falha medida, consumo real | **Reais** a partir da Etapa B: vêm de trabalhos concluídos/com falha, peso e horas informados na conclusão. Sem trabalho medido a tela mostra "—", nunca um número estimado. |
 
 ## Fórmulas (regras que a UI explica)
 
@@ -122,9 +128,8 @@ alteram nenhum cadastro. O modo de preço só é enviado se diferir da configura
 ### Status do orçamento (`p3d_mudar_status_orcamento`)
 
 `rascunho → enviado` (exige ≥ 1 item); `enviado → aprovado | recusado | expirado |
-rascunho`; `recusado | expirado → rascunho`. **`aprovado` é final** nesta etapa
-(a conversão em pedido vem na Etapa B). O banco também reconhece `convertido`, que
-a tela só exibe.
+rascunho`; `recusado | expirado → rascunho`. De `aprovado` o orçamento só sai por
+**Converter em pedido** (Etapa B), que o torna `convertido` (somente exibição).
 
 ### Recalcular × editar
 
@@ -155,8 +160,8 @@ Os textos de erro das RPCs (em português) são mostrados ao usuário como viera
 
 ## Limitações conhecidas
 
-- Sem produção, fila, pedidos, loja, integração real com impressoras ou gráficos de
-  produtividade (Etapa B). `integracao_tipo`/`integracao_url` são só cadastro.
+- Sem loja online e sem integração real com impressoras (OctoPrint, Bambu...).
+  `integracao_tipo`/`integracao_url` são só cadastro.
 - Entrada de estoque sem o extra `custos` é registrada **sem custo** (não atualiza o
   custo médio); se a RPC exigir custo, a mensagem dela aparece.
 - Precificação não tem extra: quem tem o módulo vê a composição de custos.
@@ -172,7 +177,7 @@ Os textos de erro das RPCs (em português) são mostrados ao usuário como viera
 
 ## Como ativar numa empresa
 
-1. Conferir no catálogo `modulos` as 5 chaves `p3d_*` (hoje `ativo = false`).
+1. Conferir no catálogo `modulos` as 10 chaves `p3d_*` (Etapas A e B; hoje `ativo = false`).
 2. Quando as telas estiverem validadas: `update modulos set ativo = true where chave like 'p3d\_%'`.
 3. Aplicar o nicho `impressao_3d` (e um modelo: `sob_demanda`, `loja_produtos`,
    `print_farm`) em **Configurações → Nicho e modelo** da empresa de teste, ou
@@ -195,3 +200,198 @@ permissões, extra `custos`, regras de impressora/estoque, números pt-BR, valid
 montagem de `p_entrada`, leitura do cálculo, caminho dos arquivos e o contrato das
 actions (RPCs, campos protegidos, guarda de empresa). O snapshot das empresas atuais
 (`scripts/snapshot-empresas-atuais.json`) **não muda**.
+
+
+---
+
+# Etapa B: fornecedores, pedidos, produção, qualidade e expedição
+
+Cinco módulos novos no mesmo sistema de módulos (registro, `workspace_modulos`, guard
+por módulo). O catálogo `modulos.ativo` segue `false` até a ativação manual.
+
+## Fluxo de ponta a ponta
+
+```
+Fornecedor → Compra (cotação → aprovada → recebida) ─► Estoque (entrada + custo médio)
+Orçamento aprovado ──► Converter em pedido ─┐
+Pedido manual ─────────────────────────────┴► Pedido (novo → confirmado)
+   └► Gerar produção ─► Trabalho (fila → imprimindo → concluída | falhou)
+         ├ concluir: baixa material do estoque, soma horas na impressora, libera a impressora
+         ├ falha: baixa o material perdido (se imprimindo) e pode criar reimpressão
+         └ Qualidade: inspeção (aprovado | reprovado | retrabalho)
+   └► Pedido pronto ─► Envio (preparando → postado → em trânsito → entregue)
+Pagamentos (pix, cartão...) e estornos acompanham o pedido; opcionalmente vão ao Financeiro.
+```
+
+## Fornecedores e compras (`p3d_fornecedores`)
+
+- **Fornecedores**: CRUD direto (nome, contato, telefone, e-mail, site `http(s)`, categoria,
+  observações; arquivar em vez de excluir). O cadastro de **material** (Estoque) ganhou o
+  seletor de fornecedor; quem não vê Fornecedores mantém o vínculo atual ao salvar.
+- **Compras** (`cotacao → aprovada → recebida | cancelada`). Cabeçalho direto: fornecedor,
+  data, validade da cotação, prazo, frete, desconto, observações. `status`, `numero`,
+  `subtotal`, `total`, `recebida_em`, `conta_pagar_id` só por RPC/banco. Excluir só em
+  cotação. Compra recebida/cancelada é imutável.
+- **Itens** (CRUD direto em cotação/aprovada): material, **quantidade na unidade base do
+  material (g, ml ou un)** e **valor pago pelo item** (`preco_total`). A tela converte
+  *rolos × peso líquido* quando o material tem peso de rolo. `preco_unitario` é gerado.
+- **Ações**: aprovar (exige ≥ 1 item), voltar para cotação, cancelar
+  (`p3d_mudar_status_compra`) e **receber** (`p3d_receber_compra`).
+- **Receber** exige edição em Fornecedores **e** em Estoque. Dá entrada no estoque com
+  frete e desconto **rateados por valor** e atualiza o custo médio. Gerar **conta a pagar**
+  é opcional e exige Financeiro ligado, edição nele e **vencimento**; sem isso a tela não
+  oferece e o servidor recusa.
+- **Preços** (view `p3d_historico_precos`): histórico de compras **recebidas** por material
+  e comparação das **cotações abertas** (a mais barata destacada). O preço unitário **não
+  inclui frete**. Nada é inventado: sem compras, estado vazio.
+
+## Pedidos e vendas (`p3d_pedidos`, extra `custos`)
+
+- **Pedido**: cliente cadastrado **ou** avulso (um dos dois), prioridade, datas, desconto,
+  frete, observações. Cliente, desconto e frete só mudam **antes da produção** (novo/
+  confirmado); depois só prioridade, prazo e observações. `total = subtotal − desconto +
+  frete`; `lucro_total = Σ lucro dos itens − desconto` (**frete não entra no lucro**).
+- **Itens manuais** (CRUD direto em novo/confirmado). Itens vindos de orçamento
+  (`origem='orcamento'`) são somente leitura e mostram a **composição do snapshot**
+  (estimada, não muda depois).
+- **Converter em pedido** (botão no orçamento aprovado): exige edição em Pedidos **e**
+  Orçamentos, abre o pedido criado; o orçamento vira `convertido` (a tela mostra o link
+  para o pedido).
+- **Status** (`p3d_mudar_status_pedido`): `novo→confirmado|cancelado`;
+  `confirmado→em_producao|pronto|cancelado`; `em_producao→pronto|cancelado`;
+  `pronto→enviado|entregue|em_producao|cancelado`; `enviado→entregue`. Confirmar exige
+  item; **pronto** exige não haver trabalho na fila/imprimindo nem reprovado na qualidade;
+  **cancelar** exige motivo, é barrado com trabalho imprimindo e cancela os da fila. Iniciar
+  produção e postar/entregar envio também movem o pedido sozinhos.
+- **Pagamentos** (`p3d_registrar_pagamento`): pagamento ou estorno, formas
+  pix/cartão/boleto/dinheiro/transferência/outro. Não aceita pagamento acima do saldo nem
+  estorno acima do pago (texto da RPC). O checkbox **"Lançar no Financeiro"** só aparece com
+  Financeiro ligado e edição nele. **Estorno não vai ao Financeiro**: a tela avisa para
+  ajustar lá.
+- **Gerar produção** (`p3d_gerar_producao_do_pedido`): um trabalho por item, idempotente;
+  só pedido confirmado/em produção; exige edição em **Produção**.
+- **Extra `custos`**: sem ele o servidor **não seleciona** `custo_total`, `lucro_total`,
+  `custo_unitario`, `lucro` dos itens, e o snapshot sai sem composição de custo nem
+  parâmetros de custo; o custo unitário de item manual também não pode ser enviado. É só de
+  tela (não é barreira de banco), como na Etapa A.
+
+## Produção (`p3d_producao`)
+
+- **Fila** por abas de status. Ordem: **prioridade** (urgente > alta > normal > baixa),
+  **prazo** (nulos por último), **número**.
+- **Trabalho avulso** (produção para estoque): criado direto. Trabalhos de pedido nascem de
+  "Gerar produção". Campos estruturais só na fila; depois só prioridade, prazo, observações.
+  Excluir só na fila. `status`, `numero`, `horas_reais`, `peso_real_g`, `qualidade`,
+  `iniciado_em`, `concluido_em`, `consumo_registrado_em`, `reimpressao_de` só por RPC.
+- **Iniciar** (`p3d_iniciar_producao`): escolhe impressora **disponível**; marca-a
+  `imprimindo`; o pedido confirmado vira `em_producao`. O **aviso de estoque** da RPC é
+  exibido.
+- **Concluir** (`p3d_concluir_producao`): informa **peso real** e **horas reais** (e o
+  material, se o trabalho não tiver). Baixa o material (movimento `saida_producao`), soma
+  `horas_uso` na impressora e a libera. Não pode ser feito duas vezes. Os **avisos**
+  (estoque negativo, abaixo do mínimo, manutenção devida) ficam visíveis até dispensar.
+- **Cancelar** (`p3d_cancelar_producao`): só na fila, com motivo.
+- **Registrar falha** (`p3d_registrar_falha`), com tipo de defeito, peso e horas perdidos,
+  descrição, "criar reimpressão" e quantidade afetada.
+- **Impressoras**: a tela mostra a impressora **ocupada e o trabalho atual** (para quem
+  também vê Produção). A **Produtividade** (aba da Produção) é calculada de dados reais:
+  horas de uso (cadastro), trabalhos concluídos/com falha, horas e peso reais medidos,
+  concluídos por hora. Sem medição aparece "—".
+
+## Regras de falha × estoque (importante)
+
+| Situação | O que acontece | `baixou_estoque` |
+| --- | --- | --- |
+| Falha em trabalho **imprimindo** | Baixa o material perdido do estoque; o trabalho vira `falhou` | `true` |
+| Falha em trabalho **já concluído** | **Não** baixa estoque de novo (o consumo já saiu na conclusão) | `false` |
+| Falha em concluído com quantidade afetada **menor** que a do trabalho | Falha parcial: o trabalho continua `concluida` | `false` |
+| "Reimprimir" marcado | Cria um novo trabalho na fila (`reimpressao_de`) | — |
+
+Consequência para os números: o `custo_material` de uma falha com `baixou_estoque=false` **já
+está contido** no consumo do trabalho concluído. A tela de Qualidade, ao somar o
+desperdício, mostra esse valor **separado** ("já contido no consumo") e **não** o soma ao
+"material perdido além do consumo", para não contar o mesmo material duas vezes.
+
+## Qualidade (`p3d_qualidade`)
+
+- **Para inspecionar**: trabalhos `concluida` com `qualidade='pendente'`. **Registrar
+  inspeção** (`p3d_registrar_inspecao`): `aprovado | reprovado | retrabalho`; reprovado
+  exige ≥ 1 defeito e pode "reimprimir" (a RPC dispara a falha e a reimpressão). Reprovado
+  trava o pedido em "pronto" até ser resolvido.
+- **Histórico** de inspeções e falhas (somente leitura).
+- **Indicadores** (dados reais): **taxa real = trabalhos com ao menos uma falha ÷ (trabalhos
+  concluídos + com falha)**, comparada com a **taxa estimada** (`falha_pct` da Precificação,
+  só se a pessoa vê Precificação). Falha parcial conta no numerador; reimpressão é um
+  trabalho próprio. Quebras por impressora, material, produto e tipo de defeito. Sem base,
+  "sem dados".
+
+## Expedição (`p3d_expedicao`)
+
+- Envio de pedido **pronto ou enviado**: transportadora, serviço, **código e link de
+  rastreio digitados à mão**, custo do frete, peso, volumes, previsão. Excluir só em
+  preparação.
+- Status (`p3d_mudar_status_envio`): `preparando→postado`; `postado→em_transito|entregue|
+  problema|devolvido`; `em_transito→entregue|problema|devolvido`;
+  `problema→em_transito|entregue|devolvido`. Postar leva o pedido a `enviado`; entregar o
+  último envio leva a `entregue`. Entregue pede quem recebeu.
+- **Pendência documentada**: integração com Correios/transportadoras (cotação de frete,
+  etiqueta, rastreio automático) depende de **credenciais externas** e **não foi simulada**.
+  O link de rastreio só aceita `http(s)`.
+
+## Visão geral do dono e alertas
+
+Cards por módulo ligado (só contagens, sem valores): **pedidos com prazo vencido**
+(abertos de novo a pronto, prazo anterior a hoje), **trabalhos urgentes na fila**,
+**compras aprovadas aguardando recebimento**, **manutenção devida** (Impressoras, da Etapa A),
+envios em aberto, trabalhos para inspecionar/reprovados.
+
+## Regras de escrita (Etapa B): o banco barra, o código nunca tenta
+
+Nunca enviados em insert/update direto:
+
+- `p3d_compras`: `status`, `numero`, `subtotal`, `total`, `recebida_em`, `conta_pagar_id`.
+- `p3d_compra_itens`: `preco_unitario` (gerado).
+- `p3d_pedidos`: `status`, `status_pagamento`, `numero`, `origem`, `orcamento_id`,
+  `subtotal`, `total`, `custo_total`, `lucro_total`, `pago_valor`, `cancelado_*`.
+- `p3d_pedido_itens`: `preco_total`, `custo_total`, `lucro` (calculados).
+- `p3d_producao`: `status`, `numero`, `horas_reais`, `peso_real_g`, `qualidade`,
+  `iniciado_em`, `concluido_em`, `consumo_registrado_em`, `reimpressao_de`.
+- `p3d_envios`: `status`, `postado_em`, `entregue_em`, `recebedor`.
+- Somente leitura (escrita só por RPC): `p3d_pedido_pagamentos`, `p3d_pedido_historico`,
+  `p3d_inspecoes`, `p3d_falhas`.
+
+`scripts/auditar-isolamento.mts` **falha** em escrita direta desses campos, em escrita nas
+tabelas somente leitura, em schema de formulário que aceite campo protegido e em `.rpc("p3d_...")`
+sem guarda de acesso, vinda de componente client ou das RPCs internas de apoio
+(`p3d_estoque_aplicar`, `p3d_pedido_set_status`, `p3d_recalc_*`, `p3d_calcular_preco`).
+Os textos das RPCs e das regras do banco (`raise exception`) são mostrados como vieram.
+
+## Limitações da Etapa B
+
+- **Qualidade depende de Produção para listar trabalhos**: `p3d_inspecoes` e `p3d_falhas`
+  são lidas por quem tem Produção **ou** Qualidade, mas a lista de trabalhos concluídos
+  vem de `p3d_producao` (módulo Produção). Quem só tem Qualidade vê histórico e falhas, e a
+  tela avisa que precisa de leitura em Produção para inspecionar e para os indicadores.
+- Listas auxiliares (fornecedores, produtos, pedidos, impressoras, materiais, clientes) só
+  carregam com acesso ao módulo dono da lista; senão aparecem vazias e a tela avisa.
+- Trabalhos de pedido só nascem por "Gerar produção"; a tela não vincula trabalho avulso a
+  pedido à mão.
+- Listas de Produção e Qualidade carregam os últimos 2.000 registros (a tela avisa quando
+  corta); o histórico de preços, os últimos 3.000.
+- Custos de falha (`custo_material`, `custo_maquina_estimado`) aparecem para quem vê
+  Qualidade: o contrato não define o extra `custos` para esse módulo. O custo de máquina é
+  **estimado**.
+- Registrar falha pela tela só existe em Produção (trabalho imprimindo ou concluído); em
+  Qualidade a falha nasce da inspeção reprovada.
+- Data de hoje: o servidor usa UTC (`todayISO`), como o resto do app; perto da meia-noite
+  de Brasília "hoje" pode adiantar um dia nos alertas de prazo.
+- Sem integração com transportadoras/Correios e sem consulta automática de rastreio.
+
+## Testes (Etapa B)
+
+`testar-acesso.mts` (seção *Etapa B*) cobre transições de status, ordem da fila, prazo
+vencido, saldo/total, conversão rolos→base, cotações, taxa real, desperdício sem dupla
+contagem, produtividade, leitura defensiva dos retornos das RPCs, validações, campos
+forjados, extra `custos` de Pedidos, permissões cruzadas (Estoque, Financeiro, Pedidos,
+Produção/Qualidade), registro/menu/matriz de sócios e o snapshot das empresas atuais.
+**Não cobre** fluxo logado contra o banco real: ver o relatório de entrega.

@@ -50,7 +50,11 @@ export type IconeNome =
   | "boxes"
   | "package"
   | "calculator"
-  | "file-spreadsheet";
+  | "file-spreadsheet"
+  | "shopping-cart"
+  | "clipboard-list"
+  | "factory"
+  | "truck";
 
 export interface ItemMenu {
   label: string;
@@ -306,6 +310,44 @@ export const MODULOS: ModuloRegistro[] = [
     menu: [
       { label: "Orçamentos 3D", href: "/impressao-3d/orcamentos", icone: "file-spreadsheet", grupo: "Impressão 3D" },
     ],
+  },
+  // --- Nicho Impressão 3D (Etapa B). O extra "custos" de Pedidos esconde custo, lucro e margem.
+  {
+    chave: "p3d_fornecedores",
+    rotas: ["/impressao-3d/fornecedores"],
+    icone: "shopping-cart",
+    tabelas: ["p3d_fornecedores", "p3d_compras", "p3d_compra_itens"],
+    menu: [
+      { label: "Fornecedores e compras", href: "/impressao-3d/fornecedores", icone: "shopping-cart", grupo: "Impressão 3D" },
+    ],
+  },
+  {
+    chave: "p3d_pedidos",
+    rotas: ["/impressao-3d/pedidos"],
+    icone: "clipboard-list",
+    tabelas: ["p3d_pedidos", "p3d_pedido_itens", "p3d_pedido_pagamentos", "p3d_pedido_historico"],
+    menu: [{ label: "Pedidos e vendas", href: "/impressao-3d/pedidos", icone: "clipboard-list", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_producao",
+    rotas: ["/impressao-3d/producao"],
+    icone: "factory",
+    tabelas: ["p3d_producao"],
+    menu: [{ label: "Produção", href: "/impressao-3d/producao", icone: "factory", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_qualidade",
+    rotas: ["/impressao-3d/qualidade"],
+    icone: "shield-check",
+    tabelas: ["p3d_inspecoes", "p3d_falhas"],
+    menu: [{ label: "Qualidade", href: "/impressao-3d/qualidade", icone: "shield-check", grupo: "Impressão 3D" }],
+  },
+  {
+    chave: "p3d_expedicao",
+    rotas: ["/impressao-3d/expedicao"],
+    icone: "truck",
+    tabelas: ["p3d_envios"],
+    menu: [{ label: "Expedição", href: "/impressao-3d/expedicao", icone: "truck", grupo: "Impressão 3D" }],
   },
 ];
 

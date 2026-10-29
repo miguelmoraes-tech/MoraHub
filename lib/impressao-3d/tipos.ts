@@ -157,6 +157,7 @@ export interface Material {
   estoque_atual: number;
   estoque_minimo: number;
   localizacao: string | null;
+  fornecedor_id: string | null;
   ativo: boolean;
 }
 

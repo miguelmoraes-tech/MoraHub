@@ -17,11 +17,20 @@ import {
   type Material, type MovimentoEstoque, type TipoMaterial, type TipoMovimento,
 } from "@/lib/impressao-3d/tipos";
 import { abaixoDoMinimo, custoPorGrama, gramasDeRolos } from "@/lib/impressao-3d/regras";
+import type { OpcaoFornecedor, Opcoes } from "@/lib/impressao-3d/opcoes";
 import {
   formatDataHora, formatMoeda, formatNumero,
 } from "@/lib/impressao-3d/numeros";
 
-function CamposMaterial({ item, verCustos }: { item?: Material; verCustos: boolean }) {
+function CamposMaterial({
+  item,
+  verCustos,
+  fornecedores,
+}: {
+  item?: Material;
+  verCustos: boolean;
+  fornecedores: Opcoes<OpcaoFornecedor>;
+}) {
   const [unidade, setUnidade] = useState(item?.unidade ?? "g");
   const [preco, setPreco] = useState(item?.preco_compra ?? 0);
   const [peso, setPeso] = useState(item?.peso_liquido_rolo_g ?? 0);
@@ -100,6 +109,19 @@ function CamposMaterial({ item, verCustos }: { item?: Material; verCustos: boole
         ajuda="0 = sem alerta."
       />
       <Entrada rotulo="Localização" name="localizacao" defaultValue={item?.localizacao ?? ""} />
+      {fornecedores.acessivel ? (
+        <Seletor rotulo="Fornecedor" name="fornecedor_id" defaultValue={item?.fornecedor_id ?? ""}>
+          <option value="">Sem fornecedor</option>
+          {fornecedores.itens
+            .filter((f) => f.ativo || f.id === item?.fornecedor_id)
+            .map((f) => (
+              <option key={f.id} value={f.id}>{f.nome}{f.ativo ? "" : " (inativo)"}</option>
+            ))}
+        </Seletor>
+      ) : (
+        // Sem acesso a Fornecedores: o vínculo atual é mantido ao salvar.
+        <input type="hidden" name="fornecedor_id" value={item?.fornecedor_id ?? ""} />
+      )}
       {item && (
         <p className="col-span-2 self-end text-[11px] text-zinc-600 sm:col-span-4">
           O saldo e o custo médio não são editados aqui: use Entrada, Ajuste ou Perda.
@@ -109,13 +131,23 @@ function CamposMaterial({ item, verCustos }: { item?: Material; verCustos: boole
   );
 }
 
-function FormMaterial({ item, verCustos, aoFechar }: { item?: Material; verCustos: boolean; aoFechar: () => void }) {
+function FormMaterial({
+  item,
+  verCustos,
+  fornecedores,
+  aoFechar,
+}: {
+  item?: Material;
+  verCustos: boolean;
+  fornecedores: Opcoes<OpcaoFornecedor>;
+  aoFechar: () => void;
+}) {
   const acao = item ? atualizarMaterial.bind(null, item.id) : criarMaterial;
   const [state, formAction, pendente] = useActionState(acao, undefined);
   useActionSuccess(state, aoFechar);
   return (
     <form action={formAction} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-      <CamposMaterial item={item} verCustos={verCustos} />
+      <CamposMaterial item={item} verCustos={verCustos} fornecedores={fornecedores} />
       <ErroForm state={state} />
       <div className="flex justify-end gap-2">
         <BotaoTexto onClick={aoFechar}>Cancelar</BotaoTexto>
@@ -234,10 +266,12 @@ function LinhaMaterial({
   item,
   podeEditar,
   verCustos,
+  fornecedores,
 }: {
   item: Material;
   podeEditar: boolean;
   verCustos: boolean;
+  fornecedores: Opcoes<OpcaoFornecedor>;
 }) {
   const [modo, setModo] = useState<"nenhum" | "editar" | TipoAcao>("nenhum");
   const { executar, pendente } = useAcao();
@@ -262,6 +296,7 @@ function LinhaMaterial({
             <p className="truncate text-xs text-zinc-500">
               {[item.marca, item.material, item.cor].filter(Boolean).join(" · ") || "Sem detalhes"}
               {item.localizacao && ` · ${item.localizacao}`}
+              {item.fornecedor_id && fornecedores.acessivel && ` · ${fornecedores.itens.find((f) => f.id === item.fornecedor_id)?.nome ?? "fornecedor"}`}
             </p>
             {verCustos && (
               <p className="truncate text-xs text-zinc-500">
@@ -311,7 +346,7 @@ function LinhaMaterial({
           )}
         </div>
       </div>
-      {modo === "editar" && <FormMaterial item={item} verCustos={verCustos} aoFechar={fechar} />}
+      {modo === "editar" && <FormMaterial item={item} verCustos={verCustos} fornecedores={fornecedores} aoFechar={fechar} />}
       {(modo === "entrada" || modo === "ajuste" || modo === "perda") && (
         <FormMovimento material={item} tipo={modo} verCustos={verCustos} aoFechar={fechar} />
       )}
@@ -412,12 +447,14 @@ export function EstoqueBoard({
   podeEditar,
   verCustos,
   limiteMovimentos,
+  fornecedores,
 }: {
   materiais: Material[];
   movimentos: MovimentoEstoque[];
   podeEditar: boolean;
   verCustos: boolean;
   limiteMovimentos: number;
+  fornecedores: Opcoes<OpcaoFornecedor>;
 }) {
   const [aba, setAba] = useState<"materiais" | "historico">("materiais");
   const [novo, setNovo] = useState(false);
@@ -493,7 +530,7 @@ export function EstoqueBoard({
         </Cartao>
       ) : (
         <div className="space-y-5">
-          {novo && <FormMaterial verCustos={verCustos} aoFechar={() => setNovo(false)} />}
+          {novo && <FormMaterial verCustos={verCustos} fornecedores={fornecedores} aoFechar={() => setNovo(false)} />}
           {visiveis.length === 0 && !novo ? (
             <Cartao titulo="Materiais" icone={<Boxes className="h-4 w-4" />}>
               <Vazio>
@@ -509,7 +546,7 @@ export function EstoqueBoard({
                   {visiveis
                     .filter((m) => m.tipo === t)
                     .map((m) => (
-                      <LinhaMaterial key={m.id} item={m} podeEditar={podeEditar} verCustos={verCustos} />
+                      <LinhaMaterial key={m.id} item={m} podeEditar={podeEditar} verCustos={verCustos} fornecedores={fornecedores} />
                     ))}
                 </div>
               </Cartao>

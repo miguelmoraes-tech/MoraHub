@@ -336,16 +336,24 @@ function AbaManutencoes({ impressora, manutencoes, podeEditar }: { impressora: I
 
 type Aba = "dados" | "pecas" | "manutencoes";
 
+/** Trabalho em andamento numa impressora (só de quem tem acesso a Produção). */
+export interface TrabalhoAtual {
+  numero: number;
+  descricao: string;
+}
+
 function Linha({
   item,
   pecas,
   manutencoes,
   podeEditar,
+  trabalhoAtual,
 }: {
   item: Impressora;
   pecas: PecaDesgaste[];
   manutencoes: Manutencao[];
   podeEditar: boolean;
+  trabalhoAtual: TrabalhoAtual | null;
 }) {
   const [aberto, setAberto] = useState(false);
   const [aba, setAba] = useState<Aba>("dados");
@@ -375,6 +383,11 @@ function Linha({
             {faltam != null && vencida && ` · ${formatHoras(Math.abs(faltam))} além do intervalo`}
             {deprec > 0 && ` · depreciação ${formatMoeda(deprec, 4)}/h (estimado)`}
           </p>
+          {item.status === "imprimindo" && (
+            <p className="truncate text-xs text-amber-400">
+              {trabalhoAtual ? `Ocupada: trabalho #${trabalhoAtual.numero} · ${trabalhoAtual.descricao}` : "Ocupada: imprimindo."}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <BotaoTexto onClick={() => setAberto((v) => !v)}>{aberto ? "Fechar" : "Detalhes"}</BotaoTexto>
@@ -452,11 +465,14 @@ export function ImpressorasBoard({
   pecas,
   manutencoes,
   podeEditar,
+  trabalhosAtuais,
 }: {
   impressoras: Impressora[];
   pecas: PecaDesgaste[];
   manutencoes: Manutencao[];
   podeEditar: boolean;
+  /** impressora_id → trabalho em andamento; vazio se ninguém está imprimindo. */
+  trabalhosAtuais: Record<string, TrabalhoAtual>;
 }) {
   const [statusFiltro, setStatusFiltro] = useState("");
   const [mostrarArquivadas, setMostrarArquivadas] = useState(false);
@@ -527,14 +543,15 @@ export function ImpressorasBoard({
                 pecas={pecas.filter((p) => p.impressora_id === i.id)}
                 manutencoes={manutencoes.filter((m) => m.impressora_id === i.id)}
                 podeEditar={podeEditar}
+                trabalhoAtual={trabalhosAtuais[i.id] ?? null}
               />
             ))}
           </div>
         )}
       </Cartao>
       <p className="mt-3 text-[11px] text-zinc-600">
-        Produtividade real (horas produzidas, taxa de falha medida) depende da Etapa B (produção). Por enquanto
-        mostramos só as horas de uso informadas.
+        As horas de uso crescem quando um trabalho é concluído em Produção (e também podem ser informadas à mão).
+        A produtividade medida por impressora fica na aba Produtividade da Produção.
       </p>
     </div>
   );

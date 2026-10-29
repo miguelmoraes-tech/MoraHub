@@ -45,7 +45,7 @@ import {
   type MapaRotulos,
 } from "@/lib/rotulos-shared";
 import { erroDeNicho, resumoModulos } from "@/lib/nichos-shared";
-import { sanearPermissoes, sociosErrorMessage } from "@/lib/socios-shared";
+import { MODULO_ROTULO, sanearPermissoes, sociosErrorMessage } from "@/lib/socios-shared";
 import {
   AVISO_ATIVE_FINANCEIRO,
   AVISO_SEM_FINANCEIRO,
@@ -114,6 +114,22 @@ import { ESTADO_VAZIO, estadoParaEdicao, montarEntrada } from "@/lib/impressao-3
 import { lerCalculo, normalizarFracao, ocultarCustosDoCalculo } from "@/lib/impressao-3d/calculo";
 import { mensagemEscrita, mensagemRpc } from "@/lib/impressao-3d/erros";
 import { BUCKET_P3D } from "@/lib/impressao-3d/storage-constantes";
+import {
+  ACOES_COMPRA, ACOES_ENVIO, ACOES_PEDIDO, agruparIndicadores, agruparPorDefeito, avisosConclusao, compraEditavel,
+  cotacoesAbertas, historicoRecebido, lerConclusao, lerFalha, lerInicio, lerPagamento, lerRecebimento,
+  ordenarFila, pedidoAceitaEnvio, pedidoEditavel, podeExcluirCompra, podeExcluirEnvio, podeExcluirPedido,
+  podeGerarProducao, prazoVencido, precoUnitarioBase, produtividadePorImpressora, quantidadeBaseDeRolos,
+  resumirDesperdicio, saldoPedido, taxaFalhaReal, totalDaCompra, totalDoPedido, trabalhoEstruturalEditavel,
+  urgentesNaFila, validarOpcoesRecebimento,
+} from "@/lib/impressao-3d/regras-operacao";
+import {
+  COLUNAS_PEDIDO, COLUNAS_PEDIDO_ITEM, TIPOS_DEFEITO, type Prioridade,
+} from "@/lib/impressao-3d/tipos-operacao";
+import {
+  CompraItemSchema, CompraSchema, ConclusaoSchema, EnvioSchema, FalhaSchema, FornecedorSchema, InspecaoSchema,
+  PagamentoSchema, PedidoItemSchema, PedidoLimitadoSchema, PedidoSchema, RecebimentoSchema, TrabalhoSchema,
+} from "@/lib/impressao-3d/validacao-operacao";
+import { RESUMO_P3D_VAZIO } from "@/lib/impressao-3d/resumo";
 
 let total = 0;
 function teste(nome: string, fn: () => void | Promise<void>) {
@@ -1651,15 +1667,23 @@ await teste("guard de /pessoal: exige o tipo 'pessoal' ativo; sem ele (ou com fa
 // ===========================================================================
 
 console.log("\nImpressão 3D — registro, rotas e menu");
-const P3D = ["p3d_impressoras", "p3d_estoque", "p3d_produtos", "p3d_precificacao", "p3d_orcamentos"];
+const P3D = [
+  "p3d_impressoras", "p3d_estoque", "p3d_produtos", "p3d_precificacao", "p3d_orcamentos",
+  "p3d_fornecedores", "p3d_pedidos", "p3d_producao", "p3d_qualidade", "p3d_expedicao",
+];
 const ROTA_P3D: Record<string, string> = {
   p3d_impressoras: "/impressao-3d/impressoras",
   p3d_estoque: "/impressao-3d/estoque",
   p3d_produtos: "/impressao-3d/produtos",
   p3d_precificacao: "/impressao-3d/precificacao",
   p3d_orcamentos: "/impressao-3d/orcamentos",
+  p3d_fornecedores: "/impressao-3d/fornecedores",
+  p3d_pedidos: "/impressao-3d/pedidos",
+  p3d_producao: "/impressao-3d/producao",
+  p3d_qualidade: "/impressao-3d/qualidade",
+  p3d_expedicao: "/impressao-3d/expedicao",
 };
-await teste("o registro cobre as 5 chaves do catálogo, cada uma com rota, menu e as tabelas p3d_*", () => {
+await teste("o registro cobre as 10 chaves (5 da Etapa A + 5 da Etapa B), cada uma com rota, menu e as tabelas p3d_*", () => {
   for (const chave of P3D) {
     const m = MODULOS.find((x) => x.chave === chave);
     assert.ok(m, chave);
@@ -1674,7 +1698,9 @@ await teste("o registro cobre as 5 chaves do catálogo, cada uma com rota, menu 
     "p3d_config_precificacao", "p3d_impressoras", "p3d_manutencoes", "p3d_materiais",
     "p3d_movimentos_estoque", "p3d_orcamento_itens", "p3d_orcamentos", "p3d_pecas_desgaste",
     "p3d_produto_arquivos", "p3d_produto_variacoes", "p3d_produtos",
-  ]);
+    "p3d_compra_itens", "p3d_compras", "p3d_envios", "p3d_falhas", "p3d_fornecedores", "p3d_inspecoes",
+    "p3d_pedido_historico", "p3d_pedido_itens", "p3d_pedido_pagamentos", "p3d_pedidos", "p3d_producao",
+  ].sort());
 });
 await teste("moduloDaRota reconhece as telas (inclusive detalhes) e não confunde com /orcamentos do Financeiro", () => {
   for (const [chave, rota] of Object.entries(ROTA_P3D)) {
@@ -1737,6 +1763,10 @@ await teste("guard: leitura x edição por módulo p3d e extra 'custos' (só de 
   const semExtra = g("p3d_orcamentos", "socio", "leitura", [perm("p3d_orcamentos", "leitura")]);
   assert.equal(podeVerCustos(comExtra), true);
   assert.equal(podeVerCustos(semExtra), false);
+  const pedidoComExtra = g("p3d_pedidos", "socio", "leitura", [perm("p3d_pedidos", "leitura", ["custos"])]);
+  const pedidoSemExtra = g("p3d_pedidos", "socio", "leitura", [perm("p3d_pedidos", "leitura")]);
+  assert.equal(podeVerCustos(pedidoComExtra), true);
+  assert.equal(podeVerCustos(pedidoSemExtra), false, "Pedidos sem o extra custos não vê custo, lucro nem margem");
   assert.equal(podeVerCustos(g("p3d_estoque", "dono", "leitura")), true, "fundador sempre vê custos");
   assert.equal(podeVerCustos(g("p3d_estoque", "cofundador", "leitura")), true);
   assert.equal(podeVerCustos(null), false);
@@ -1986,11 +2016,17 @@ const ARQ_P3D = [
   "app/(dashboard)/impressao-3d/produtos/actions.ts",
   "app/(dashboard)/impressao-3d/precificacao/actions.ts",
   "app/(dashboard)/impressao-3d/orcamentos/actions.ts",
+  "app/(dashboard)/impressao-3d/fornecedores/actions.ts",
+  "app/(dashboard)/impressao-3d/pedidos/actions.ts",
+  "app/(dashboard)/impressao-3d/producao/actions.ts",
+  "app/(dashboard)/impressao-3d/qualidade/actions.ts",
+  "app/(dashboard)/impressao-3d/expedicao/actions.ts",
 ];
 await teste("toda action de escrita do nicho passa por getAcessoEdicao do módulo certo", () => {
   const modulo: Record<string, string> = {
     impressoras: "p3d_impressoras", estoque: "p3d_estoque", produtos: "p3d_produtos",
-    precificacao: "p3d_precificacao", orcamentos: "p3d_orcamentos",
+    precificacao: "p3d_precificacao", orcamentos: "p3d_orcamentos", fornecedores: "p3d_fornecedores",
+    pedidos: "p3d_pedidos", producao: "p3d_producao", qualidade: "p3d_qualidade", expedicao: "p3d_expedicao",
   };
   for (const arq of ARQ_P3D) {
     const texto = lerFonte(arq);
@@ -2105,6 +2141,467 @@ await teste("Visão Geral: resumo do nicho só consulta módulos ligados e só l
   assert.ok(!/preco_|custo|lucro|valor_/.test(r.replace(/\/\*[\s\S]*?\*\//g, "")), "sem valores monetários");
   const home = lerFonte("components/dashboard-home/dashboard-home-board.tsx");
   for (const chave of P3D) assert.ok(home.includes(`com("${chave}")`), chave);
+});
+
+// ===========================================================================
+// Nicho Impressão 3D (Etapa B) — fornecedores e compras, pedidos, produção, qualidade, expedição
+// ===========================================================================
+
+console.log("\nImpressão 3D (Etapa B) — status, fila e regras puras");
+await teste("pedido: transições espelham a RPC (novo→confirmado|cancelado; … ; enviado→entregue; finais sem ação)", () => {
+  const alvos = (s: keyof typeof ACOES_PEDIDO) => ACOES_PEDIDO[s].map((a) => a.alvo);
+  assert.deepEqual(alvos("novo"), ["confirmado", "cancelado"]);
+  assert.deepEqual(alvos("confirmado"), ["em_producao", "pronto", "cancelado"]);
+  assert.deepEqual(alvos("em_producao"), ["pronto", "cancelado"]);
+  assert.deepEqual(alvos("pronto"), ["enviado", "entregue", "em_producao", "cancelado"]);
+  assert.deepEqual(alvos("enviado"), ["entregue"]);
+  assert.deepEqual([alvos("entregue"), alvos("cancelado")], [[], []]);
+  for (const s of Object.keys(ACOES_PEDIDO) as (keyof typeof ACOES_PEDIDO)[])
+    for (const a of ACOES_PEDIDO[s]) assert.equal(!!a.pedeMotivo, a.alvo === "cancelado", `${s}→${a.alvo}`);
+});
+await teste("compra e envio: transições espelham as RPCs; recebida/cancelada/entregue/devolvido são finais", () => {
+  const c = (s: keyof typeof ACOES_COMPRA) => ACOES_COMPRA[s].map((a) => a.alvo);
+  assert.deepEqual(c("cotacao"), ["aprovada", "cancelada"]);
+  assert.deepEqual(c("aprovada"), ["cotacao", "cancelada"]);
+  assert.deepEqual([c("recebida"), c("cancelada")], [[], []]);
+  const e = (s: keyof typeof ACOES_ENVIO) => ACOES_ENVIO[s].map((a) => a.alvo);
+  assert.deepEqual(e("preparando"), ["postado"]);
+  assert.deepEqual(e("postado"), ["em_transito", "entregue", "problema", "devolvido"]);
+  assert.deepEqual(e("em_transito"), ["entregue", "problema", "devolvido"]);
+  assert.deepEqual(e("problema"), ["em_transito", "entregue", "devolvido"]);
+  assert.deepEqual([e("entregue"), e("devolvido")], [[], []]);
+});
+await teste("exclusão e edição: só o que o banco permite (pedido novo sem pagamento e sem orçamento; compra em cotação; envio em preparação)", () => {
+  assert.equal(podeExcluirPedido({ status: "novo", pago_valor: 0, orcamento_id: null, origem: "manual" }), true);
+  assert.equal(podeExcluirPedido({ status: "novo", pago_valor: 10, orcamento_id: null, origem: "manual" }), false);
+  assert.equal(podeExcluirPedido({ status: "novo", pago_valor: 0, orcamento_id: "x", origem: "orcamento" }), false);
+  assert.equal(podeExcluirPedido({ status: "confirmado", pago_valor: 0, orcamento_id: null, origem: "manual" }), false);
+  assert.equal(podeExcluirCompra("cotacao"), true);
+  assert.equal(podeExcluirCompra("aprovada"), false);
+  assert.equal(compraEditavel("aprovada"), true);
+  assert.equal(compraEditavel("recebida"), false);
+  assert.equal(podeExcluirEnvio("preparando"), true);
+  assert.equal(podeExcluirEnvio("postado"), false);
+  assert.equal(pedidoEditavel("confirmado"), true);
+  assert.equal(pedidoEditavel("em_producao"), false);
+  assert.equal(podeGerarProducao("confirmado"), true);
+  assert.equal(podeGerarProducao("novo"), false);
+  assert.equal(pedidoAceitaEnvio("pronto"), true);
+  assert.equal(pedidoAceitaEnvio("em_producao"), false);
+  assert.equal(trabalhoEstruturalEditavel("fila"), true);
+  assert.equal(trabalhoEstruturalEditavel("imprimindo"), false);
+});
+await teste("fila: prioridade (urgente>alta>normal>baixa), depois prazo (nulos por último), depois número", () => {
+  const t = (numero: number, prioridade: Prioridade, prazo: string | null) => ({ numero, prioridade, prazo });
+  const fila = ordenarFila([
+    t(1, "normal", null), t(2, "baixa", "2026-01-01"), t(3, "urgente", null), t(4, "normal", "2026-03-01"),
+    t(5, "alta", "2026-05-01"), t(6, "normal", "2026-03-01"), t(7, "urgente", "2026-02-01"), t(8, "normal", "2026-02-01"),
+  ]);
+  assert.deepEqual(fila.map((x) => x.numero), [7, 3, 5, 8, 4, 6, 1, 2]);
+  assert.equal(urgentesNaFila([{ status: "fila", prioridade: "urgente" }, { status: "imprimindo", prioridade: "urgente" }, { status: "fila", prioridade: "alta" }]), 1);
+  const entrada = [t(2, "normal", null), t(1, "normal", null)];
+  ordenarFila(entrada);
+  assert.deepEqual(entrada.map((x) => x.numero), [2, 1], "não altera a lista original");
+});
+await teste("pedido: prazo vencido só em pedido aberto (novo→pronto); saldo nunca negativo; total = subtotal − desconto + frete", () => {
+  assert.equal(prazoVencido({ status: "confirmado", prazo_entrega: "2026-01-01" }, "2026-01-02"), true);
+  assert.equal(prazoVencido({ status: "confirmado", prazo_entrega: "2026-01-02" }, "2026-01-02"), false, "o próprio dia não vence");
+  assert.equal(prazoVencido({ status: "entregue", prazo_entrega: "2026-01-01" }, "2026-02-01"), false);
+  assert.equal(prazoVencido({ status: "cancelado", prazo_entrega: "2026-01-01" }, "2026-02-01"), false);
+  assert.equal(prazoVencido({ status: "novo", prazo_entrega: null }, "2026-02-01"), false);
+  assert.equal(saldoPedido(100, 40), 60);
+  assert.equal(saldoPedido(100, 120), 0);
+  assert.equal(totalDoPedido(100, 10, 15.5), 105.5);
+});
+await teste("compras: rolos × peso líquido = unidade base; preço unitário sem frete; cotações abertas do menor ao maior", () => {
+  assert.equal(quantidadeBaseDeRolos(3, 1000), 3000);
+  assert.equal(quantidadeBaseDeRolos(3, null), null);
+  assert.equal(quantidadeBaseDeRolos(0, 1000), null);
+  assert.equal(precoUnitarioBase(120, 1000), 0.12);
+  assert.equal(precoUnitarioBase(120, 0), null);
+  assert.equal(totalDaCompra(300, 20, 10), 310);
+  assert.equal(validarOpcoesRecebimento(true, null), "Informe o vencimento para gerar a conta a pagar.");
+  assert.equal(validarOpcoesRecebimento(false, null), null);
+  const l = (compra_id: string, material_id: string, compra_status: string, preco_unitario: number, data: string) => ({
+    material_id, fornecedor_id: "f", compra_id, compra_numero: 1, compra_status, data, quantidade: 1000, preco_unitario, preco_total: preco_unitario * 1000,
+  });
+  const linhas = [l("a", "m1", "cotacao", 0.15, "2026-01-01"), l("b", "m1", "cotacao", 0.1, "2026-01-02"), l("c", "m1", "recebida", 0.2, "2026-01-03"), l("d", "m2", "cotacao", 0.01, "2026-01-01"), l("e", "m1", "recebida", 0.18, "2026-02-01")];
+  assert.deepEqual(cotacoesAbertas(linhas, "m1").map((x) => x.compra_id), ["b", "a"]);
+  assert.deepEqual(historicoRecebido(linhas, "m1").map((x) => x.compra_id), ["e", "c"], "mais recente primeiro");
+});
+
+console.log("\nImpressão 3D (Etapa B) — qualidade: taxa real, desperdício e produtividade");
+await teste("taxa real = trabalhos com falha ÷ (concluídos + falhos); sem base = null (nunca zero inventado)", () => {
+  assert.equal(taxaFalhaReal({ concluidos: 0, falhos: 0, trabalhosComFalha: 0 }), null);
+  assert.equal(taxaFalhaReal({ concluidos: 8, falhos: 2, trabalhosComFalha: 1 }), 0.1);
+  assert.equal(taxaFalhaReal({ concluidos: 0, falhos: 1, trabalhosComFalha: 5 }), 1, "limitada a 100%");
+});
+await teste("desperdício: falha com baixou_estoque=false NÃO soma ao adicional (já está no consumo do concluído)", () => {
+  const f = (baixou_estoque: boolean, peso: number, custo: number) => ({
+    baixou_estoque, peso_perdido_g: peso, custo_material: custo, horas_perdidas: 1, custo_maquina_estimado: 2,
+  });
+  const r = resumirDesperdicio([f(true, 100, 10), f(false, 50, 5), f(true, 20, 2)]);
+  assert.equal(r.adicionalG, 120);
+  assert.equal(r.adicionalCusto, 12);
+  assert.equal(r.jaContidoG, 50);
+  assert.equal(r.jaContidoCusto, 5);
+  assert.equal(r.horasPerdidas, 3);
+  assert.equal(r.custoMaquina, 6);
+  assert.equal(resumirDesperdicio([]).adicionalCusto, 0);
+  const tela = lerFonte("components/impressao-3d/qualidade-board.tsx");
+  assert.ok(tela.includes("não soma") && tela.includes("duas vezes"), "a tela explica a regra");
+});
+await teste("indicadores por impressora/material/produto: concluídos, falhos, falhas e taxa vêm dos dados", () => {
+  const trabalhos = [
+    { id: "1", status: "concluida" as const, impressora_id: "A", material_id: "m", produto_id: "p" },
+    { id: "2", status: "concluida" as const, impressora_id: "A", material_id: "m", produto_id: "p" },
+    { id: "3", status: "falhou" as const, impressora_id: "A", material_id: "m", produto_id: null },
+    { id: "4", status: "concluida" as const, impressora_id: "B", material_id: "m", produto_id: "p" },
+    { id: "5", status: "fila" as const, impressora_id: "B", material_id: "m", produto_id: "p" },
+  ];
+  const falhas = [
+    { producao_id: "3", tipo_defeito: "warping", impressora_id: "A", material_id: "m", produto_id: null, peso_perdido_g: 30, horas_perdidas: 1 },
+    { producao_id: "1", tipo_defeito: "stringing", impressora_id: "A", material_id: "m", produto_id: "p", peso_perdido_g: 5, horas_perdidas: 0.5 },
+    { producao_id: "1", tipo_defeito: "cor", impressora_id: null, material_id: "m", produto_id: "p", peso_perdido_g: 5, horas_perdidas: 0 },
+  ];
+  const porImp = agruparIndicadores(trabalhos, falhas, "impressora_id");
+  const a = porImp.find((g) => g.chave === "A")!;
+  assert.deepEqual([a.concluidos, a.falhos, a.falhas, a.trabalhosComFalha], [2, 1, 3, 2]);
+  assert.equal(taxaFalhaReal(a), 2 / 3);
+  const b = porImp.find((g) => g.chave === "B")!;
+  assert.deepEqual([b.concluidos, b.falhos, b.falhas], [1, 0, 0], "trabalho na fila não entra");
+  assert.equal(taxaFalhaReal(b), 0);
+  const porDef = agruparPorDefeito(falhas);
+  assert.equal(porDef.length, 3);
+  assert.equal(porDef[0].falhas, 1);
+});
+await teste("produtividade por impressora vem de trabalhos concluídos/falhos e horas medidas; sem horas = sem taxa", () => {
+  const m = produtividadePorImpressora([
+    { status: "concluida", impressora_id: "A", horas_reais: 2, peso_real_g: 100 },
+    { status: "concluida", impressora_id: "A", horas_reais: 2, peso_real_g: 50 },
+    { status: "falhou", impressora_id: "A", horas_reais: null, peso_real_g: null },
+    { status: "fila", impressora_id: "A", horas_reais: 99, peso_real_g: 99 },
+    { status: "concluida", impressora_id: "B", horas_reais: null, peso_real_g: null },
+    { status: "concluida", impressora_id: null, horas_reais: 1, peso_real_g: 1 },
+  ]);
+  const a = m.get("A")!;
+  assert.deepEqual([a.concluidos, a.falhos, a.horasReais, a.pesoRealG, a.trabalhosPorHora], [2, 1, 4, 150, 0.5]);
+  assert.equal(m.get("B")!.trabalhosPorHora, null);
+  assert.equal(m.size, 2);
+});
+await teste("retornos das RPCs são lidos com defesa (jsonb não confiável) e geram os avisos certos", () => {
+  const c = lerConclusao({ saldo: -5, estoque_negativo: true, abaixo_do_minimo: true, manutencao_devida: true });
+  const avisos = avisosConclusao(c, (n) => String(n));
+  assert.ok(avisos.some((a) => /NEGATIVO/.test(a)) && avisos.some((a) => /manutenção/.test(a)));
+  assert.ok(!avisos.some((a) => /Saldo do material/.test(a)), "saldo negativo não é anunciado como saldo normal");
+  assert.deepEqual(avisosConclusao(lerConclusao({ saldo: 900 }), (n) => `${n} g`), ["Saldo do material após a baixa: 900 g."]);
+  assert.deepEqual(lerConclusao(null), { saldo: null, estoque_negativo: false, abaixo_do_minimo: false, manutencao_devida: false });
+  assert.deepEqual(lerInicio({ impressora: "Ender", aviso: " Estoque baixo " }), { impressora: "Ender", aviso: "Estoque baixo" });
+  assert.deepEqual(lerInicio("lixo"), { impressora: null, aviso: null });
+  const f = lerFalha({ falha_id: "x", reimpressao_id: "y", baixou_estoque: false, custo_material: "3", estoque_negativo: false });
+  assert.deepEqual([f.baixou_estoque, f.custo_material, f.reimpressao_id], [false, 3, "y"]);
+  assert.equal(lerPagamento({ status_pagamento: "parcial", saldo: "10", pago_valor: 5 }).status_pagamento, "parcial");
+  assert.equal(lerPagamento({}).status_pagamento, "pendente");
+  assert.equal(lerRecebimento({ itens_recebidos: 2, total: 99.5, conta_pagar_id: null }).total, 99.5);
+});
+
+console.log("\nImpressão 3D (Etapa B) — validação dos formulários");
+await teste("pedido: exige cliente cadastrado OU avulso; prioridade válida; valores não negativos", () => {
+  const base = { prioridade: "normal", cliente_avulso: "Maria", desconto_valor: "", frete_valor: "12,50" };
+  const r = PedidoSchema.safeParse(base);
+  assert.ok(r.success);
+  if (r.success) assert.deepEqual([r.data.frete_valor, r.data.desconto_valor, r.data.cliente_id], [12.5, 0, null]);
+  assert.ok(!PedidoSchema.safeParse({ ...base, cliente_avulso: "" }).success, "sem cliente nenhum");
+  assert.ok(PedidoSchema.safeParse({ ...base, cliente_avulso: "", cliente_id: "11111111-1111-4111-8111-111111111111" }).success);
+  assert.ok(!PedidoSchema.safeParse({ ...base, prioridade: "critica" }).success);
+  assert.ok(!PedidoSchema.safeParse({ ...base, desconto_valor: "-1" }).success);
+  assert.ok(PedidoLimitadoSchema.safeParse({ prioridade: "alta", prazo_entrega: "2026-12-01" }).success);
+});
+await teste("schemas nunca deixam passar campo protegido (status, total, horas_reais...), mesmo se o formulário forjar", () => {
+  const forjado = {
+    status: "pago", total: "1", numero: "9", pago_valor: "1", subtotal: "1", custo_total: "1", lucro_total: "1",
+    horas_reais: "1", peso_real_g: "1", qualidade: "aprovada", postado_em: "2026-01-01", recebedor: "x",
+    recebida_em: "2026-01-01", conta_pagar_id: "x",
+  };
+  const u = "11111111-1111-4111-8111-111111111111";
+  const saidas: Record<string, unknown>[] = [
+    PedidoSchema.parse({ ...forjado, prioridade: "normal", cliente_avulso: "A" }),
+    CompraSchema.parse({ ...forjado, fornecedor_id: u }),
+    TrabalhoSchema.parse({ ...forjado, descricao: "Peça", quantidade: "1", prioridade: "normal" }),
+    EnvioSchema.parse({ ...forjado, pedido_id: u, volumes: "1" }),
+    PedidoItemSchema.parse({ ...forjado, descricao: "x", quantidade: "1", preco_unitario: "1", preco_total: "99", lucro: "99" }),
+    CompraItemSchema.parse({ ...forjado, material_id: u, quantidade: "1", preco_total: "1", preco_unitario: "99" }),
+  ];
+  for (const saida of saidas) for (const campo of Object.keys(forjado)) assert.ok(!(campo in saida), campo);
+  assert.ok(!("preco_total" in saidas[4]) && !("lucro" in saidas[4]), "preço total e lucro do item são calculados pelo banco");
+  assert.ok(!("preco_unitario" in saidas[5]), "preço unitário da compra é gerado pelo banco");
+});
+await teste("item de compra: quantidade > 0 (unidade base) e valor pago ≥ 0; recebimento exige vencimento se gerar conta", () => {
+  const u = "11111111-1111-4111-8111-111111111111";
+  assert.ok(CompraItemSchema.safeParse({ material_id: u, quantidade: "3000", preco_total: "360,00" }).success);
+  assert.ok(!CompraItemSchema.safeParse({ material_id: u, quantidade: "0", preco_total: "10" }).success);
+  assert.ok(!CompraItemSchema.safeParse({ material_id: u, quantidade: "10", preco_total: "-1" }).success);
+  assert.ok(!CompraItemSchema.safeParse({ material_id: "", quantidade: "10", preco_total: "1" }).success);
+  assert.ok(RecebimentoSchema.safeParse({}).success);
+  assert.ok(!RecebimentoSchema.safeParse({ gerar_conta_pagar: "on" }).success, "sem vencimento");
+  assert.ok(RecebimentoSchema.safeParse({ gerar_conta_pagar: "on", vencimento: "2026-12-10" }).success);
+});
+await teste("item de pedido: quantidade inteira > 0, preço ≥ 0, custo opcional; produção: quantidade e prioridade", () => {
+  const ok = { descricao: "Suporte", quantidade: "2", preco_unitario: "19,90", custo_unitario: "" };
+  const r = PedidoItemSchema.safeParse(ok);
+  assert.ok(r.success);
+  if (r.success) assert.deepEqual([r.data.preco_unitario, r.data.custo_unitario], [19.9, null]);
+  assert.ok(!PedidoItemSchema.safeParse({ ...ok, quantidade: "1,5" }).success);
+  assert.ok(!PedidoItemSchema.safeParse({ ...ok, quantidade: "0" }).success);
+  assert.ok(!PedidoItemSchema.safeParse({ ...ok, descricao: " " }).success);
+  assert.ok(TrabalhoSchema.safeParse({ descricao: "Lote", quantidade: "10", prioridade: "urgente" }).success);
+  assert.ok(!TrabalhoSchema.safeParse({ descricao: "Lote", quantidade: "0", prioridade: "normal" }).success);
+  assert.ok(!TrabalhoSchema.safeParse({ descricao: "Lote", quantidade: "1", prioridade: "x" }).success);
+});
+await teste("conclusão e falha: pesos/horas ≥ 0 obrigatórios; tipo de defeito do contrato; quantidade afetada inteira > 0", () => {
+  assert.ok(ConclusaoSchema.safeParse({ peso_real_g: "152,3", horas_reais: "4,5" }).success);
+  assert.ok(!ConclusaoSchema.safeParse({ peso_real_g: "", horas_reais: "4" }).success);
+  assert.ok(!ConclusaoSchema.safeParse({ peso_real_g: "10", horas_reais: "-1" }).success);
+  assert.equal(TIPOS_DEFEITO.length, 14);
+  const base = { tipo_defeito: "warping", peso_perdido_g: "20", horas_perdidas: "1", quantidade_afetada: "" };
+  const r = FalhaSchema.safeParse(base);
+  assert.ok(r.success);
+  if (r.success) assert.deepEqual([r.data.quantidade_afetada, r.data.reimprimir], [null, false]);
+  assert.ok(!FalhaSchema.safeParse({ ...base, tipo_defeito: "outro_tipo" }).success);
+  assert.ok(!FalhaSchema.safeParse({ ...base, quantidade_afetada: "1,5" }).success);
+  assert.ok(!FalhaSchema.safeParse({ ...base, quantidade_afetada: "0" }).success);
+  assert.ok(FalhaSchema.safeParse({ ...base, quantidade_afetada: "2", reimprimir: "on" }).success);
+});
+await teste("inspeção: reprovado exige ≥ 1 defeito; aprovado não; defeitos só do contrato", () => {
+  assert.ok(InspecaoSchema.safeParse({ resultado: "aprovado", defeitos: [], acao: "manter" }).success);
+  assert.ok(!InspecaoSchema.safeParse({ resultado: "reprovado", defeitos: [], acao: "manter" }).success);
+  assert.ok(InspecaoSchema.safeParse({ resultado: "reprovado", defeitos: ["warping"], acao: "reimprimir" }).success);
+  assert.ok(!InspecaoSchema.safeParse({ resultado: "reprovado", defeitos: ["inventado"], acao: "manter" }).success);
+  assert.ok(InspecaoSchema.safeParse({ resultado: "retrabalho", defeitos: [], acao: "manter" }).success);
+});
+await teste("pagamento: valor > 0, forma e tipo do contrato; envio: link só http(s), volumes ≥ 1", () => {
+  assert.ok(PagamentoSchema.safeParse({ tipo: "pagamento", valor: "50,00", forma: "pix" }).success);
+  assert.ok(PagamentoSchema.safeParse({ tipo: "estorno", valor: "10", forma: "outro" }).success);
+  assert.ok(!PagamentoSchema.safeParse({ tipo: "pagamento", valor: "0", forma: "pix" }).success);
+  assert.ok(!PagamentoSchema.safeParse({ tipo: "pagamento", valor: "5", forma: "cheque" }).success);
+  const u = "11111111-1111-4111-8111-111111111111";
+  assert.ok(EnvioSchema.safeParse({ pedido_id: u, volumes: "1", url_rastreio: "https://rastreio.exemplo/abc" }).success);
+  assert.ok(!EnvioSchema.safeParse({ pedido_id: u, volumes: "1", url_rastreio: "javascript:alert(1)" }).success);
+  assert.ok(!EnvioSchema.safeParse({ pedido_id: u, volumes: "0" }).success);
+  assert.ok(!EnvioSchema.safeParse({ pedido_id: "", volumes: "1" }).success);
+  assert.ok(FornecedorSchema.safeParse({ nome: "Filamentos SA", email: "contato@f.com", site: "https://f.com" }).success);
+  assert.ok(!FornecedorSchema.safeParse({ nome: "X", email: "sem-arroba" }).success);
+  assert.ok(!FornecedorSchema.safeParse({ nome: "X", site: "ftp://x" }).success);
+  assert.ok(MaterialSchema.safeParse({ tipo: "filamento", nome: "PLA", unidade: "g", fornecedor_id: u }).success, "material aceita fornecedor");
+  assert.ok(!MaterialSchema.safeParse({ tipo: "filamento", nome: "PLA", unidade: "g", fornecedor_id: "abc" }).success);
+});
+await teste("erros do banco: raise exception (P0001) chega como veio; RPC chega como veio", () => {
+  assert.equal(mensagemEscrita({ code: "P0001", message: "Compra recebida não pode ser alterada." }, "padrão"), "Compra recebida não pode ser alterada.");
+  assert.equal(mensagemEscrita({ code: "P0001", message: " " }, "padrão"), "padrão");
+  assert.equal(mensagemRpc({ message: "Impressora ocupada." }, "padrão"), "Impressora ocupada.");
+});
+
+console.log("\nImpressão 3D (Etapa B) — registro, menu e contrato do banco no código");
+const P3D_B = ["p3d_fornecedores", "p3d_pedidos", "p3d_producao", "p3d_qualidade", "p3d_expedicao"];
+await teste("5 módulos novos registrados com rota, menu no grupo 'Impressão 3D' e nenhuma rota fora de /impressao-3d", () => {
+  const esperado: Record<string, string> = {
+    p3d_fornecedores: "/impressao-3d/fornecedores", p3d_pedidos: "/impressao-3d/pedidos", p3d_producao: "/impressao-3d/producao",
+    p3d_qualidade: "/impressao-3d/qualidade", p3d_expedicao: "/impressao-3d/expedicao",
+  };
+  for (const chave of P3D_B) {
+    const m = MODULOS.find((x) => x.chave === chave)!;
+    assert.deepEqual(m.rotas, [esperado[chave]], chave);
+    assert.equal(m.menu[0].grupo, "Impressão 3D", chave);
+    assert.equal(moduloDaRota(`${esperado[chave]}/qualquer/subrota`), chave);
+  }
+  assert.equal(moduloDaRota("/impressao-3d/fornecedores/compras/abc"), "p3d_fornecedores");
+  assert.equal(moduloDaRota("/impressao-3d/pedidos/abc"), "p3d_pedidos");
+  assert.deepEqual(MODULOS.find((m) => m.chave === "p3d_pedidos")!.tabelas, ["p3d_pedidos", "p3d_pedido_itens", "p3d_pedido_pagamentos", "p3d_pedido_historico"]);
+});
+await teste("matriz de sócios e rótulos têm as 5 chaves novas", () => {
+  for (const chave of P3D_B) {
+    assert.ok(MODULO_ROTULO[chave], `socios ${chave}`);
+    assert.ok(ROTULOS_PADRAO[chave], `rotulos ${chave}`);
+  }
+  assert.equal(ROTULOS_PADRAO.p3d_pedidos.plural, "Pedidos e vendas");
+});
+await teste("extra 'custos' de Pedidos: sem ele o servidor não seleciona custo, lucro nem margem (lista, detalhe e snapshot)", () => {
+  const lista = lerFonte("app/(dashboard)/impressao-3d/pedidos/page.tsx");
+  assert.ok(lista.includes("verCustos ? `${COLUNAS_PEDIDO}, custo_total, lucro_total` : COLUNAS_PEDIDO"));
+  const det = lerFonte("app/(dashboard)/impressao-3d/pedidos/[id]/page.tsx");
+  assert.ok(det.includes("verCustos ? `${COLUNAS_PEDIDO}, custo_total, lucro_total` : COLUNAS_PEDIDO"));
+  assert.ok(det.includes("verCustos ? `${COLUNAS_PEDIDO_ITEM}, custo_unitario, custo_total, lucro` : COLUNAS_PEDIDO_ITEM"));
+  assert.ok(det.includes("ocultarCustosDoCalculo(") && det.includes("entradaParaRecalculo("), "snapshot sem custos");
+  for (const coluna of ["custo_total", "lucro_total", "custo_unitario", "lucro,", "lucro "]) {
+    assert.ok(!COLUNAS_PEDIDO.includes(coluna) && !COLUNAS_PEDIDO_ITEM.includes(coluna), `coluna base não pode ter ${coluna}`);
+  }
+  const acoes = lerFonte("app/(dashboard)/impressao-3d/pedidos/actions.ts");
+  assert.ok(acoes.includes("SEM_PERMISSAO_CUSTOS") && acoes.includes("custo_unitario !== null && !verCustos"), "custo unitário só com o extra");
+  const tela = lerFonte("components/impressao-3d/pedido-detalhe.tsx");
+  assert.ok(tela.includes("verCustos &&"), "a tela esconde custo/lucro/margem sem o extra");
+});
+await teste("toda action da Etapa B passa por getAcessoEdicao do módulo certo e filtra por workspace_id", () => {
+  const arquivos: [string, string][] = [
+    ["app/(dashboard)/impressao-3d/fornecedores/actions.ts", "p3d_fornecedores"],
+    ["app/(dashboard)/impressao-3d/pedidos/actions.ts", "p3d_pedidos"],
+    ["app/(dashboard)/impressao-3d/producao/actions.ts", "p3d_producao"],
+    ["app/(dashboard)/impressao-3d/qualidade/actions.ts", "p3d_qualidade"],
+    ["app/(dashboard)/impressao-3d/expedicao/actions.ts", "p3d_expedicao"],
+  ];
+  for (const [arq, modulo] of arquivos) {
+    const texto = lerFonte(arq);
+    assert.ok(texto.includes(`const MODULO = "${modulo}"`), arq);
+    assert.ok(!/getDonoIdAtivo|getWorkspaceIdAtivo|getAcessoSoDono/.test(texto), `${arq} usa código antigo de dono`);
+    for (const parte of texto.split(/\nexport async function /).slice(1)) {
+      const nome = parte.slice(0, parte.indexOf("(")).trim();
+      assert.ok(parte.includes("getAcessoEdicao("), `${arq} ${nome} sem guarda de edição`);
+      if (/\.(insert|update|upsert|delete)\(/.test(parte)) assert.ok(parte.includes("workspace_id"), `${arq} ${nome} sem workspace_id`);
+      assert.ok(!/p_ws:\s*["'`]|workspace_id:\s*["'`]/.test(parte), `${arq} ${nome} fixa empresa em texto`);
+    }
+  }
+});
+await teste("páginas da Etapa B leem pelo guard e filtram por workspace_id da empresa ativa", () => {
+  const paginas: [string, string][] = [
+    ["app/(dashboard)/impressao-3d/fornecedores/page.tsx", "p3d_fornecedores"],
+    ["app/(dashboard)/impressao-3d/fornecedores/compras/[id]/page.tsx", "p3d_fornecedores"],
+    ["app/(dashboard)/impressao-3d/pedidos/page.tsx", "p3d_pedidos"],
+    ["app/(dashboard)/impressao-3d/pedidos/[id]/page.tsx", "p3d_pedidos"],
+    ["app/(dashboard)/impressao-3d/producao/page.tsx", "p3d_producao"],
+    ["app/(dashboard)/impressao-3d/qualidade/page.tsx", "p3d_qualidade"],
+    ["app/(dashboard)/impressao-3d/expedicao/page.tsx", "p3d_expedicao"],
+  ];
+  for (const [arq, modulo] of paginas) {
+    const t = lerFonte(arq);
+    assert.ok(t.includes(`getAcessoModulo("${modulo}")`), arq);
+    assert.ok(t.includes("workspace_id") || t.includes("acesso.workspaceId"), arq);
+    assert.ok(!/getDonoIdAtivo|getWorkspaceIdAtivo/.test(t), `${arq} usa o código antigo de dono`);
+  }
+  const opcoes = lerFonte("lib/impressao-3d/opcoes.ts");
+  for (const chave of ["p3d_fornecedores", "p3d_produtos", "p3d_pedidos"]) assert.ok(opcoes.includes(`getAcessoModulo("${chave}")`), chave);
+});
+await teste("tabelas somente leitura e campos protegidos: nenhum insert/update direto na Etapa B", () => {
+  const todos = ["fornecedores", "pedidos", "producao", "qualidade", "expedicao"].map((p) => lerFonte(`app/(dashboard)/impressao-3d/${p}/actions.ts`)).join("\n");
+  for (const tabela of ["p3d_pedido_pagamentos", "p3d_pedido_historico", "p3d_inspecoes", "p3d_falhas"])
+    assert.ok(!new RegExp(`\\.from\\("${tabela}"\\)\\s*\\.(insert|update|upsert|delete)`).test(todos), `${tabela} é somente leitura`);
+  const direto = (tabela: string) => {
+    const trechos: string[] = [];
+    const re = new RegExp(`\\.from\\("${tabela}"\\)\\s*\\.(insert|update|upsert)\\(`, "g");
+    for (let m = re.exec(todos); m; m = re.exec(todos)) {
+      let i = m.index + m[0].length, nivel = 1;
+      const ini = i;
+      while (i < todos.length && nivel > 0) { if (todos[i] === "(") nivel++; else if (todos[i] === ")") nivel--; i++; }
+      trechos.push(todos.slice(ini, i - 1));
+    }
+    return trechos;
+  };
+  const PROTEGIDOS: Record<string, string[]> = {
+    p3d_compras: ["status", "numero", "subtotal", "total", "recebida_em", "conta_pagar_id"],
+    p3d_pedidos: ["status", "status_pagamento", "numero", "origem", "orcamento_id", "subtotal", "total", "custo_total", "lucro_total", "pago_valor", "cancelado_em", "cancelado_motivo"],
+    p3d_producao: ["status", "numero", "horas_reais", "peso_real_g", "qualidade", "iniciado_em", "concluido_em", "consumo_registrado_em", "reimpressao_de"],
+    p3d_envios: ["status", "postado_em", "entregue_em", "recebedor"],
+    p3d_pedido_itens: ["preco_total", "custo_total", "lucro"],
+    p3d_compra_itens: ["preco_unitario"],
+  };
+  for (const [tabela, campos] of Object.entries(PROTEGIDOS)) {
+    const trechos = direto(tabela);
+    assert.ok(trechos.length >= 1, `${tabela} tem escrita direta no código`);
+    for (const t of trechos) for (const c of campos) assert.ok(!new RegExp(`\\b${c}\\b`).test(t), `${tabela}.${c}`);
+  }
+});
+await teste("tudo que muda status/saldo/estoque vai por RPC com o nome do contrato", () => {
+  const f = lerFonte("app/(dashboard)/impressao-3d/fornecedores/actions.ts");
+  for (const rpc of ["p3d_mudar_status_compra", "p3d_receber_compra"]) assert.ok(f.includes(`.rpc("${rpc}"`), rpc);
+  const p = lerFonte("app/(dashboard)/impressao-3d/pedidos/actions.ts");
+  for (const rpc of ["p3d_mudar_status_pedido", "p3d_registrar_pagamento", "p3d_gerar_producao_do_pedido"]) assert.ok(p.includes(`.rpc("${rpc}"`), rpc);
+  const o = lerFonte("app/(dashboard)/impressao-3d/orcamentos/actions.ts");
+  assert.ok(o.includes('.rpc("p3d_criar_pedido_de_orcamento"'));
+  const pr = lerFonte("app/(dashboard)/impressao-3d/producao/actions.ts");
+  for (const rpc of ["p3d_iniciar_producao", "p3d_concluir_producao", "p3d_cancelar_producao", "p3d_registrar_falha"]) assert.ok(pr.includes(`.rpc("${rpc}"`), rpc);
+  assert.ok(lerFonte("app/(dashboard)/impressao-3d/qualidade/actions.ts").includes('.rpc("p3d_registrar_inspecao"'));
+  assert.ok(lerFonte("app/(dashboard)/impressao-3d/expedicao/actions.ts").includes('.rpc("p3d_mudar_status_envio"'));
+  for (const texto of [f, p, o, pr]) assert.ok(/mensagemRpc\(error/.test(texto), "erro da RPC mostrado como veio");
+  // O app nunca chama as RPCs internas de apoio.
+  const tudo = [f, p, o, pr].join("\n");
+  for (const interna of ["p3d_estoque_aplicar", "p3d_pedido_set_status", "p3d_recalc_pedido", "p3d_recalc_compra"])
+    assert.ok(!tudo.includes(interna), interna);
+});
+await teste("permissões cruzadas: receber compra (Estoque + Financeiro), converter orçamento (Pedidos), gerar produção (Produção), falha (Produção OU Qualidade), lançar no Financeiro", () => {
+  const f = lerFonte("app/(dashboard)/impressao-3d/fornecedores/actions.ts");
+  const receber = f.slice(f.indexOf("export async function receberCompra"));
+  assert.ok(receber.includes('getAcessoEdicao("p3d_estoque")') && receber.includes('getAcessoEdicao("financeiro")'));
+  assert.ok(receber.indexOf("RecebimentoSchema") < receber.indexOf("p3d_receber_compra"), "valida vencimento antes da RPC");
+  const o = lerFonte("app/(dashboard)/impressao-3d/orcamentos/actions.ts");
+  assert.ok(o.slice(o.indexOf("export async function converterOrcamentoEmPedido")).includes('getAcessoEdicao("p3d_pedidos")'));
+  const p = lerFonte("app/(dashboard)/impressao-3d/pedidos/actions.ts");
+  assert.ok(p.slice(p.indexOf("export async function gerarProducaoDoPedido")).includes('getAcessoEdicao("p3d_producao")'));
+  const pagamento = p.slice(p.indexOf("export async function registrarPagamento"), p.indexOf("export type ResultadoGerarProducao"));
+  assert.ok(pagamento.includes('getAcessoEdicao("financeiro")') && pagamento.includes('tipo === "pagamento"'), "estorno nunca vai ao Financeiro");
+  assert.ok(pagamento.includes("não é enviado ao Financeiro"), "avisa o usuário sobre o estorno");
+  const pr = lerFonte("app/(dashboard)/impressao-3d/producao/actions.ts");
+  assert.ok(pr.includes('(await getAcessoEdicao(MODULO)) ?? (await getAcessoEdicao("p3d_qualidade"))'));
+  const pagina = lerFonte("app/(dashboard)/impressao-3d/pedidos/[id]/page.tsx");
+  assert.ok(pagina.includes('getAcessoEdicao("financeiro")'), "a tela só oferece 'lançar no Financeiro' a quem pode");
+});
+await teste("orçamento aprovado tem 'Converter em pedido' (só com edição em Pedidos E Orçamentos) e leva ao pedido criado", () => {
+  const tela = lerFonte("components/impressao-3d/orcamento-detalhe.tsx");
+  assert.ok(tela.includes("Converter em pedido") && tela.includes('orcamento.status === "aprovado"') && tela.includes("podeConverter"));
+  assert.ok(tela.includes("/impressao-3d/pedidos/${r.pedidoId}"), "navega até o pedido criado");
+  assert.ok(!tela.includes("virá na Etapa B"), "texto antigo removido");
+  const pagina = lerFonte("app/(dashboard)/impressao-3d/orcamentos/[id]/page.tsx");
+  assert.ok(pagina.includes('podeEditar && !!(await getAcessoEdicao("p3d_pedidos"))'));
+});
+await teste("material: cadastro tem seletor de fornecedor e mantém o vínculo quando a pessoa não vê Fornecedores", () => {
+  const tela = lerFonte("components/impressao-3d/estoque-board.tsx");
+  assert.ok(tela.includes('name="fornecedor_id"'));
+  assert.ok(tela.includes('type="hidden" name="fornecedor_id"'), "sem acesso, o vínculo atual é preservado");
+  assert.ok(lerFonte("app/(dashboard)/impressao-3d/estoque/page.tsx").includes("fornecedor_id"));
+  const val = lerFonte("lib/impressao-3d/validacao.ts");
+  assert.ok(val.slice(val.indexOf("export const MaterialSchema")).includes("fornecedor_id: uuidOpc()"));
+});
+await teste("compra: a tela pede quantidade na unidade base e ajuda a converter rolos; receber mostra o rateio de frete/desconto", () => {
+  const tela = lerFonte("components/impressao-3d/compra-detalhe.tsx");
+  assert.ok(tela.includes("unidade base") && tela.includes("quantidadeBaseDeRolos"));
+  assert.ok(tela.includes("rateados entre os itens por valor"));
+  const board = lerFonte("components/impressao-3d/fornecedores-board.tsx");
+  assert.ok(board.includes("não inclui frete"), "a aba Preços diz que o preço unitário não inclui frete");
+  assert.ok(board.includes("p3d_historico_precos") === false, "a tela recebe as linhas prontas do servidor");
+  assert.ok(lerFonte("app/(dashboard)/impressao-3d/fornecedores/page.tsx").includes('.from("p3d_historico_precos")'));
+});
+await teste("expedição: rastreio manual, sem integração com transportadoras/Correios simulada", () => {
+  const tela = lerFonte("components/impressao-3d/expedicao-board.tsx");
+  assert.ok(tela.includes("manual") && tela.includes("credenciais externas"));
+  const codigo = ["components/impressao-3d/expedicao-board.tsx", "app/(dashboard)/impressao-3d/expedicao/actions.ts", "app/(dashboard)/impressao-3d/expedicao/page.tsx"].map(lerFonte).join("\n");
+  assert.ok(!/fetch\(|correios\.com|api\.melhorenvio|jadlog\.com/i.test(codigo), "nenhuma chamada externa");
+  assert.ok(tela.includes('rel="noopener noreferrer"'));
+});
+await teste("produção: iniciar mostra o aviso da RPC, concluir mostra os avisos, falha explica a regra de estoque", () => {
+  const acoes = lerFonte("app/(dashboard)/impressao-3d/producao/actions.ts");
+  assert.ok(acoes.includes("lerInicio(") && acoes.includes("avisosConclusao(") && acoes.includes("lerFalha("));
+  assert.ok(acoes.includes("Estoque NÃO foi baixado de novo"));
+  const tela = lerFonte("components/impressao-3d/producao-board.tsx");
+  assert.ok(tela.includes("ordenarFila(") && tela.includes("setAvisos(r.avisos)"));
+  assert.ok(tela.includes("NÃO é baixado de novo") && tela.includes("falha parcial"));
+  assert.ok(tela.includes("Impressora disponível"), "só impressoras disponíveis para iniciar");
+  const imp = lerFonte("app/(dashboard)/impressao-3d/impressoras/page.tsx");
+  assert.ok(imp.includes('.eq("status", "imprimindo")') && imp.includes('getAcessoModulo("p3d_producao")'), "trabalho atual só para quem vê Produção");
+});
+await teste("Visão Geral: alertas da Etapa B (prazo vencido, urgentes na fila, compras aprovadas, manutenção) só com módulo ligado e só contagens", () => {
+  const r = lerFonte("lib/impressao-3d/resumo.ts");
+  for (const chave of P3D_B) assert.ok(r.includes(`com("${chave}")`), chave);
+  for (const campo of ["prazoVencido", "urgentesNaFila", "comprasAprovadas", "manutencaoVencida"]) assert.ok(r.includes(campo), campo);
+  assert.ok(!/preco_|custo|lucro|valor_/.test(r.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")), "sem valores monetários");
+  const home = lerFonte("components/dashboard-home/dashboard-home-board.tsx");
+  for (const chave of P3D_B) assert.ok(home.includes(`com("${chave}")`), chave);
+  assert.equal(RESUMO_P3D_VAZIO.pedidos.prazoVencido, 0);
+  assert.equal(RESUMO_P3D_VAZIO.qualidade, null);
+});
+await teste("o snapshot das empresas atuais continua sem nenhuma rota do nicho (Mora Lab e vendedores intactos)", () => {
+  for (const chave of P3D_B) {
+    const m = MODULOS.find((x) => x.chave === chave)!;
+    for (const rota of m.rotas) assert.equal(rotaPermitida(rota, ATUAIS), false, rota);
+  }
+  assert.ok(Object.keys(dourado.rotaPermitida).every((p) => !p.startsWith("/impressao-3d")));
+  assert.ok(menuDoDono(ATUAIS).every((g) => g.titulo !== "Impressão 3D"));
 });
 
 console.log(`\n${total} testes`);

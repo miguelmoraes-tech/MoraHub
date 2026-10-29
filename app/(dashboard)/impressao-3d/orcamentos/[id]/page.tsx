@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getAcessoModulo } from "@/lib/empresa-ativa";
+import { getAcessoEdicao, getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { CONFIG_PADRAO, entradaParaRecalculo, podeVerCustos } from "@/lib/impressao-3d/regras";
 import { ocultarCustosDoCalculo } from "@/lib/impressao-3d/calculo";
@@ -82,6 +82,19 @@ export default async function OrcamentoDetalhePage({ params }: { params: Promise
     entrada: verCustos ? (i.entrada ?? {}) : entradaParaRecalculo(i.entrada ?? {}),
   })) as ItemOrcamento[];
 
+  // "Converter em pedido": edição em Pedidos E em Orçamentos. O pedido vinculado só é lido por quem vê Pedidos.
+  const podeConverter = podeEditar && !!(await getAcessoEdicao("p3d_pedidos"));
+  let pedidoVinculado: { id: string; numero: number } | null = null;
+  if (orcamento.status === "convertido" && (await getAcessoModulo("p3d_pedidos"))) {
+    const { data: pedido } = await supabase
+      .from("p3d_pedidos")
+      .select("id, numero")
+      .eq("orcamento_id", id)
+      .eq("workspace_id", ws)
+      .maybeSingle();
+    pedidoVinculado = (pedido as { id: string; numero: number } | null) ?? null;
+  }
+
   return (
     <OrcamentoDetalhe
       orcamento={orcamento}
@@ -93,6 +106,8 @@ export default async function OrcamentoDetalhePage({ params }: { params: Promise
       config={(config as unknown as ConfigPrecificacao | null) ?? CONFIG_PADRAO}
       podeEditar={podeEditar}
       verCustos={verCustos}
+      podeConverter={podeConverter}
+      pedidoVinculado={pedidoVinculado}
     />
   );
 }

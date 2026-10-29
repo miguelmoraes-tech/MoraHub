@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
-import { ImpressorasBoard } from "@/components/impressao-3d/impressoras-board";
+import { ImpressorasBoard, type TrabalhoAtual } from "@/components/impressao-3d/impressoras-board";
 import {
   COLUNAS_IMPRESSORA,
   type Impressora,
@@ -35,12 +35,26 @@ export default async function ImpressorasPage() {
       .order("created_at", { ascending: false }),
   ]);
 
+  // Trabalho atual de cada impressora ocupada: só para quem também tem acesso a Produção.
+  const trabalhosAtuais: Record<string, TrabalhoAtual> = {};
+  if (await getAcessoModulo("p3d_producao")) {
+    const { data: imprimindo } = await supabase
+      .from("p3d_producao")
+      .select("impressora_id, numero, descricao")
+      .eq("workspace_id", ws)
+      .eq("status", "imprimindo");
+    for (const t of (imprimindo ?? []) as { impressora_id: string | null; numero: number; descricao: string }[]) {
+      if (t.impressora_id) trabalhosAtuais[t.impressora_id] = { numero: t.numero, descricao: t.descricao };
+    }
+  }
+
   return (
     <ImpressorasBoard
       impressoras={(impressoras ?? []) as unknown as Impressora[]}
       pecas={(pecas ?? []) as unknown as PecaDesgaste[]}
       manutencoes={(manutencoes ?? []) as unknown as Manutencao[]}
       podeEditar={acesso.nivel === "edicao"}
+      trabalhosAtuais={trabalhosAtuais}
     />
   );
 }

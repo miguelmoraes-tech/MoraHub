@@ -2522,6 +2522,135 @@ export type Database = {
           },
         ]
       }
+      p3d_compra_itens: {
+        Row: {
+          compra_id: string
+          created_at: string
+          id: string
+          material_id: string
+          observacao: string | null
+          preco_total: number
+          preco_unitario: number | null
+          quantidade: number
+          workspace_id: string
+        }
+        Insert: {
+          compra_id: string
+          created_at?: string
+          id?: string
+          material_id: string
+          observacao?: string | null
+          preco_total: number
+          preco_unitario?: number | null
+          quantidade: number
+          workspace_id: string
+        }
+        Update: {
+          compra_id?: string
+          created_at?: string
+          id?: string
+          material_id?: string
+          observacao?: string | null
+          preco_total?: number
+          preco_unitario?: number | null
+          quantidade?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_compra_itens_compra_id_workspace_id_fkey"
+            columns: ["compra_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_compras"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_compra_itens_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_compras: {
+        Row: {
+          conta_pagar_id: string | null
+          created_at: string
+          data: string
+          desconto: number
+          fornecedor_id: string
+          frete: number
+          id: string
+          numero: number
+          observacoes: string | null
+          prazo_entrega: string | null
+          recebida_em: string | null
+          status: string
+          subtotal: number
+          total: number
+          updated_at: string
+          user_id: string
+          validade_cotacao: string | null
+          workspace_id: string
+        }
+        Insert: {
+          conta_pagar_id?: string | null
+          created_at?: string
+          data?: string
+          desconto?: number
+          fornecedor_id: string
+          frete?: number
+          id?: string
+          numero?: number
+          observacoes?: string | null
+          prazo_entrega?: string | null
+          recebida_em?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          user_id?: string
+          validade_cotacao?: string | null
+          workspace_id: string
+        }
+        Update: {
+          conta_pagar_id?: string | null
+          created_at?: string
+          data?: string
+          desconto?: number
+          fornecedor_id?: string
+          frete?: number
+          id?: string
+          numero?: number
+          observacoes?: string | null
+          prazo_entrega?: string | null
+          recebida_em?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          user_id?: string
+          validade_cotacao?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_compras_fornecedor_id_workspace_id_fkey"
+            columns: ["fornecedor_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_fornecedores"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_compras_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       p3d_config_precificacao: {
         Row: {
           arredondar_para: number
@@ -2591,6 +2720,229 @@ export type Database = {
             foreignKeyName: "p3d_config_precificacao_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: true
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      p3d_envios: {
+        Row: {
+          codigo_rastreio: string | null
+          created_at: string
+          custo_frete: number
+          entregue_em: string | null
+          id: string
+          observacoes: string | null
+          pedido_id: string
+          peso_kg: number | null
+          postado_em: string | null
+          previsao_entrega: string | null
+          recebedor: string | null
+          servico: string | null
+          status: string
+          transportadora: string | null
+          updated_at: string
+          url_rastreio: string | null
+          user_id: string
+          volumes: number
+          workspace_id: string
+        }
+        Insert: {
+          codigo_rastreio?: string | null
+          created_at?: string
+          custo_frete?: number
+          entregue_em?: string | null
+          id?: string
+          observacoes?: string | null
+          pedido_id: string
+          peso_kg?: number | null
+          postado_em?: string | null
+          previsao_entrega?: string | null
+          recebedor?: string | null
+          servico?: string | null
+          status?: string
+          transportadora?: string | null
+          updated_at?: string
+          url_rastreio?: string | null
+          user_id?: string
+          volumes?: number
+          workspace_id: string
+        }
+        Update: {
+          codigo_rastreio?: string | null
+          created_at?: string
+          custo_frete?: number
+          entregue_em?: string | null
+          id?: string
+          observacoes?: string | null
+          pedido_id?: string
+          peso_kg?: number | null
+          postado_em?: string | null
+          previsao_entrega?: string | null
+          recebedor?: string | null
+          servico?: string | null
+          status?: string
+          transportadora?: string | null
+          updated_at?: string
+          url_rastreio?: string | null
+          user_id?: string
+          volumes?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_envios_pedido_id_workspace_id_fkey"
+            columns: ["pedido_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_pedidos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_envios_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      p3d_falhas: {
+        Row: {
+          baixou_estoque: boolean
+          created_at: string
+          custo_maquina_estimado: number
+          custo_material: number
+          descricao: string | null
+          horas_perdidas: number
+          id: string
+          impressora_id: string | null
+          material_id: string | null
+          peso_perdido_g: number
+          producao_id: string
+          produto_id: string | null
+          reimpressao_producao_id: string | null
+          tipo_defeito: string
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          baixou_estoque?: boolean
+          created_at?: string
+          custo_maquina_estimado?: number
+          custo_material?: number
+          descricao?: string | null
+          horas_perdidas?: number
+          id?: string
+          impressora_id?: string | null
+          material_id?: string | null
+          peso_perdido_g?: number
+          producao_id: string
+          produto_id?: string | null
+          reimpressao_producao_id?: string | null
+          tipo_defeito: string
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          baixou_estoque?: boolean
+          created_at?: string
+          custo_maquina_estimado?: number
+          custo_material?: number
+          descricao?: string | null
+          horas_perdidas?: number
+          id?: string
+          impressora_id?: string | null
+          material_id?: string | null
+          peso_perdido_g?: number
+          producao_id?: string
+          produto_id?: string | null
+          reimpressao_producao_id?: string | null
+          tipo_defeito?: string
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_falhas_impressora_id_workspace_id_fkey"
+            columns: ["impressora_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_impressoras"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_falhas_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_falhas_producao_id_workspace_id_fkey"
+            columns: ["producao_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_producao"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_falhas_produto_id_workspace_id_fkey"
+            columns: ["produto_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produtos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_fornecedores: {
+        Row: {
+          ativo: boolean
+          categoria: string | null
+          contato: string | null
+          created_at: string
+          email: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          site: string | null
+          telefone: string | null
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string | null
+          contato?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          site?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string
+          workspace_id: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string | null
+          contato?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          site?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_fornecedores_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
             referencedRelation: "perfis_tipos_ativos"
             referencedColumns: ["id"]
           },
@@ -2694,6 +3046,47 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "perfis_tipos_ativos"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      p3d_inspecoes: {
+        Row: {
+          created_at: string
+          defeitos: string[]
+          id: string
+          observacoes: string | null
+          producao_id: string
+          resultado: string
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          defeitos?: string[]
+          id?: string
+          observacoes?: string | null
+          producao_id: string
+          resultado: string
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          defeitos?: string[]
+          id?: string
+          observacoes?: string | null
+          producao_id?: string
+          resultado?: string
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_inspecoes_producao_id_workspace_id_fkey"
+            columns: ["producao_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_producao"
+            referencedColumns: ["id", "workspace_id"]
           },
         ]
       }
@@ -2821,6 +3214,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "p3d_materiais_fornecedor_fk"
+            columns: ["fornecedor_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_fornecedores"
+            referencedColumns: ["id", "workspace_id"]
+          },
           {
             foreignKeyName: "p3d_materiais_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -3084,6 +3484,445 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "p3d_impressoras"
             referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_pedido_historico: {
+        Row: {
+          created_at: string
+          de: string | null
+          id: string
+          motivo: string | null
+          para: string
+          pedido_id: string
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          de?: string | null
+          id?: string
+          motivo?: string | null
+          para: string
+          pedido_id: string
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          de?: string | null
+          id?: string
+          motivo?: string | null
+          para?: string
+          pedido_id?: string
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_pedido_historico_pedido_id_workspace_id_fkey"
+            columns: ["pedido_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_pedidos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_pedido_itens: {
+        Row: {
+          calculo: Json | null
+          created_at: string
+          custo_total: number
+          custo_unitario: number
+          descricao: string
+          entrada: Json | null
+          id: string
+          lucro: number
+          orcamento_item_id: string | null
+          ordem: number
+          origem: string
+          pedido_id: string
+          preco_total: number
+          preco_unitario: number
+          produto_id: string | null
+          quantidade: number
+          variacao_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          calculo?: Json | null
+          created_at?: string
+          custo_total?: number
+          custo_unitario?: number
+          descricao: string
+          entrada?: Json | null
+          id?: string
+          lucro?: number
+          orcamento_item_id?: string | null
+          ordem?: number
+          origem?: string
+          pedido_id: string
+          preco_total?: number
+          preco_unitario: number
+          produto_id?: string | null
+          quantidade: number
+          variacao_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          calculo?: Json | null
+          created_at?: string
+          custo_total?: number
+          custo_unitario?: number
+          descricao?: string
+          entrada?: Json | null
+          id?: string
+          lucro?: number
+          orcamento_item_id?: string | null
+          ordem?: number
+          origem?: string
+          pedido_id?: string
+          preco_total?: number
+          preco_unitario?: number
+          produto_id?: string | null
+          quantidade?: number
+          variacao_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_pedido_itens_pedido_id_workspace_id_fkey"
+            columns: ["pedido_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_pedidos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_pedido_itens_produto_id_workspace_id_fkey"
+            columns: ["produto_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produtos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_pedido_itens_variacao_id_workspace_id_fkey"
+            columns: ["variacao_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produto_variacoes"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_pedido_pagamentos: {
+        Row: {
+          conta_receber_id: string | null
+          created_at: string
+          data: string
+          forma: string
+          id: string
+          observacao: string | null
+          pedido_id: string
+          tipo: string
+          user_id: string | null
+          valor: number
+          workspace_id: string
+        }
+        Insert: {
+          conta_receber_id?: string | null
+          created_at?: string
+          data?: string
+          forma?: string
+          id?: string
+          observacao?: string | null
+          pedido_id: string
+          tipo?: string
+          user_id?: string | null
+          valor: number
+          workspace_id: string
+        }
+        Update: {
+          conta_receber_id?: string | null
+          created_at?: string
+          data?: string
+          forma?: string
+          id?: string
+          observacao?: string | null
+          pedido_id?: string
+          tipo?: string
+          user_id?: string | null
+          valor?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_pedido_pagamentos_pedido_id_workspace_id_fkey"
+            columns: ["pedido_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_pedidos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_pedidos: {
+        Row: {
+          cancelado_em: string | null
+          cancelado_motivo: string | null
+          cliente_avulso: string | null
+          cliente_id: string | null
+          created_at: string
+          custo_total: number
+          data_pedido: string
+          desconto_valor: number
+          frete_valor: number
+          id: string
+          lucro_total: number
+          numero: number
+          observacoes: string | null
+          orcamento_id: string | null
+          origem: string
+          pago_valor: number
+          prazo_entrega: string | null
+          prioridade: string
+          status: string
+          status_pagamento: string
+          subtotal: number
+          total: number
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          cancelado_em?: string | null
+          cancelado_motivo?: string | null
+          cliente_avulso?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          custo_total?: number
+          data_pedido?: string
+          desconto_valor?: number
+          frete_valor?: number
+          id?: string
+          lucro_total?: number
+          numero?: number
+          observacoes?: string | null
+          orcamento_id?: string | null
+          origem?: string
+          pago_valor?: number
+          prazo_entrega?: string | null
+          prioridade?: string
+          status?: string
+          status_pagamento?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          user_id?: string
+          workspace_id: string
+        }
+        Update: {
+          cancelado_em?: string | null
+          cancelado_motivo?: string | null
+          cliente_avulso?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          custo_total?: number
+          data_pedido?: string
+          desconto_valor?: number
+          frete_valor?: number
+          id?: string
+          lucro_total?: number
+          numero?: number
+          observacoes?: string | null
+          orcamento_id?: string | null
+          origem?: string
+          pago_valor?: number
+          prazo_entrega?: string | null
+          prioridade?: string
+          status?: string
+          status_pagamento?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_pedidos_cliente_id_workspace_id_fkey"
+            columns: ["cliente_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_pedidos_orcamento_id_workspace_id_fkey"
+            columns: ["orcamento_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_orcamentos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_pedidos_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      p3d_producao: {
+        Row: {
+          arquivo_id: string | null
+          concluido_em: string | null
+          consumo_registrado_em: string | null
+          created_at: string
+          descricao: string
+          horas_estimadas: number | null
+          horas_reais: number | null
+          id: string
+          impressora_id: string | null
+          iniciado_em: string | null
+          material_id: string | null
+          numero: number
+          observacoes: string | null
+          pedido_id: string | null
+          pedido_item_id: string | null
+          peso_estimado_g: number | null
+          peso_real_g: number | null
+          prazo: string | null
+          prioridade: string
+          produto_id: string | null
+          qualidade: string
+          quantidade: number
+          reimpressao_de: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          variacao_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          arquivo_id?: string | null
+          concluido_em?: string | null
+          consumo_registrado_em?: string | null
+          created_at?: string
+          descricao: string
+          horas_estimadas?: number | null
+          horas_reais?: number | null
+          id?: string
+          impressora_id?: string | null
+          iniciado_em?: string | null
+          material_id?: string | null
+          numero?: number
+          observacoes?: string | null
+          pedido_id?: string | null
+          pedido_item_id?: string | null
+          peso_estimado_g?: number | null
+          peso_real_g?: number | null
+          prazo?: string | null
+          prioridade?: string
+          produto_id?: string | null
+          qualidade?: string
+          quantidade?: number
+          reimpressao_de?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          variacao_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          arquivo_id?: string | null
+          concluido_em?: string | null
+          consumo_registrado_em?: string | null
+          created_at?: string
+          descricao?: string
+          horas_estimadas?: number | null
+          horas_reais?: number | null
+          id?: string
+          impressora_id?: string | null
+          iniciado_em?: string | null
+          material_id?: string | null
+          numero?: number
+          observacoes?: string | null
+          pedido_id?: string | null
+          pedido_item_id?: string | null
+          peso_estimado_g?: number | null
+          peso_real_g?: number | null
+          prazo?: string | null
+          prioridade?: string
+          produto_id?: string | null
+          qualidade?: string
+          quantidade?: number
+          reimpressao_de?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          variacao_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_producao_arquivo_id_workspace_id_fkey"
+            columns: ["arquivo_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produto_arquivos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_producao_impressora_id_workspace_id_fkey"
+            columns: ["impressora_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_impressoras"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_producao_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_producao_pedido_id_workspace_id_fkey"
+            columns: ["pedido_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_pedidos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_producao_pedido_item_id_workspace_id_fkey"
+            columns: ["pedido_item_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_pedido_itens"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_producao_produto_id_workspace_id_fkey"
+            columns: ["produto_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produtos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_producao_reimpressao_de_workspace_id_fkey"
+            columns: ["reimpressao_de", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_producao"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_producao_variacao_id_workspace_id_fkey"
+            columns: ["variacao_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produto_variacoes"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_producao_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5022,7 +5861,29 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      p3d_historico_precos: {
+        Row: {
+          compra_id: string | null
+          compra_numero: number | null
+          compra_status: string | null
+          data: string | null
+          fornecedor_id: string | null
+          material_id: string | null
+          preco_total: number | null
+          preco_unitario: number | null
+          quantidade: number | null
+          workspace_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_compra_itens_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
     }
     Functions: {
       _executar_aprovacao: {
@@ -5251,7 +6112,52 @@ export type Database = {
         Returns: boolean
       }
       p3d_calcular_preco: { Args: { p: Json }; Returns: Json }
+      p3d_cancelar_producao: {
+        Args: { p_motivo: string; p_producao_id: string }
+        Returns: undefined
+      }
+      p3d_concluir_producao: {
+        Args: {
+          p_horas_reais: number
+          p_material_id?: string
+          p_observacao?: string
+          p_peso_real_g: number
+          p_producao_id: string
+        }
+        Returns: Json
+      }
+      p3d_criar_pedido_de_orcamento: {
+        Args: {
+          p_orcamento_id: string
+          p_prazo?: string
+          p_prioridade?: string
+        }
+        Returns: string
+      }
+      p3d_estoque_aplicar: {
+        Args: {
+          p_custo_total: number
+          p_custo_unitario: number
+          p_material_id: string
+          p_observacao: string
+          p_permitir_negativo: boolean
+          p_quantidade: number
+          p_referencia_id: string
+          p_referencia_tipo: string
+          p_tipo: string
+          p_ws: string
+        }
+        Returns: Json
+      }
       p3d_garantir_config: { Args: { p_ws: string }; Returns: undefined }
+      p3d_gerar_producao_do_pedido: {
+        Args: { p_pedido_id: string }
+        Returns: number
+      }
+      p3d_iniciar_producao: {
+        Args: { p_impressora_id?: string; p_producao_id: string }
+        Returns: Json
+      }
       p3d_movimentar_estoque: {
         Args: {
           p_custo_total?: number
@@ -5267,12 +6173,82 @@ export type Database = {
         }
         Returns: Json
       }
+      p3d_mudar_status_compra: {
+        Args: { p_compra_id: string; p_status: string }
+        Returns: string
+      }
+      p3d_mudar_status_envio: {
+        Args: {
+          p_data?: string
+          p_envio_id: string
+          p_recebedor?: string
+          p_status: string
+        }
+        Returns: string
+      }
       p3d_mudar_status_orcamento: {
         Args: { p_orcamento_id: string; p_status: string }
         Returns: string
       }
+      p3d_mudar_status_pedido: {
+        Args: { p_motivo?: string; p_pedido_id: string; p_status: string }
+        Returns: string
+      }
       p3d_num: { Args: { d?: number; k: string; p: Json }; Returns: number }
+      p3d_pedido_set_status: {
+        Args: {
+          p_motivo: string
+          p_para: string
+          p_pedido: string
+          p_ws: string
+        }
+        Returns: undefined
+      }
+      p3d_recalc_compra: { Args: { p_id: string }; Returns: undefined }
       p3d_recalc_orcamento: { Args: { p_id: string }; Returns: undefined }
+      p3d_recalc_pedido: { Args: { p_id: string }; Returns: undefined }
+      p3d_receber_compra: {
+        Args: {
+          p_compra_id: string
+          p_gerar_conta_pagar?: boolean
+          p_vencimento?: string
+        }
+        Returns: Json
+      }
+      p3d_registrar_falha: {
+        Args: {
+          p_descricao?: string
+          p_horas_perdidas: number
+          p_peso_perdido_g: number
+          p_producao_id: string
+          p_quantidade_afetada?: number
+          p_reimprimir?: boolean
+          p_tipo_defeito: string
+        }
+        Returns: Json
+      }
+      p3d_registrar_inspecao: {
+        Args: {
+          p_acao?: string
+          p_defeitos?: string[]
+          p_observacoes?: string
+          p_producao_id: string
+          p_resultado: string
+        }
+        Returns: Json
+      }
+      p3d_registrar_pagamento: {
+        Args: {
+          p_data?: string
+          p_forma?: string
+          p_lancar_financeiro?: boolean
+          p_observacao?: string
+          p_pedido_id: string
+          p_tipo?: string
+          p_valor: number
+        }
+        Returns: Json
+      }
       p3d_remover_item_orcamento: {
         Args: { p_item_id: string }
         Returns: undefined

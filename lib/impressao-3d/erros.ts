@@ -17,6 +17,9 @@ export function mensagemRpc(erro: ErroBanco | null | undefined, padrao: string):
 /** Erro de insert/update/delete direto. */
 export function mensagemEscrita(erro: ErroBanco | null | undefined, padrao: string): string {
   switch (erro?.code) {
+    // raise exception das regras do banco (ex.: compra recebida é imutável): texto como veio.
+    case "P0001":
+      return erro.message?.trim() || padrao;
     case "23505":
       return "Já existe um registro com esse valor (por exemplo, o mesmo SKU).";
     case "23503":

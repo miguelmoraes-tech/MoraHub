@@ -16,6 +16,11 @@ import {
   Package,
   Calculator,
   FileSpreadsheet,
+  ShoppingCart,
+  ClipboardList,
+  Factory,
+  ShieldCheck,
+  Truck,
 } from "lucide-react";
 import { SetorResumoCard } from "@/components/dashboard-executivo/setor-resumo-card";
 import type { DashboardHomeOverview } from "@/lib/dashboard-home/get-overview";
@@ -53,6 +58,11 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
     "p3d_produtos",
     "p3d_precificacao",
     "p3d_orcamentos",
+    "p3d_fornecedores",
+    "p3d_pedidos",
+    "p3d_producao",
+    "p3d_qualidade",
+    "p3d_expedicao",
   ].some(com);
 
   return (
@@ -312,6 +322,88 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
               { label: "em rascunho", value: String(impressao3d.orcamentos.rascunhos) },
               { label: "enviados", value: String(impressao3d.orcamentos.enviados), tone: impressao3d.orcamentos.enviados > 0 ? "copper" : "zinc" },
             ]}
+          />
+        )}
+
+        {com("p3d_pedidos") && (
+          <SetorResumoCard
+            icon={ClipboardList}
+            titulo={rotulos.plural("p3d_pedidos")}
+            href="/impressao-3d/pedidos"
+            stats={[
+              { label: "em aberto", value: String(impressao3d.pedidos.abertos) },
+              {
+                label: "prazo vencido",
+                value: String(impressao3d.pedidos.prazoVencido),
+                tone: impressao3d.pedidos.prazoVencido > 0 ? "rose" : "emerald",
+              },
+            ]}
+          />
+        )}
+
+        {com("p3d_producao") && (
+          <SetorResumoCard
+            icon={Factory}
+            titulo={rotulos.plural("p3d_producao")}
+            href="/impressao-3d/producao"
+            stats={[
+              { label: "na fila", value: String(impressao3d.producao.fila) },
+              { label: "imprimindo", value: String(impressao3d.producao.imprimindo), tone: impressao3d.producao.imprimindo > 0 ? "amber" : "zinc" },
+              {
+                label: "urgentes na fila",
+                value: String(impressao3d.producao.urgentesNaFila),
+                tone: impressao3d.producao.urgentesNaFila > 0 ? "rose" : "emerald",
+              },
+            ]}
+          />
+        )}
+
+        {com("p3d_qualidade") && (
+          <SetorResumoCard
+            icon={ShieldCheck}
+            titulo={rotulos.plural("p3d_qualidade")}
+            href="/impressao-3d/qualidade"
+            stats={
+              impressao3d.qualidade
+                ? [
+                    {
+                      label: "para inspecionar",
+                      value: String(impressao3d.qualidade.paraInspecionar),
+                      tone: impressao3d.qualidade.paraInspecionar > 0 ? "amber" : "emerald",
+                    },
+                    {
+                      label: "reprovados",
+                      value: String(impressao3d.qualidade.reprovados),
+                      tone: impressao3d.qualidade.reprovados > 0 ? "rose" : "emerald",
+                    },
+                  ]
+                : [{ label: "inspeções", value: "ver tela" }]
+            }
+          />
+        )}
+
+        {com("p3d_fornecedores") && (
+          <SetorResumoCard
+            icon={ShoppingCart}
+            titulo={rotulos.plural("p3d_fornecedores")}
+            href="/impressao-3d/fornecedores"
+            stats={[
+              { label: "fornecedores", value: String(impressao3d.fornecedores.ativos) },
+              {
+                label: "compras aguardando recebimento",
+                value: String(impressao3d.fornecedores.comprasAprovadas),
+                tone: impressao3d.fornecedores.comprasAprovadas > 0 ? "amber" : "zinc",
+              },
+            ]}
+          />
+        )}
+
+        {com("p3d_expedicao") && (
+          <SetorResumoCard
+            icon={Truck}
+            titulo={rotulos.plural("p3d_expedicao")}
+            href="/impressao-3d/expedicao"
+            stats={[{ label: "envios em aberto", value: String(impressao3d.expedicao.emAberto), tone: impressao3d.expedicao.emAberto > 0 ? "copper" : "zinc" }]}
           />
         )}
       </div>

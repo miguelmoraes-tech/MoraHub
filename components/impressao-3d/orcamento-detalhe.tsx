@@ -7,15 +7,16 @@ import { ArrowLeft, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { StatusChip } from "@/components/status-chip";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import {
-  Aviso, BotaoNovo, BotaoPrimario, BotaoTexto, Cartao, ErroForm, SomenteLeitura, Vazio, useAcao,
+  Aviso, BotaoNovo, BotaoPrimario, BotaoTexto, Cartao, Entrada, ErroForm, Seletor, SomenteLeitura, Vazio, useAcao,
 } from "@/components/impressao-3d/campos";
 import { CamposOrcamento, TOM_STATUS_ORCAMENTO } from "@/components/impressao-3d/orcamentos-board";
 import { ComposicaoCalculo } from "@/components/impressao-3d/composicao-calculo";
 import { ParametrosUsados, Simulador, type ProdutoOpcao } from "@/components/impressao-3d/simulador";
 import {
-  atualizarOrcamento, excluirOrcamento, mudarStatusOrcamento, recalcularOrcamento, removerItemOrcamento,
+  atualizarOrcamento, converterOrcamentoEmPedido, excluirOrcamento, mudarStatusOrcamento, recalcularOrcamento, removerItemOrcamento,
 } from "@/app/(dashboard)/impressao-3d/orcamentos/actions";
 import { lerCalculo } from "@/lib/impressao-3d/calculo";
+import { PRIORIDADE_ROTULO } from "@/lib/impressao-3d/tipos-operacao";
 import {
   STATUS_ORCAMENTO_ROTULO, type ConfigPrecificacao, type ItemOrcamento, type Orcamento,
 } from "@/lib/impressao-3d/tipos";
@@ -27,7 +28,7 @@ import { formatDate } from "@/lib/format";
 const ACOES_STATUS: Record<string, { alvo: string; rotulo: string; confirmar?: string }[]> = {
   rascunho: [{ alvo: "enviado", rotulo: "Marcar como enviado", confirmar: "Marcar como enviado? O orçamento deixa de ser editável." }],
   enviado: [
-    { alvo: "aprovado", rotulo: "Aprovar", confirmar: "Aprovar o orçamento? Nesta etapa a aprovação é final." },
+    { alvo: "aprovado", rotulo: "Aprovar", confirmar: "Aprovar o orçamento? Depois de aprovado ele pode ser convertido em pedido." },
     { alvo: "recusado", rotulo: "Recusar" },
     { alvo: "expirado", rotulo: "Marcar como expirado" },
     { alvo: "rascunho", rotulo: "Voltar para rascunho" },
@@ -132,6 +133,51 @@ function ItemCard({
   );
 }
 
+/** "Converter em pedido": só no orçamento aprovado, com edição em Pedidos E em Orçamentos. */
+function ConverterEmPedido({ orcamentoId, aoFechar }: { orcamentoId: string; aoFechar: () => void }) {
+  const router = useRouter();
+  const { executar, pendente, ultimoErro } = useAcao();
+  const [prazo, setPrazo] = useState("");
+  const [prioridade, setPrioridade] = useState("normal");
+  return (
+    <div className="space-y-3 rounded-lg border border-copper-500/30 bg-zinc-950/60 p-3">
+      <p className="text-sm font-medium text-zinc-100">Converter em pedido</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Entrada rotulo="Prazo de entrega" type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} />
+        <Seletor rotulo="Prioridade" value={prioridade} onChange={(e) => setPrioridade(e.target.value)}>
+          {Object.entries(PRIORIDADE_ROTULO).map(([k, l]) => (
+            <option key={k} value={k}>{l}</option>
+          ))}
+        </Seletor>
+      </div>
+      <p className="text-[11px] text-zinc-600">
+        Os itens e os valores são copiados do orçamento (com o cálculo salvo). O orçamento passa a &quot;Convertido&quot;.
+      </p>
+      {ultimoErro && <p className="text-xs text-rose-400">{ultimoErro}</p>}
+      <div className="flex justify-end gap-2">
+        <BotaoTexto onClick={aoFechar}>Cancelar</BotaoTexto>
+        <BotaoPrimario
+          type="button"
+          pendente={pendente}
+          onClick={() =>
+            executar(
+              async () => {
+                const r = await converterOrcamentoEmPedido(orcamentoId, prazo || null, prioridade);
+                if ("error" in r) return r;
+                router.push(`/impressao-3d/pedidos/${r.pedidoId}`);
+                return { ok: true } as const;
+              },
+              { sucesso: "Pedido criado a partir do orçamento." }
+            )
+          }
+        >
+          {pendente ? "Convertendo..." : "Converter em pedido"}
+        </BotaoPrimario>
+      </div>
+    </div>
+  );
+}
+
 export function OrcamentoDetalhe({
   orcamento,
   itens,
@@ -142,6 +188,8 @@ export function OrcamentoDetalhe({
   config,
   podeEditar,
   verCustos,
+  podeConverter,
+  pedidoVinculado,
 }: {
   orcamento: Orcamento;
   itens: ItemOrcamento[];
@@ -152,8 +200,12 @@ export function OrcamentoDetalhe({
   config: ConfigPrecificacao;
   podeEditar: boolean;
   verCustos: boolean;
+  /** Edição em Pedidos E em Orçamentos (a RPC confere de novo). */
+  podeConverter: boolean;
+  pedidoVinculado: { id: string; numero: number } | null;
 }) {
   const router = useRouter();
+  const [convertendo, setConvertendo] = useState(false);
   const rascunho = orcamento.status === "rascunho";
   const editavel = podeEditar && rascunho;
   const [editandoCabecalho, setEditandoCabecalho] = useState(false);
@@ -196,6 +248,14 @@ export function OrcamentoDetalhe({
                 {a.rotulo}
               </BotaoPrimario>
             ))}
+            {podeConverter && orcamento.status === "aprovado" && !convertendo && (
+              <BotaoPrimario type="button" onClick={() => setConvertendo(true)}>Converter em pedido</BotaoPrimario>
+            )}
+            {pedidoVinculado && (
+              <Link href={`/impressao-3d/pedidos/${pedidoVinculado.id}`} className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-800">
+                Ver pedido #{pedidoVinculado.numero}
+              </Link>
+            )}
             {editavel && (
               <BotaoTexto
                 perigo
@@ -219,10 +279,18 @@ export function OrcamentoDetalhe({
       {!rascunho && (
         <Aviso>
           Este orçamento está {STATUS_ORCAMENTO_ROTULO[orcamento.status].toLowerCase()} e fica somente leitura.
-          {orcamento.status === "aprovado" && " A conversão em pedido virá na Etapa B (produção)."}
+          {orcamento.status === "aprovado" &&
+            (podeConverter
+              ? " Use \"Converter em pedido\" para levar os itens à produção."
+              : " Converter em pedido exige permissão de edição em Pedidos e em Orçamentos.")}
+          {orcamento.status === "convertido" && " Já virou pedido."}
           {(orcamento.status === "enviado" || orcamento.status === "recusado" || orcamento.status === "expirado") &&
             " Volte para rascunho para editar."}
         </Aviso>
+      )}
+
+      {convertendo && podeConverter && orcamento.status === "aprovado" && (
+        <ConverterEmPedido orcamentoId={orcamento.id} aoFechar={() => setConvertendo(false)} />
       )}
 
       {editandoCabecalho && editavel ? (

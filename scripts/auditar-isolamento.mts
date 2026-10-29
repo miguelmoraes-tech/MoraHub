@@ -41,6 +41,10 @@ const MODULOS_NOVOS: Record<string, string[]> = {
     "p3d_config_precificacao", "p3d_impressoras", "p3d_pecas_desgaste", "p3d_manutencoes",
     "p3d_materiais", "p3d_movimentos_estoque", "p3d_produtos", "p3d_produto_variacoes",
     "p3d_produto_arquivos", "p3d_orcamentos", "p3d_orcamento_itens",
+    // Etapa B: fornecedores e compras, pedidos, producao, qualidade e expedicao.
+    "p3d_fornecedores", "p3d_compras", "p3d_compra_itens", "p3d_pedidos", "p3d_pedido_itens",
+    "p3d_pedido_pagamentos", "p3d_pedido_historico", "p3d_producao", "p3d_inspecoes", "p3d_falhas",
+    "p3d_envios",
   ],
 };
 const ESTRITAS = Object.values(MODULOS_NOVOS).flat();
@@ -177,6 +181,11 @@ const ACTIONS_COM_GUARDA = [
   "app/(dashboard)/impressao-3d/produtos/actions.ts",
   "app/(dashboard)/impressao-3d/precificacao/actions.ts",
   "app/(dashboard)/impressao-3d/orcamentos/actions.ts",
+  "app/(dashboard)/impressao-3d/fornecedores/actions.ts",
+  "app/(dashboard)/impressao-3d/pedidos/actions.ts",
+  "app/(dashboard)/impressao-3d/producao/actions.ts",
+  "app/(dashboard)/impressao-3d/qualidade/actions.ts",
+  "app/(dashboard)/impressao-3d/expedicao/actions.ts",
 ];
 const semGuarda: string[] = [];
 let actionsVerificadas = 0;
@@ -296,6 +305,11 @@ const MODULO_DA_PASTA: Record<string, string> = {
   produtos: "p3d_produtos",
   precificacao: "p3d_precificacao",
   orcamentos: "p3d_orcamentos",
+  fornecedores: "p3d_fornecedores",
+  pedidos: "p3d_pedidos",
+  producao: "p3d_producao",
+  qualidade: "p3d_qualidade",
+  expedicao: "p3d_expedicao",
 };
 const p3dSemGuard: string[] = [];
 let p3dArquivos = 0;
@@ -328,8 +342,25 @@ if (p3dSemGuard.length) process.exitCode = 1;
 const PROTEGIDOS: Record<string, string[]> = {
   p3d_materiais: ["estoque_atual", "custo_medio", "ultimo_custo", "custo_cadastro"],
   p3d_orcamentos: ["status", "numero", "subtotal", "total", "custo_total", "lucro_total", "enviado_em", "aprovado_em"],
+  // Etapa B: status, numeracao, totais e datas de processo so mudam pelas RPCs.
+  p3d_compras: ["status", "numero", "subtotal", "total", "recebida_em", "conta_pagar_id"],
+  p3d_compra_itens: ["preco_unitario"],
+  p3d_pedidos: [
+    "status", "status_pagamento", "numero", "origem", "orcamento_id", "subtotal", "total",
+    "custo_total", "lucro_total", "pago_valor", "cancelado_em", "cancelado_motivo",
+  ],
+  p3d_pedido_itens: ["preco_total", "custo_total", "lucro"],
+  p3d_producao: [
+    "status", "numero", "horas_reais", "peso_real_g", "qualidade", "iniciado_em", "concluido_em",
+    "consumo_registrado_em", "reimpressao_de",
+  ],
+  p3d_envios: ["status", "postado_em", "entregue_em", "recebedor"],
 };
-const SOMENTE_LEITURA = ["p3d_orcamento_itens", "p3d_movimentos_estoque"];
+const SOMENTE_LEITURA = [
+  "p3d_orcamento_itens", "p3d_movimentos_estoque",
+  // Etapa B: somente leitura (escrita so por RPC).
+  "p3d_pedido_pagamentos", "p3d_pedido_historico", "p3d_inspecoes", "p3d_falhas",
+];
 const escritasProtegidas: string[] = [];
 let escritasP3d = 0;
 
@@ -369,15 +400,32 @@ for (const pasta of ["app", "components", "lib"]) {
 }
 
 // Os schemas que alimentam esses payloads (spread de parsed.data) também não podem ter o campo.
-const schemas = readFileSync(join(raiz, "lib/impressao-3d/validacao.ts"), "utf8");
-const SCHEMA_DA_TABELA: Record<string, string> = { p3d_materiais: "MaterialSchema", p3d_orcamentos: "OrcamentoSchema" };
+const schemas =
+  readFileSync(join(raiz, "lib/impressao-3d/validacao.ts"), "utf8") + "\n" +
+  readFileSync(join(raiz, "lib/impressao-3d/validacao-operacao.ts"), "utf8");
+const SCHEMA_DA_TABELA: Record<string, string[]> = {
+  p3d_materiais: ["MaterialSchema"],
+  p3d_orcamentos: ["OrcamentoSchema"],
+  p3d_compras: ["CompraSchema"],
+  p3d_compra_itens: ["CompraItemSchema"],
+  p3d_pedidos: ["PedidoSchema", "PedidoLimitadoSchema"],
+  p3d_pedido_itens: ["PedidoItemSchema"],
+  p3d_producao: ["TrabalhoSchema", "TrabalhoLimitadoSchema"],
+  p3d_envios: ["EnvioSchema"],
+};
 for (const [tabela, campos] of Object.entries(PROTEGIDOS)) {
-  const ini = schemas.indexOf(`export const ${SCHEMA_DA_TABELA[tabela]}`);
-  const fim = schemas.indexOf("\nexport const", ini + 10);
-  const corpo = schemas.slice(ini, fim === -1 ? undefined : fim);
-  for (const campo of campos) {
-    if (new RegExp(`\\b${campo}:`).test(corpo)) {
-      escritasProtegidas.push(`lib/impressao-3d/validacao.ts ${SCHEMA_DA_TABELA[tabela]} aceita ${campo}`);
+  for (const nomeSchema of SCHEMA_DA_TABELA[tabela] ?? []) {
+    const ini = schemas.indexOf(`export const ${nomeSchema}`);
+    if (ini === -1) {
+      escritasProtegidas.push(`schema ${nomeSchema} (tabela ${tabela}) nao encontrado`);
+      continue;
+    }
+    const fim = schemas.indexOf("\nexport const", ini + 10);
+    const corpo = schemas.slice(ini, fim === -1 ? undefined : fim);
+    for (const campo of campos) {
+      if (new RegExp(`\\b${campo}:`).test(corpo)) {
+        escritasProtegidas.push(`validacao ${nomeSchema} aceita ${campo} (protegido em ${tabela})`);
+      }
     }
   }
 }
@@ -405,3 +453,43 @@ for (const pasta of ["app/(dashboard)/impressao-3d", "components/impressao-3d", 
 console.log(`\nImpressão 3D: acessos ao storage fora do bucket p3d-arquivos: ${storageFora.length}`);
 for (const s of storageFora) console.log("  ! " + s);
 if (storageFora.length) process.exitCode = 1;
+
+// --- Nicho Impressão 3D: RPC chamada sem guarda --------------------------------
+// Toda chamada .rpc("p3d_...") precisa estar dentro de uma função que passa por
+// getAcessoEdicao/getAcessoModulo (o banco confere de novo; isto pega a chamada esquecida), nunca
+// de um componente client, e as RPCs internas (de apoio às outras RPCs) não podem ser chamadas pelo app.
+const RPC_INTERNAS = [
+  "p3d_estoque_aplicar", "p3d_pedido_set_status", "p3d_recalc_compra", "p3d_recalc_orcamento",
+  "p3d_recalc_pedido", "p3d_calcular_preco", "p3d_num",
+];
+const rpcSemGuarda: string[] = [];
+let rpcsVerificadas = 0;
+for (const pasta of ["app", "components", "lib"]) {
+  for (const arq of arquivos(join(raiz, pasta))) {
+    const rel = relative(raiz, arq).replace(/\\/g, "/");
+    const texto = readFileSync(arq, "utf8").replace(/\r\n/g, "\n");
+    const re = /\.rpc\(\s*["'`](p3d_[a-z_]+)["'`]/g;
+    for (let m = re.exec(texto); m; m = re.exec(texto)) {
+      rpcsVerificadas++;
+      const linha = texto.slice(0, m.index).split("\n").length;
+      const alvo = `${rel}:${linha} ${m[1]}`;
+      if (RPC_INTERNAS.includes(m[1])) {
+        rpcSemGuarda.push(`${alvo}: RPC interna, o app não deve chamar`);
+        continue;
+      }
+      if (rel.startsWith("components/")) {
+        rpcSemGuarda.push(`${alvo}: RPC chamada de componente (use uma server action com guarda)`);
+        continue;
+      }
+      // Função que contém a chamada: do último "function " antes dela até a próxima declaração.
+      const inicio = texto.lastIndexOf("function ", m.index);
+      const proximo = texto.indexOf("\nexport ", m.index);
+      const corpo = texto.slice(inicio === -1 ? 0 : inicio, proximo === -1 ? undefined : proximo);
+      if (!/getAcesso(Edicao|Modulo)\(/.test(corpo)) rpcSemGuarda.push(`${alvo}: sem getAcessoEdicao/getAcessoModulo na função`);
+    }
+  }
+}
+console.log(`\nImpressão 3D: chamadas .rpc("p3d_...") verificadas: ${rpcsVerificadas}`);
+console.log(`RPC sem guarda, interna ou em componente: ${rpcSemGuarda.length}`);
+for (const s of rpcSemGuarda) console.log("  ! " + s);
+if (rpcSemGuarda.length) process.exitCode = 1;

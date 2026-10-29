@@ -4,6 +4,10 @@ import {
   Banknote,
   Blocks,
   Boxes,
+  ClipboardList,
+  Factory,
+  ShoppingCart,
+  Truck,
   Calculator,
   FileSpreadsheet,
   Package,
@@ -81,6 +85,10 @@ const ICONES: Record<IconeNome, Icone> = {
   package: Package,
   calculator: Calculator,
   "file-spreadsheet": FileSpreadsheet,
+  "shopping-cart": ShoppingCart,
+  "clipboard-list": ClipboardList,
+  factory: Factory,
+  truck: Truck,
 };
 
 /** Ícone pelo nome; nome desconhecido (ex.: vindo do catálogo) cai num padrão. */
