@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
+import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { getOpcoesMateriais } from "@/lib/impressao-3d/opcoes";
 import { FornecedoresBoard } from "@/components/impressao-3d/fornecedores-board";
 import {
@@ -14,6 +15,7 @@ const LIMITE_HISTORICO = 3000;
 export default async function FornecedoresPage() {
   const acesso = await getAcessoModulo("p3d_fornecedores");
   if (!acesso) redirect(HOME_DONO);
+  const abas = await getAbasVisiveis("p3d_fornecedores");
   const supabase = await createClient();
   const ws = acesso.workspaceId;
 
@@ -31,6 +33,7 @@ export default async function FornecedoresPage() {
 
   return (
     <FornecedoresBoard
+      abas={abas}
       fornecedores={(fornecedores ?? []) as unknown as Fornecedor[]}
       compras={(compras ?? []) as unknown as Compra[]}
       historico={(historico ?? []) as unknown as HistoricoPreco[]}

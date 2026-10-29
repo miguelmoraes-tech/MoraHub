@@ -29,6 +29,7 @@ import {
 import { SetorResumoCard } from "@/components/dashboard-executivo/setor-resumo-card";
 import type { DashboardHomeOverview } from "@/lib/dashboard-home/get-overview";
 import { getRotulos } from "@/lib/rotulos";
+import { PrimeirosPassos } from "@/components/dashboard-home/primeiros-passos";
 
 export async function DashboardHomeBoard({ overview }: { overview: DashboardHomeOverview }) {
   const {
@@ -44,6 +45,8 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
     juridico,
     impressao3d,
     habilitados,
+    primeirosPassos,
+    secoes,
   } = overview;
   const rotulos = await getRotulos();
   const com = (chave: string) => habilitados.includes(chave);
@@ -102,6 +105,9 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
         </div>
       )}
 
+      {primeirosPassos && <PrimeirosPassos passos={primeirosPassos} />}
+
+      {secoes.includes("resumo") && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {com("leads") && (
           <SetorResumoCard
@@ -462,6 +468,7 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
           />
         )}
       </div>
+      )}
     </div>
   );
 }

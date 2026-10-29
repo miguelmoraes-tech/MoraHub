@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
+import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { podeVerCustos } from "@/lib/impressao-3d/regras";
 import { getOpcoesFornecedores } from "@/lib/impressao-3d/opcoes";
 import { EstoqueBoard } from "@/components/impressao-3d/estoque-board";
@@ -15,6 +16,7 @@ const LIMITE_MOVIMENTOS = 500;
 export default async function EstoquePage() {
   const acesso = await getAcessoModulo("p3d_estoque");
   if (!acesso) redirect(HOME_DONO);
+  const abas = await getAbasVisiveis("p3d_estoque");
   const verCustos = podeVerCustos(acesso);
   const supabase = await createClient();
   const ws = acesso.workspaceId;
@@ -50,6 +52,7 @@ export default async function EstoquePage() {
 
   return (
     <EstoqueBoard
+      abas={abas}
       materiais={listaMateriais}
       movimentos={listaMovimentos}
       podeEditar={acesso.nivel === "edicao"}

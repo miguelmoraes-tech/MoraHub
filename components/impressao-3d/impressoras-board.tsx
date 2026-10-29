@@ -24,6 +24,7 @@ import {
 import { formatHoras, formatMoeda, formatNumero } from "@/lib/impressao-3d/numeros";
 import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
 import { formatDate } from "@/lib/format";
+import { abaInicial } from "@/lib/modulos/preferencias";
 
 const TOM_STATUS: Record<StatusImpressora, ChipTone> = {
   disponivel: "emerald",
@@ -349,15 +350,17 @@ function Linha({
   manutencoes,
   podeEditar,
   trabalhoAtual,
+  abas,
 }: {
   item: Impressora;
   pecas: PecaDesgaste[];
   manutencoes: Manutencao[];
   podeEditar: boolean;
+  abas: string[];
   trabalhoAtual: TrabalhoAtual | null;
 }) {
   const [aberto, setAberto] = useState(false);
-  const [aba, setAba] = useState<Aba>("dados");
+  const [aba, setAba] = useState<Aba>(abaInicial(abas, "dados"));
   const { executar, pendente } = useAcao();
   const vencida = manutencaoVencida(item);
   const faltam = horasParaManutencao(item);
@@ -424,7 +427,7 @@ function Linha({
               ["dados", "Dados"],
               ["pecas", `Peças de desgaste (${pecas.length})`],
               ["manutencoes", `Manutenções (${manutencoes.length})`],
-            ] as [Aba, string][]).map(([k, l]) => (
+            ] as [Aba, string][]).filter(([k]) => abas.includes(k)).map(([k, l]) => (
               <button
                 key={k}
                 type="button"
@@ -467,6 +470,7 @@ export function ImpressorasBoard({
   manutencoes,
   podeEditar,
   trabalhosAtuais,
+  abas,
 }: {
   impressoras: Impressora[];
   pecas: PecaDesgaste[];
@@ -474,6 +478,8 @@ export function ImpressorasBoard({
   podeEditar: boolean;
   /** impressora_id → trabalho em andamento; vazio se ninguém está imprimindo. */
   trabalhosAtuais: Record<string, TrabalhoAtual>;
+  /** Abas visíveis pela preferência de navegação (nunca vazia; ordem do registro). */
+  abas: string[];
 }) {
   const [statusFiltro, setStatusFiltro] = useState("");
   const [mostrarArquivadas, setMostrarArquivadas] = useState(false);
@@ -544,6 +550,7 @@ export function ImpressorasBoard({
                 pecas={pecas.filter((p) => p.impressora_id === i.id)}
                 manutencoes={manutencoes.filter((m) => m.impressora_id === i.id)}
                 podeEditar={podeEditar}
+                abas={abas}
                 trabalhoAtual={trabalhosAtuais[i.id] ?? null}
               />
             ))}

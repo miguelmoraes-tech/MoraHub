@@ -19,6 +19,7 @@ import {
   agruparIndicadores, agruparPorDefeito, resumirDesperdicio, taxaFalhaReal, type GrupoIndicador,
 } from "@/lib/impressao-3d/regras-operacao";
 import { formatDataHora, formatGramas, formatHoras, formatMoeda, formatPct, formatPercentualFracao } from "@/lib/impressao-3d/numeros";
+import { abaInicial } from "@/lib/modulos/preferencias";
 
 function FormInspecao({
   trabalho,
@@ -277,6 +278,7 @@ export function QualidadeBoard({
   podeEditar,
   truncado,
   verCustos,
+  abas,
 }: {
   inspecoes: Inspecao[];
   falhas: Falha[];
@@ -290,11 +292,13 @@ export function QualidadeBoard({
   truncado: boolean;
   /** Extra "custos" de Qualidade ("Ver custos das falhas"). */
   verCustos: boolean;
+  /** Abas visíveis pela preferência de navegação (nunca vazia; ordem do registro). */
+  abas: string[];
 }) {
   const router = useRouter();
   const toast = useToast();
   const [pendente, iniciar] = useTransition();
-  const [aba, setAba] = useState<"pendentes" | "historico" | "indicadores">("pendentes");
+  const [aba, setAba] = useState<"pendentes" | "historico" | "indicadores">(abaInicial(abas, "pendentes"));
   const [inspecionando, setInspecionando] = useState<string | null>(null);
   const [avisos, setAvisos] = useState<string[]>([]);
 
@@ -338,7 +342,7 @@ export function QualidadeBoard({
       )}
 
       <div className="mb-6 inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
-        {([["pendentes", "Para inspecionar"], ["historico", "Histórico"], ["indicadores", "Indicadores"]] as const).map(([k, l]) => (
+        {([["pendentes", "Para inspecionar"], ["historico", "Histórico"], ["indicadores", "Indicadores"]] as const).filter(([k]) => abas.includes(k)).map(([k, l]) => (
           <button
             key={k}
             type="button"

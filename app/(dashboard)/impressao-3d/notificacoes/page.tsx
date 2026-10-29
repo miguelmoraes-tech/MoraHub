@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
+import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { COLUNAS_NOTIFICACAO, lerNotificacoes } from "@/lib/impressao-3d/alertas";
 import { mensagemRpc } from "@/lib/impressao-3d/erros";
 import { NotificacoesBoard } from "@/components/impressao-3d/notificacoes-board";
@@ -17,6 +18,7 @@ export default async function NotificacoesPage() {
   const acesso = await getAcessoModulo("p3d_automacoes");
   if (!acesso) redirect(HOME_DONO);
   const supabase = await createClient();
+  const abas = await getAbasVisiveis("p3d_automacoes");
 
   const [{ data, error }, ...referencias] = await Promise.all([
     supabase
@@ -33,6 +35,7 @@ export default async function NotificacoesPage() {
 
   return (
     <NotificacoesBoard
+      abas={abas}
       empresaId={acesso.workspaceId}
       notificacoes={notificacoes}
       erro={error ? mensagemRpc(error, "Não foi possível carregar as notificações.") : null}

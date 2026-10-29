@@ -46,9 +46,11 @@ function BotaoCsv({ desabilitado, aoClicar }: { desabilitado: boolean; aoClicar:
 }
 
 export function RelatoriosBoard({
-  aba, periodo, erroPeriodo, agrupar, limite, verCustos, erro, vendas, produtos, produtividade,
+  aba, abas, periodo, erroPeriodo, agrupar, limite, verCustos, erro, vendas, produtos, produtividade,
 }: {
   aba: AbaRelatorio;
+  /** Abas visíveis pela preferência de navegação (nunca vazia). */
+  abas: string[];
   periodo: Periodo;
   erroPeriodo: string | null;
   agrupar: Agrupamento;
@@ -77,7 +79,7 @@ export function RelatoriosBoard({
       </div>
 
       <nav className="flex gap-1 border-b border-zinc-800" aria-label="Relatórios">
-        {ABAS_RELATORIO.map((a) => (
+        {ABAS_RELATORIO.filter((a) => abas.includes(a)).map((a) => (
           <Link
             key={a}
             href={hrefAba(a)}

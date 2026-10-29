@@ -70,6 +70,15 @@ export interface ItemMenu {
   badge?: "solicitacoes";
 }
 
+/**
+ * Aba (ou seção) de uma tela, com chave estável: é o que a preferência de navegação guarda em
+ * `menu_preferencias.abas_ocultas`. A primeira da lista é a aba padrão da tela.
+ */
+export interface AbaRegistro {
+  chave: string;
+  rotulo: string;
+}
+
 export interface ModuloRegistro {
   /** Mesma chave da linha em `modulos`. */
   chave: string;
@@ -87,6 +96,8 @@ export interface ModuloRegistro {
    * empresa (workspace_id) na RLS.
    */
   tabelas: string[];
+  /** Abas da tela do módulo que podem ser ocultadas (mínimo de 1 visível). A 1ª é a padrão. */
+  abas?: AbaRegistro[];
 }
 
 export const GRUPOS_MENU = [
@@ -277,6 +288,7 @@ export const MODULOS: ModuloRegistro[] = [
     rotas: ["/impressao-3d/impressoras"],
     icone: "printer",
     tabelas: ["p3d_impressoras", "p3d_pecas_desgaste", "p3d_manutencoes"],
+    abas: [{ chave: "dados", rotulo: "Dados" }, { chave: "pecas", rotulo: "Peças de desgaste" }, { chave: "manutencoes", rotulo: "Manutenções" }],
     menu: [
       { label: "Impressoras", href: "/impressao-3d/impressoras", icone: "printer", grupo: "Impressão 3D" },
     ],
@@ -286,6 +298,7 @@ export const MODULOS: ModuloRegistro[] = [
     rotas: ["/impressao-3d/estoque"],
     icone: "boxes",
     tabelas: ["p3d_materiais", "p3d_movimentos_estoque"],
+    abas: [{ chave: "materiais", rotulo: "Materiais" }, { chave: "historico", rotulo: "Histórico de movimentos" }],
     menu: [{ label: "Estoque", href: "/impressao-3d/estoque", icone: "boxes", grupo: "Impressão 3D" }],
   },
   {
@@ -302,6 +315,7 @@ export const MODULOS: ModuloRegistro[] = [
     rotas: ["/impressao-3d/precificacao"],
     icone: "calculator",
     tabelas: ["p3d_config_precificacao"],
+    abas: [{ chave: "simulador", rotulo: "Simulador" }, { chave: "config", rotulo: "Configurações da empresa" }],
     menu: [
       { label: "Precificação", href: "/impressao-3d/precificacao", icone: "calculator", grupo: "Impressão 3D" },
     ],
@@ -321,6 +335,7 @@ export const MODULOS: ModuloRegistro[] = [
     rotas: ["/impressao-3d/fornecedores"],
     icone: "shopping-cart",
     tabelas: ["p3d_fornecedores", "p3d_compras", "p3d_compra_itens"],
+    abas: [{ chave: "compras", rotulo: "Compras" }, { chave: "fornecedores", rotulo: "Fornecedores" }, { chave: "precos", rotulo: "Preços" }],
     menu: [
       { label: "Fornecedores e compras", href: "/impressao-3d/fornecedores", icone: "shopping-cart", grupo: "Impressão 3D" },
     ],
@@ -337,6 +352,7 @@ export const MODULOS: ModuloRegistro[] = [
     rotas: ["/impressao-3d/producao"],
     icone: "factory",
     tabelas: ["p3d_producao"],
+    abas: [{ chave: "fila", rotulo: "Na fila" }, { chave: "imprimindo", rotulo: "Imprimindo" }, { chave: "concluida", rotulo: "Concluída" }, { chave: "falhou", rotulo: "Falhou" }, { chave: "cancelada", rotulo: "Cancelada" }, { chave: "produtividade", rotulo: "Produtividade" }],
     menu: [{ label: "Produção", href: "/impressao-3d/producao", icone: "factory", grupo: "Impressão 3D" }],
   },
   {
@@ -344,6 +360,7 @@ export const MODULOS: ModuloRegistro[] = [
     rotas: ["/impressao-3d/qualidade"],
     icone: "shield-check",
     tabelas: ["p3d_inspecoes", "p3d_falhas"],
+    abas: [{ chave: "pendentes", rotulo: "Para inspecionar" }, { chave: "historico", rotulo: "Histórico" }, { chave: "indicadores", rotulo: "Indicadores" }],
     menu: [{ label: "Qualidade", href: "/impressao-3d/qualidade", icone: "shield-check", grupo: "Impressão 3D" }],
   },
   {
@@ -362,6 +379,7 @@ export const MODULOS: ModuloRegistro[] = [
     icone: "gauge",
     // Sem tabela própria: lê por RPC (p3d_painel) e dispara p3d_atualizar_alertas.
     tabelas: [],
+    abas: [{ chave: "vendas", rotulo: "Vendas" }, { chave: "resultado", rotulo: "Resultado" }, { chave: "producao", rotulo: "Produção" }, { chave: "alertas", rotulo: "Alertas" }],
     menu: [{ label: "Dashboard 3D", href: "/impressao-3d/dashboard", icone: "gauge", grupo: "Impressão 3D" }],
   },
   {
@@ -370,6 +388,7 @@ export const MODULOS: ModuloRegistro[] = [
     icone: "bar-chart-3",
     // Sem tabela própria: só RPCs de leitura (p3d_relatorio_*).
     tabelas: [],
+    abas: [{ chave: "vendas", rotulo: "Vendas" }, { chave: "produtos", rotulo: "Produtos" }, { chave: "produtividade", rotulo: "Produtividade" }],
     menu: [{ label: "Relatórios 3D", href: "/impressao-3d/relatorios", icone: "bar-chart-3", grupo: "Impressão 3D" }],
   },
   {
@@ -377,6 +396,7 @@ export const MODULOS: ModuloRegistro[] = [
     rotas: ["/impressao-3d/notificacoes"],
     icone: "bell",
     tabelas: ["p3d_notificacoes", "p3d_config_alertas"],
+    abas: [{ chave: "abertas", rotulo: "Abertas" }, { chave: "resolvidas", rotulo: "Resolvidas" }, { chave: "todas", rotulo: "Todas" }],
     menu: [{ label: "Notificações e alertas", href: "/impressao-3d/notificacoes", icone: "bell", grupo: "Impressão 3D" }],
   },
   {
@@ -386,6 +406,14 @@ export const MODULOS: ModuloRegistro[] = [
     tabelas: ["p3d_integracoes"],
     menu: [{ label: "Integrações", href: "/impressao-3d/integracoes", icone: "plug", grupo: "Impressão 3D" }],
   },
+];
+
+/** Chave da Visão Geral do dono no mecanismo de abas (não é módulo). */
+export const CHAVE_VISAO_GERAL = "visao_geral";
+/** Seções da Visão Geral que podem ser ocultadas (mínimo de 1 visível). */
+export const ABAS_VISAO_GERAL: AbaRegistro[] = [
+  { chave: "primeiros_passos", rotulo: "Primeiros passos" },
+  { chave: "resumo", rotulo: "Resumo dos módulos" },
 ];
 
 const POR_CHAVE = new Map(MODULOS.map((m) => [m.chave, m]));

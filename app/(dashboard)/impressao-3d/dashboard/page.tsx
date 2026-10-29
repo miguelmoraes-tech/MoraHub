@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { podeVerCustos } from "@/lib/impressao-3d/regras";
 import { HOME_DONO } from "@/lib/modulos/registry";
+import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { lerPainel, resolverPeriodo } from "@/lib/impressao-3d/painel";
 import { mensagemRpc } from "@/lib/impressao-3d/erros";
 import { DashboardBoard } from "@/components/impressao-3d/dashboard-board";
@@ -18,6 +19,7 @@ export default async function DashboardNichoPage({
   const acesso = await getAcessoModulo("p3d_dashboard");
   if (!acesso) redirect(HOME_DONO);
   const verCustos = podeVerCustos(acesso);
+  const abas = await getAbasVisiveis("p3d_dashboard");
   const params = await searchParams;
   const { periodo, padrao, erro: erroPeriodo } = resolverPeriodo(UM(params.de), UM(params.ate));
 
@@ -37,6 +39,7 @@ export default async function DashboardNichoPage({
 
   return (
     <DashboardBoard
+      abas={abas}
       empresaId={acesso.workspaceId}
       painel={painel}
       periodoPedido={periodo}

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
+import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { getOpcoesMateriais, getOpcoesPedidos, getOpcoesProdutos } from "@/lib/impressao-3d/opcoes";
 import { ProducaoBoard, type ImpressoraProducao } from "@/components/impressao-3d/producao-board";
 import { COLUNAS_TRABALHO, type Trabalho } from "@/lib/impressao-3d/tipos-operacao";
@@ -12,6 +13,7 @@ const LIMITE_TRABALHOS = 2000;
 export default async function ProducaoPage() {
   const acesso = await getAcessoModulo("p3d_producao");
   if (!acesso) redirect(HOME_DONO);
+  const abas = await getAbasVisiveis("p3d_producao");
   const supabase = await createClient();
   const ws = acesso.workspaceId;
   const acessoImpressoras = await getAcessoModulo("p3d_impressoras");
@@ -37,6 +39,7 @@ export default async function ProducaoPage() {
 
   return (
     <ProducaoBoard
+      abas={abas}
       trabalhos={(trabalhos ?? []) as unknown as Trabalho[]}
       truncado={(trabalhos ?? []).length >= LIMITE_TRABALHOS}
       impressoras={acessoImpressoras ? ((impressoras ?? []) as unknown as ImpressoraProducao[]) : null}

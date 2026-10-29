@@ -1,4 +1,4 @@
-# Nicho Impressão 3D (Etapas A, B e C-1)
+# Nicho Impressão 3D (Etapas A, B, C-1 e D)
 
 Impressoras, Estoque, Produtos e catálogo, Precificação e Orçamentos para quem
 trabalha com impressão 3D sob demanda, loja de produtos ou print farm. Usa o
@@ -521,3 +521,98 @@ conexão" nem "Conectar" (a auditoria falha se surgir).
 - O Dashboard não usa `tipo_valores`; "Real" e "Estimado" são fixos por métrica.
 - O catálogo `modulos` (linhas das 4 chaves, `permissoes_extras` com `custos`, `permite_membros`) é dado do banco e não foi
   verificado por este código; sem as linhas os módulos não aparecem para sócios.
+
+
+---
+
+# Etapa D: navegação e abas personalizáveis, e praticidade
+
+Tudo aqui é **aparência ou atalho**: nenhuma alteração de módulos ligados, permissões ou dados.
+
+## Personalizar navegação (`/configuracoes/navegacao`)
+
+Tabela `menu_preferencias` (`workspace_id`, `user_id`, `itens`, `abas_ocultas`, `updated_at`):
+
+- `user_id` nulo = **padrão da empresa** (só fundador/cofundador grava); `user_id` = a própria pessoa =
+  **preferência pessoal**. Cada pessoa lê o padrão e a própria linha; ninguém lê a de outro (RLS).
+- `itens`: `[{ chave, visivel, ordem }]`, com `chave` = rota sem a barra inicial (`leads`,
+  `impressao-3d/estoque`, `dashboard`, `modulos`...). `abas_ocultas`: `{ "<módulo ou visao_geral>": ["<aba>"] }`.
+- **Hierarquia ao montar o menu**: preferência pessoal → padrão da empresa → ordem do registro. Sem nenhuma
+  linha, o menu é exatamente o de antes (o snapshot das empresas atuais não muda).
+- A barra lateral recebe a preferência do layout (servidor), então o menu já chega montado, sem piscar. Não há
+  menu mobile separado no app: a barra lateral é o único menu.
+- **Regras**: Visão Geral, Módulos e Configurações nunca podem ser ocultados; itens novos (módulo ligado depois)
+  entram no fim do grupo, visíveis; itens de módulos desligados somem do menu, mas a preferência guardada para eles
+  é preservada ao salvar e volta quando o módulo é religado; a ordem é dentro de cada grupo.
+- **Esconder item não bloqueia a rota**: o acesso pelo endereço continua regido só pela permissão (o proxy não lê
+  preferência). A tela explica isso.
+- Tela: só os itens que a pessoa já vê (registro ∩ módulos ligados ∩ permissão), agrupados como no menu, com
+  mostrar/ocultar e subir/descer, pré-visualização (a mesma função da barra lateral), **Salvar** (pessoal),
+  **Restaurar padrão** (apaga só a linha pessoal) e, para fundador/cofundador, **Salvar como padrão da empresa**.
+- Atalhos: bloco do usuário na barra lateral ("Personalizar navegação") e um cartão em Configurações. Sócio e
+  funcionário com algum módulo liberado também abrem a tela (exceção dentro de `/configuracoes`, que segue só do
+  painel); vendedor nunca.
+- **Gravação sem upsert** (o banco usa índices parciais): lê a linha; se existe, update pelo `id` e
+  `workspace_id`; senão insert. Se outra sessão inserir no meio (violação de unicidade, `23505`), relê e faz
+  update. Os erros do banco aparecem como vieram.
+
+## Abas opcionais
+
+Cada módulo do nicho declara `abas` no registro (`lib/modulos/registry.ts`), com chave estável; a primeira é a
+aba de abertura. A Visão Geral usa a chave `visao_geral`.
+
+| Tela | Abas (chave) |
+| --- | --- |
+| Impressoras (detalhe) | `dados`, `pecas`, `manutencoes` |
+| Estoque | `materiais`, `historico` |
+| Precificação | `simulador`, `config` |
+| Fornecedores e compras | `compras`, `fornecedores`, `precos` |
+| Produção | `fila`, `imprimindo`, `concluida`, `falhou`, `cancelada`, `produtividade` |
+| Qualidade | `pendentes`, `historico`, `indicadores` |
+| Dashboard 3D (seções) | `vendas`, `resultado`, `producao`, `alertas` |
+| Relatórios 3D | `vendas`, `produtos`, `produtividade` |
+| Notificações (situação) | `abertas`, `resolvidas`, `todas` |
+| Visão Geral (`visao_geral`) | `primeiros_passos`, `resumo` |
+
+- Mínimo de **1 aba visível** por tela (a tela de personalização e o servidor recusam ocultar todas; se uma linha
+  antiga vier com tudo oculto, a tela mostra a primeira).
+- A página lê as abas no servidor (`getAbasVisiveis`) e o board mostra só as visíveis. Se a aba padrão estiver
+  oculta, abre a primeira visível; nos Relatórios, uma aba oculta pedida pela URL também cai na primeira visível.
+- A seção "Resultado" do Dashboard continua exigindo o extra `custos`, além de estar visível.
+
+## Módulos
+
+O card de cada módulo ligado avisa, junto do botão **Remover**: "Remover não apaga nada: os dados ficam guardados
+e voltam ao adicionar o módulo de novo." Remover chama `definir_modulo` com `habilitado = false` (só o flag em
+`workspace_modulos`); nenhum código apaga dados.
+
+## Clientes: Pedidos e orçamentos
+
+No detalhe do cliente, com `p3d_pedidos` e/ou `p3d_orcamentos` ligados e leitura neles, aparece a seção
+"Pedidos e orçamentos": total comprado (pedidos não cancelados), última compra, pedidos (número, data, status,
+total, pago, prazo) e orçamentos (número, status, total), cada um com link. Nenhuma coluna de custo ou lucro é
+lida. Sem os módulos, a página fica como antes.
+
+## Financeiro por padrão
+
+Com o Financeiro ligado e edição nele, "Lançar no Financeiro" (pagamento de pedido) e "Gerar conta a pagar"
+(recebimento de compra, com vencimento obrigatório) vêm **pré-marcados**. Sem Financeiro (ou sem edição) as opções
+não aparecem, e o servidor confere a permissão de novo ao gravar.
+
+## Primeiros passos (Visão Geral)
+
+Para empresa com nicho Impressão 3D, a Visão Geral do dono mostra um checklist marcado **só por dados reais**:
+parâmetros de precificação ajustados (tarifa de energia > 0 e valor da hora > 0), 1ª impressora, 1º material com
+preço, 1ª entrada de estoque, 1º produto, 1º orçamento e 1º pedido. Cada item leva à tela certa (módulo desligado
+leva a Módulos e nunca conta como feito). Some quando tudo está concluído e pode ser ocultado em Personalizar
+navegação (Visão Geral → Primeiros passos).
+
+## Testes e auditoria (Etapa D)
+
+`testar-acesso.mts` (seção *Etapa D*): menu sem preferência idêntico ao snapshot, itens fixos nunca ocultos, ordem
+e itens novos, preservação de módulos desligados, hierarquia, rota não bloqueada por preferência, acesso à tela de
+navegação por papel, contrato de gravação (sem upsert, corrida, restaurar só a pessoal), abas mínimas e de
+abertura, Primeiros passos, Módulos, Clientes e Financeiro. `auditar-isolamento.mts` falha em escrita em
+`menu_preferencias` fora de `configuracoes/navegacao/actions.ts`, em upsert nela, em campo fora do contrato
+(`itens`, `abas_ocultas`, `workspace_id`, `user_id`, `updated_at`), em delete que não filtre `user_id` e em escrita
+de módulos/permissões a partir da navegação.

@@ -11,6 +11,7 @@ import { salvarConfigPrecificacao } from "@/app/(dashboard)/impressao-3d/precifi
 import { FAIXA_DESPERDICIO, FAIXA_FALHAS } from "@/lib/impressao-3d/validacao";
 import type { OpcaoImpressora, OpcaoMaterial, Opcoes } from "@/lib/impressao-3d/opcoes";
 import type { ConfigPrecificacao } from "@/lib/impressao-3d/tipos";
+import { abaInicial } from "@/lib/modulos/preferencias";
 
 function foraDaFaixa(valor: string, faixa: { min: number; max: number }): boolean {
   if (valor.trim() === "") return false;
@@ -132,6 +133,7 @@ export function PrecificacaoBoard({
   materiais,
   podeEditar,
   usarEmOrcamento,
+  abas,
 }: {
   config: ConfigPrecificacao;
   configSalva: boolean;
@@ -139,8 +141,10 @@ export function PrecificacaoBoard({
   materiais: Opcoes<OpcaoMaterial>;
   podeEditar: boolean;
   usarEmOrcamento: { podeUsar: boolean; rascunhos: RascunhoOpcao[] };
+  /** Abas visíveis pela preferência de navegação (nunca vazia; ordem do registro). */
+  abas: string[];
 }) {
-  const [aba, setAba] = useState<"simulador" | "config">("simulador");
+  const [aba, setAba] = useState<"simulador" | "config">(abaInicial(abas, "simulador"));
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -152,7 +156,7 @@ export function PrecificacaoBoard({
       </div>
 
       <div className="mb-6 inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
-        {([["simulador", "Simulador"], ["config", "Configurações da empresa"]] as const).map(([k, l]) => (
+        {([["simulador", "Simulador"], ["config", "Configurações da empresa"]] as const).filter(([k]) => abas.includes(k)).map(([k, l]) => (
           <button
             key={k}
             type="button"

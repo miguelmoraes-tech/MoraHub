@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { podeVerCustos } from "@/lib/impressao-3d/regras";
 import { HOME_DONO } from "@/lib/modulos/registry";
+import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import {
   ABAS_RELATORIO, LIMITES_PRODUTOS, agrupamentoValido, lerRelatorioProdutividade, lerRelatorioProdutos,
   lerRelatorioVendas, resolverPeriodo,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/impressao-3d/painel";
 import { mensagemRpc } from "@/lib/impressao-3d/erros";
 import { RelatoriosBoard } from "@/components/impressao-3d/relatorios-board";
+import { abaInicial } from "@/lib/modulos/preferencias";
 
 const UM = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -23,7 +25,12 @@ export default async function RelatoriosPage({
   if (!acesso) redirect(HOME_DONO);
   const verCustos = podeVerCustos(acesso);
   const params = await searchParams;
-  const aba: AbaRelatorio = ABAS_RELATORIO.find((a) => a === UM(params.aba)) ?? "vendas";
+  // Aba oculta na preferência (ou desconhecida): abre a primeira visível.
+  const abas = await getAbasVisiveis("p3d_relatorios");
+  const aba: AbaRelatorio = abaInicial(
+    abas,
+    ABAS_RELATORIO.find((a) => a === UM(params.aba)) ?? "vendas"
+  );
   const agrupar = agrupamentoValido(UM(params.agrupar));
   const limitePedido = Number(UM(params.limite));
   const limite = LIMITES_PRODUTOS.includes(limitePedido) ? limitePedido : 20;
@@ -56,6 +63,7 @@ export default async function RelatoriosPage({
   return (
     <RelatoriosBoard
       aba={aba}
+      abas={abas}
       periodo={periodo}
       erroPeriodo={erroPeriodo}
       agrupar={agrupar}

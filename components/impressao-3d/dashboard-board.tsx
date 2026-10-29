@@ -18,6 +18,7 @@ const TOM_SEVERIDADE = { critico: "rose", aviso: "amber", info: "zinc" } as cons
  * "custos": sem ele nada de custo, lucro ou margem chega à tela. Os gráficos usam só o retorno do banco.
  */
 export function DashboardBoard({
+  abas,
   empresaId,
   painel,
   periodoPedido,
@@ -26,6 +27,8 @@ export function DashboardBoard({
   verCustos,
   links,
 }: {
+  /** Seções visíveis pela preferência de navegação (vendas, resultado, producao, alertas). */
+  abas: string[];
   empresaId: string;
   painel: Painel | null;
   periodoPedido: Periodo;
@@ -68,6 +71,7 @@ export function DashboardBoard({
 
       {painel && (
         <>
+          {abas.includes("vendas") && (
           <Cartao titulo="Vendas">
             {vendas ? (
               <div className="space-y-5">
@@ -103,8 +107,9 @@ export function DashboardBoard({
               <Vazio>O banco não devolveu os dados de vendas.</Vazio>
             )}
           </Cartao>
+          )}
 
-          {verCustos && resultado && (
+          {abas.includes("resultado") && verCustos && resultado && (
             <Cartao titulo="Resultado">
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -137,6 +142,7 @@ export function DashboardBoard({
             </Cartao>
           )}
 
+          {abas.includes("producao") && (
           <Cartao titulo="Produção">
             {producao ? (
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -162,7 +168,9 @@ export function DashboardBoard({
               <Vazio>O banco não devolveu os dados de produção.</Vazio>
             )}
           </Cartao>
+          )}
 
+          {abas.includes("alertas") && (
           <Cartao titulo="Alertas">
             {alertas ? (
               <div className="space-y-5">
@@ -219,6 +227,7 @@ export function DashboardBoard({
               <Vazio>O banco não devolveu os alertas.</Vazio>
             )}
           </Cartao>
+          )}
         </>
       )}
     </div>

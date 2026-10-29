@@ -194,13 +194,18 @@ export function ModulosBoard({
                     Remova antes: {dependentes.map((d) => d.nome).join(", ")}
                   </p>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmando(m.chave)}
-                    className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:border-rose-800 hover:text-rose-300"
-                  >
-                    Remover
-                  </button>
+                  <div className="space-y-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmando(m.chave)}
+                      className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:border-rose-800 hover:text-rose-300"
+                    >
+                      Remover
+                    </button>
+                    <p className="text-[11px] leading-snug text-zinc-600">
+                      Remover não apaga nada: os dados ficam guardados e voltam ao adicionar o módulo de novo.
+                    </p>
+                  </div>
                 )
               ) : faltando.length > 0 ? (
                 <p className="text-[11px] text-zinc-600">

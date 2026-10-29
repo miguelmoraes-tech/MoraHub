@@ -21,6 +21,7 @@ import type { OpcaoFornecedor, Opcoes } from "@/lib/impressao-3d/opcoes";
 import {
   formatDataHora, formatMoeda, formatNumero,
 } from "@/lib/impressao-3d/numeros";
+import { abaInicial } from "@/lib/modulos/preferencias";
 
 function CamposMaterial({
   item,
@@ -448,6 +449,7 @@ export function EstoqueBoard({
   verCustos,
   limiteMovimentos,
   fornecedores,
+  abas,
 }: {
   materiais: Material[];
   movimentos: MovimentoEstoque[];
@@ -455,8 +457,10 @@ export function EstoqueBoard({
   verCustos: boolean;
   limiteMovimentos: number;
   fornecedores: Opcoes<OpcaoFornecedor>;
+  /** Abas visíveis pela preferência de navegação (nunca vazia; ordem do registro). */
+  abas: string[];
 }) {
-  const [aba, setAba] = useState<"materiais" | "historico">("materiais");
+  const [aba, setAba] = useState<"materiais" | "historico">(abaInicial(abas, "materiais"));
   const [novo, setNovo] = useState(false);
   const [tipoFiltro, setTipoFiltro] = useState("");
   const [mostrarArquivados, setMostrarArquivados] = useState(false);
@@ -497,7 +501,7 @@ export function EstoqueBoard({
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
-          {([["materiais", "Materiais"], ["historico", "Histórico de movimentos"]] as const).map(([k, l]) => (
+          {([["materiais", "Materiais"], ["historico", "Histórico de movimentos"]] as const).filter(([k]) => abas.includes(k)).map(([k, l]) => (
             <button
               key={k}
               type="button"

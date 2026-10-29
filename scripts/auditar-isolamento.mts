@@ -48,6 +48,8 @@ const MODULOS_NOVOS: Record<string, string[]> = {
     // Etapa C-1: alertas, notificacoes e integracoes.
     "p3d_config_alertas", "p3d_notificacoes", "p3d_integracoes",
   ],
+  // Etapa D: preferências de navegação (padrão da empresa e pessoal).
+  navegacao: ["menu_preferencias"],
 };
 const ESTRITAS = Object.values(MODULOS_NOVOS).flat();
 
@@ -654,3 +656,49 @@ for (const pasta of ["app/(dashboard)/impressao-3d", "components/impressao-3d"])
 console.log(`\nImpressão 3D (C-1): integração com conexão simulada ou sem restrição: ${integracaoSimulada.length}`);
 for (const s of integracaoSimulada) console.log("  ! " + s);
 if (integracaoSimulada.length) process.exitCode = 1;
+
+// --- Etapa D: preferências de navegação (menu_preferencias) ------------------------------------
+// Só aparência. Escrita apenas em configuracoes/navegacao/actions.ts, nunca por upsert (o banco usa
+// índices parciais), só com os campos do contrato, sempre pela empresa ativa; o delete (Restaurar
+// padrão) filtra o user_id da própria pessoa. A navegação nunca escreve em módulos ou permissões, e o
+// proxy não lê preferência (esconder item não bloqueia rota).
+const navegacaoForaDoContrato: string[] = [];
+const ARQ_NAVEGACAO = "app/(dashboard)/configuracoes/navegacao/actions.ts";
+const CAMPOS_PREFERENCIA = ["itens", "abas_ocultas", "workspace_id", "user_id", "updated_at"];
+for (const pasta of ["app", "components", "lib"]) {
+  for (const arq of arquivos(join(raiz, pasta))) {
+    const rel = relative(raiz, arq).replace(/\\/g, "/");
+    const texto = readFileSync(arq, "utf8").replace(/\r\n/g, "\n");
+    const re = /\.from\(\s*["'`]menu_preferencias["'`]\s*\)\s*\.(insert|update|upsert|delete)\(/g;
+    for (let m = re.exec(texto); m; m = re.exec(texto)) {
+      const linha = texto.slice(0, m.index).split("\n").length;
+      const alvo = `${rel}:${linha} menu_preferencias (${m[1]})`;
+      if (rel !== ARQ_NAVEGACAO) navegacaoForaDoContrato.push(`${alvo}: escrita fora de ${ARQ_NAVEGACAO}`);
+      if (m[1] === "upsert") navegacaoForaDoContrato.push(`${alvo}: upsert não é permitido (índices parciais)`);
+      const payload = argumentos(texto, m.index + m[0].length);
+      for (const campo of payload.matchAll(/\b([a-z_]+)\s*:/g)) {
+        if (!CAMPOS_PREFERENCIA.includes(campo[1])) navegacaoForaDoContrato.push(`${alvo}: campo fora do contrato (${campo[1]})`);
+      }
+      const resto = texto.slice(m.index, m.index + 400);
+      if (m[1] === "delete" && !/\.eq\("user_id", ctx\.userId\)/.test(resto)) {
+        navegacaoForaDoContrato.push(`${alvo}: delete sem filtrar o user_id da própria pessoa`);
+      }
+    }
+  }
+}
+{
+  const acoes = readFileSync(join(raiz, ARQ_NAVEGACAO), "utf8");
+  for (const proibido of [/workspace_modulos/, /permissoes_membro/, /definir_modulo/, /\.rpc\(/]) {
+    if (proibido.test(acoes)) navegacaoForaDoContrato.push(`${ARQ_NAVEGACAO} usa ${proibido.source} (navegação é só aparência)`);
+  }
+  for (const rel of ["lib/acesso.ts", "lib/supabase/proxy.ts"]) {
+    if (/menu_preferencias|getPreferenciasNavegacao/.test(readFileSync(join(raiz, rel), "utf8"))) {
+      navegacaoForaDoContrato.push(`${rel} lê preferência: esconder item não pode bloquear rota`);
+    }
+  }
+  const puro = readFileSync(join(raiz, "lib/modulos/preferencias.ts"), "utf8");
+  if (/supabase|from\(/.test(puro)) navegacaoForaDoContrato.push("lib/modulos/preferencias.ts deve ser puro (sem banco)");
+}
+console.log(`\nEtapa D: escritas em menu_preferencias fora do contrato: ${navegacaoForaDoContrato.length}`);
+for (const s of navegacaoForaDoContrato) console.log("  ! " + s);
+if (navegacaoForaDoContrato.length) process.exitCode = 1;

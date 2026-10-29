@@ -18,6 +18,8 @@ import { PropostasSection } from "@/components/propostas-section";
 import { LeadOrigemCard } from "@/components/lead-origem-card";
 import { RentabilidadeClienteCard } from "@/components/rentabilidade-cliente-card";
 import { calcularRentabilidade, custoPorProjeto } from "@/lib/rentabilidade";
+import { getComprasDoCliente } from "@/lib/impressao-3d/cliente";
+import { ClientePedidosOrcamentos } from "@/components/impressao-3d/cliente-pedidos";
 import type {
   Cliente,
   Contrato,
@@ -154,6 +156,9 @@ export default async function ClienteDetailPage({
       })
     : { data: null };
 
+  // Nicho Impressão 3D: só com Pedidos e/ou Orçamentos ligados e leitura neles; senão null (página como antes).
+  const comprasP3d = await getComprasDoCliente(cliente.id);
+
   const contratosList = contratos ?? [];
   const comprovantesList = comprovantes ?? [];
   const projetosList = projetos ?? [];
@@ -198,6 +203,7 @@ export default async function ClienteDetailPage({
       {leadOrigem && (
         <LeadOrigemCard lead={leadOrigem} convertidoEm={cliente.created_at} />
       )}
+      {comprasP3d && <ClientePedidosOrcamentos dados={comprasP3d} />}
       <RentabilidadeClienteCard rentabilidade={rentabilidade} />
       <PropostasSection clienteId={id} propostas={propostas ?? []} />
       <AssinaturasSection clienteId={id} assinaturas={assinaturas ?? []} />

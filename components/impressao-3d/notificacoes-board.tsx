@@ -12,12 +12,15 @@ import {
   type Notificacao, type Severidade,
 } from "@/lib/impressao-3d/alertas";
 import { formatDataHora } from "@/lib/impressao-3d/numeros";
+import { abaInicial } from "@/lib/modulos/preferencias";
 
 const TOM: Record<Severidade, "rose" | "amber" | "sky"> = { critico: "rose", aviso: "amber", info: "sky" };
 
 export function NotificacoesBoard({
-  empresaId, notificacoes, erro, truncado, acessiveis, podeEditar,
+  abas, empresaId, notificacoes, erro, truncado, acessiveis, podeEditar,
 }: {
+  /** Situações visíveis pela preferência de navegação (abertas, resolvidas, todas). */
+  abas: string[];
   empresaId: string;
   notificacoes: Notificacao[];
   erro: string | null;
@@ -25,7 +28,7 @@ export function NotificacoesBoard({
   acessiveis: string[];
   podeEditar: boolean;
 }) {
-  const [estado, setEstado] = useState<"abertas" | "resolvidas" | "todas">("abertas");
+  const [estado, setEstado] = useState<"abertas" | "resolvidas" | "todas">(abaInicial(abas, "abertas"));
   const [tipo, setTipo] = useState("");
   const [severidade, setSeveridade] = useState("");
   const { executar, pendente } = useAcao();
@@ -74,9 +77,9 @@ export function NotificacoesBoard({
       <Cartao titulo="Histórico">
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Seletor rotulo="Situação" value={estado} onChange={(e) => setEstado(e.target.value as typeof estado)}>
-            <option value="abertas">Abertas</option>
-            <option value="resolvidas">Resolvidas</option>
-            <option value="todas">Todas</option>
+            {abas.includes("abertas") && <option value="abertas">Abertas</option>}
+            {abas.includes("resolvidas") && <option value="resolvidas">Resolvidas</option>}
+            {abas.includes("todas") && <option value="todas">Todas</option>}
           </Seletor>
           <Seletor rotulo="Tipo" value={tipo} onChange={(e) => setTipo(e.target.value)}>
             <option value="">Todos</option>

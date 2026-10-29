@@ -2157,6 +2157,44 @@ export type Database = {
           },
         ]
       }
+      menu_preferencias: {
+        Row: {
+          abas_ocultas: Json
+          id: string
+          itens: Json
+          updated_at: string
+          updated_by: string | null
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          abas_ocultas?: Json
+          id?: string
+          itens?: Json
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          abas_ocultas?: Json
+          id?: string
+          itens?: Json
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_preferencias_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       metas_okr: {
         Row: {
           created_at: string
