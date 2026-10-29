@@ -30,7 +30,6 @@ export function PrimeirosPassos({ passos }: { passos: Passo[] }) {
                 <Circle className="h-4 w-4 shrink-0 text-zinc-600" />
               )}
               <span className={p.concluido ? "text-zinc-500 line-through" : "text-zinc-200"}>{p.titulo}</span>
-              {!p.moduloLigado && <span className="ml-auto text-[11px] text-zinc-500">ligar o módulo →</span>}
             </Link>
           </li>
         ))}

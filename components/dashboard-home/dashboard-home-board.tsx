@@ -46,6 +46,7 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
     impressao3d,
     habilitados,
     primeirosPassos,
+    maisModulos,
     secoes,
   } = overview;
   const rotulos = await getRotulos();
@@ -106,6 +107,19 @@ export async function DashboardHomeBoard({ overview }: { overview: DashboardHome
       )}
 
       {primeirosPassos && <PrimeirosPassos passos={primeirosPassos} />}
+
+      {maisModulos.length > 0 && (
+        <Link
+          href="/modulos"
+          className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3 text-sm transition-colors hover:border-zinc-700 hover:bg-zinc-900/60"
+        >
+          <span className="text-zinc-400">
+            <strong className="font-medium text-zinc-200">Precisa de mais?</strong> Adicione{" "}
+            {maisModulos.map((m) => rotulos.plural(m)).join(", ")} em Módulos.
+          </span>
+          <span className="shrink-0 text-xs font-medium text-copper-400">Ver módulos →</span>
+        </Link>
+      )}
 
       {secoes.includes("resumo") && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

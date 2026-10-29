@@ -46,7 +46,7 @@ export interface GrupoNavegacao<T = ItemNavegacao> {
 export const ITEM_VISAO_GERAL: ItemNavegacao = { label: "Visão Geral", href: "/dashboard" };
 export const ITENS_EMPRESA: ItemNavegacao[] = [
   { label: "Módulos", href: "/modulos" },
-  { label: "Sócios", href: "/socios" },
+  { label: "Equipe e cofundadores", href: "/socios" },
   { label: "Aprovações", href: "/aprovacoes", badge: "aprovacoes" },
   { label: "Configurações", href: "/configuracoes" },
 ];
@@ -56,8 +56,12 @@ export function chaveDoHref(href: string): string {
   return href.replace(/^\/+/, "");
 }
 
-/** Visão Geral, Módulos e Configurações nunca podem ser ocultados (ninguém se tranca para fora). */
-export const ITENS_FIXOS = ["dashboard", "modulos", "configuracoes"] as const;
+/**
+ * Visão Geral, Módulos, Equipe e cofundadores e Configurações nunca podem ser ocultados (ninguém se
+ * tranca para fora, e quem funda a empresa sempre acha onde convidar um cofundador). Equipe só
+ * existe no menu de fundador/cofundador, então a regra não afeta sócios e funcionários.
+ */
+export const ITENS_FIXOS = ["dashboard", "modulos", "socios", "configuracoes"] as const;
 export function itemFixo(chave: string): boolean {
   return (ITENS_FIXOS as readonly string[]).includes(chave);
 }

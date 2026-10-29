@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
+import { podeVerCustos } from "@/lib/impressao-3d/regras";
 import type { Impressora, Material } from "@/lib/impressao-3d/tipos";
 
 /**
@@ -49,6 +50,40 @@ export async function getOpcoesMateriais(): Promise<Opcoes<OpcaoMaterial>> {
     .eq("ativo", true)
     .order("nome", { ascending: true });
   return { itens: (data ?? []) as unknown as OpcaoMaterial[], acessivel: true };
+}
+
+export type OpcaoMaterialCusto = OpcaoMaterial & { custo_por_g: number | null };
+
+/**
+ * Materiais da Calculadora de preço, com o custo por g que o cadastro já guarda (não é cálculo de
+ * preço). O custo só sai do servidor para quem tem o extra "custos" do Estoque; sem ele vem null.
+ */
+export async function getOpcoesMateriaisComCusto(
+  base: "cadastro" | "medio"
+): Promise<Opcoes<OpcaoMaterialCusto>> {
+  const acesso = await getAcessoModulo("p3d_estoque");
+  if (!acesso) return { itens: [], acessivel: false };
+  const ver = podeVerCustos(acesso);
+  const { data } = await (await createClient())
+    .from("p3d_materiais")
+    .select(
+      ver
+        ? "id, nome, tipo, unidade, cor, cor_hex, peso_liquido_rolo_g, custo_cadastro, custo_medio"
+        : "id, nome, tipo, unidade, cor, cor_hex, peso_liquido_rolo_g"
+    )
+    .eq("workspace_id", acesso.workspaceId)
+    .eq("ativo", true)
+    .order("nome", { ascending: true });
+  const linhas = (data ?? []) as unknown as (OpcaoMaterial & { custo_cadastro?: number | null; custo_medio?: number | null })[];
+  return {
+    itens: linhas.map(({ custo_cadastro, custo_medio, ...m }) => {
+      const medio = Number(custo_medio) || 0;
+      const cadastro = Number(custo_cadastro) || 0;
+      const custo = base === "medio" && medio > 0 ? medio : cadastro;
+      return { ...m, custo_por_g: ver && custo > 0 ? custo : null };
+    }),
+    acessivel: true,
+  };
 }
 
 export async function getOpcoesClientes(): Promise<Opcoes<OpcaoCliente>> {

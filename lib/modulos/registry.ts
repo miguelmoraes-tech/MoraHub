@@ -315,9 +315,13 @@ export const MODULOS: ModuloRegistro[] = [
     rotas: ["/impressao-3d/precificacao"],
     icone: "calculator",
     tabelas: ["p3d_config_precificacao"],
-    abas: [{ chave: "simulador", rotulo: "Simulador" }, { chave: "config", rotulo: "Configurações da empresa" }],
+    abas: [
+      { chave: "calculadora", rotulo: "Calculadora rápida" },
+      { chave: "simulador", rotulo: "Simulador (avançado)" },
+      { chave: "config", rotulo: "Configurações da empresa" },
+    ],
     menu: [
-      { label: "Precificação", href: "/impressao-3d/precificacao", icone: "calculator", grupo: "Impressão 3D" },
+      { label: "Calculadora de preço", href: "/impressao-3d/precificacao", icone: "calculator", grupo: "Impressão 3D" },
     ],
   },
   {

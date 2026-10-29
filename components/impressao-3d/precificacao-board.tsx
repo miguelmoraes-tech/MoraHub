@@ -7,9 +7,10 @@ import {
   Aviso, BotaoPrimario, Cartao, ErroForm, Numero, Seletor, SomenteLeitura,
 } from "@/components/impressao-3d/campos";
 import { Simulador, type RascunhoOpcao } from "@/components/impressao-3d/simulador";
+import { CalculadoraRapida } from "@/components/impressao-3d/calculadora-rapida";
 import { salvarConfigPrecificacao } from "@/app/(dashboard)/impressao-3d/precificacao/actions";
 import { FAIXA_DESPERDICIO, FAIXA_FALHAS } from "@/lib/impressao-3d/validacao";
-import type { OpcaoImpressora, OpcaoMaterial, Opcoes } from "@/lib/impressao-3d/opcoes";
+import type { OpcaoImpressora, OpcaoMaterial, OpcaoMaterialCusto, Opcoes } from "@/lib/impressao-3d/opcoes";
 import type { ConfigPrecificacao } from "@/lib/impressao-3d/tipos";
 import { abaInicial } from "@/lib/modulos/preferencias";
 
@@ -131,6 +132,7 @@ export function PrecificacaoBoard({
   configSalva,
   impressoras,
   materiais,
+  materiaisComCusto,
   podeEditar,
   usarEmOrcamento,
   abas,
@@ -139,36 +141,65 @@ export function PrecificacaoBoard({
   configSalva: boolean;
   impressoras: Opcoes<OpcaoImpressora>;
   materiais: Opcoes<OpcaoMaterial>;
+  materiaisComCusto: Opcoes<OpcaoMaterialCusto>;
   podeEditar: boolean;
   usarEmOrcamento: { podeUsar: boolean; rascunhos: RascunhoOpcao[] };
   /** Abas visíveis pela preferência de navegação (nunca vazia; ordem do registro). */
   abas: string[];
 }) {
-  const [aba, setAba] = useState<"simulador" | "config">(abaInicial(abas, "simulador"));
+  const [aba, setAba] = useState<"calculadora" | "simulador" | "config">(abaInicial(abas, "calculadora"));
+  // O modo avançado (simulador completo e configurações) fica atrás de um botão; nada foi removido.
+  const [avancado, setAvancado] = useState(aba !== "calculadora");
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-lg font-semibold text-zinc-100">Precificação</h1>
-        <p className="text-sm text-zinc-500">
-          Simule o preço de um lote e ajuste as regras da empresa. Todos os valores são estimados.
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-zinc-100">Calculadora de preço</h1>
+          <p className="text-sm text-zinc-500">
+            {avancado
+              ? "Modo avançado: simulador completo e regras da empresa. Todos os valores são estimados."
+              : "Veja o custo por peça e o preço sugerido. Todos os valores são estimados."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setAvancado((v) => !v);
+            setAba(avancado ? "calculadora" : abas.includes("simulador") ? "simulador" : "config");
+          }}
+          className="rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-900"
+        >
+          {avancado ? "Voltar à calculadora rápida" : "Modo avançado"}
+        </button>
       </div>
 
-      <div className="mb-6 inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
-        {([["simulador", "Simulador"], ["config", "Configurações da empresa"]] as const).filter(([k]) => abas.includes(k)).map(([k, l]) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setAba(k)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${aba === k ? "bg-copper-600 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
+      {avancado && (
+        <div className="mb-6 inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+          {([["simulador", "Simulador"], ["config", "Configurações da empresa"]] as const).filter(([k]) => abas.includes(k)).map(([k, l]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setAba(k)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${aba === k ? "bg-copper-600 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {aba === "simulador" ? (
+      {!avancado ? (
+        <Cartao titulo="Calculadora rápida" icone={<Calculator className="h-4 w-4" />}>
+          <CalculadoraRapida
+            impressoras={impressoras}
+            materiais={materiaisComCusto}
+            config={config}
+            podeEditar={podeEditar}
+            usarEmOrcamento={usarEmOrcamento}
+          />
+        </Cartao>
+      ) : aba === "simulador" ? (
         <Cartao titulo="Simulador de preço" icone={<Calculator className="h-4 w-4" />}>
           <Simulador
             impressoras={impressoras}

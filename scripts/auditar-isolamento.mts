@@ -702,3 +702,27 @@ for (const pasta of ["app", "components", "lib"]) {
 console.log(`\nEtapa D: escritas em menu_preferencias fora do contrato: ${navegacaoForaDoContrato.length}`);
 for (const s of navegacaoForaDoContrato) console.log("  ! " + s);
 if (navegacaoForaDoContrato.length) process.exitCode = 1;
+
+// --- Etapa E: a Calculadora de preço NUNCA calcula preço no cliente -----------------------------
+// A tela só monta a entrada (lib/impressao-3d/calculadora-rapida.ts) e mostra o retorno de
+// p3d_simular_preco. Falha se encontrar custo × multiplicador, custo ÷ (1 − margem), preço atribuído
+// por multiplicação etc. nos arquivos da calculadora, ou se a tela deixar de chamar a RPC.
+{
+  // Caminho em variável: o node exige a extensão .ts; o tsc não aceita no import literal.
+  const caminhoAuditoria = "../lib/impressao-3d/auditoria-preco.ts";
+  const { ARQUIVOS_CALCULADORA_RAPIDA, precoCalculadoNoCliente } = (await import(
+    caminhoAuditoria
+  )) as typeof import("../lib/impressao-3d/auditoria-preco");
+  const precoNoCliente: string[] = [];
+  for (const rel of ARQUIVOS_CALCULADORA_RAPIDA) {
+    const texto = readFileSync(join(raiz, rel), "utf8").replace(/\r\n/g, "\n");
+    for (const nome of precoCalculadoNoCliente(texto)) precoNoCliente.push(`${rel}: ${nome}`);
+  }
+  const tela = readFileSync(join(raiz, "components/impressao-3d/calculadora-rapida.tsx"), "utf8");
+  if (!tela.includes("simularPreco(")) precoNoCliente.push("calculadora-rapida.tsx não chama simularPreco (RPC p3d_simular_preco)");
+  const simulacao = readFileSync(join(raiz, "app/(dashboard)/impressao-3d/precificacao/simulacao.ts"), "utf8");
+  if (!simulacao.includes('rpc("p3d_simular_preco"')) precoNoCliente.push("simulacao.ts não usa a RPC p3d_simular_preco");
+  console.log(`\nEtapa E: preço calculado no cliente (Calculadora de preço): ${precoNoCliente.length}`);
+  for (const s of precoNoCliente) console.log("  ! " + s);
+  if (precoNoCliente.length) process.exitCode = 1;
+}

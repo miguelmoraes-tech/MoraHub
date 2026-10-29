@@ -13,6 +13,8 @@ export interface ModuloCatalogo {
   chave: string;
   nome: string;
   descricao: string | null;
+  /** Módulo do nicho: uma linha dizendo para que serve e que os dados ficam guardados ao remover. */
+  frase?: string | null;
   icone: string | null;
   categoria: string | null;
   /** false = "Em breve": existe no catálogo, mas ainda não pode ser ligado. */
@@ -149,7 +151,9 @@ export function ModulosBoard({
               )}
             </div>
 
-            {m.descricao && <p className="text-xs leading-relaxed text-zinc-500">{m.descricao}</p>}
+            {(m.frase ?? m.descricao) && (
+              <p className="text-xs leading-relaxed text-zinc-500">{m.frase ?? m.descricao}</p>
+            )}
 
             {m.dependeDe.length > 0 && (
               <p className="text-[11px] text-zinc-600">

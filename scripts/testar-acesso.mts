@@ -151,12 +151,22 @@ import { atalhosConfiguracaoNicho } from "@/lib/impressao-3d/configuracoes";
 import { adicionarDias, dataIsoValida, diasEntre, formatDataIso, primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/impressao-3d/datas";
 import {
   CHAVE_VALIDA, ITENS_FIXOS, abaInicial, abasDe, abasVisiveis, aplicarPreferenciaMenu, chaveDoHref, gruposDoMenu, itemFixo,
-  lerPreferencia, ordenarComPreferencia, prepararPreferencia, resolverPreferencia,
+  ITENS_EMPRESA, lerPreferencia, ordenarComPreferencia, prepararPreferencia, resolverPreferencia,
 } from "@/lib/modulos/preferencias";
 import { CHAVE_VISAO_GERAL } from "@/lib/modulos/registry";
 import { ROTA_NAVEGACAO, precisaDeModulos } from "@/lib/acesso";
 import { PASSOS, montarPassos, precificacaoAjustada, todosConcluidos } from "@/lib/impressao-3d/primeiros-passos";
 import { COLUNAS_ORCAMENTO_CLIENTE, COLUNAS_PEDIDO_CLIENTE, resumirCompras } from "@/lib/impressao-3d/cliente-compras";
+import { MODULOS_OPCIONAIS, modulosOpcionaisFaltando } from "@/lib/impressao-3d/primeiros-passos";
+import {
+  EXTRAS_RAPIDOS, ZEROS_MODO_RAPIDO, custoHoraImpressora, estadoInicialRapido, explicarMargem, explicarMultiplicador,
+  kwParaWatts, markupPctParaMultiplicador, montarEntradaRapida, multiplicadorInicial, multiplicadorParaMarkupPct,
+  resumoWhatsapp, valoresIniciaisExtras, wattsParaKw, type EstadoRapido,
+} from "@/lib/impressao-3d/calculadora-rapida";
+import { entradaDeRolosComprados, saldoEmRolos } from "@/lib/impressao-3d/cadastro-simples";
+import { ARQUIVOS_CALCULADORA_RAPIDA, precoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
+import { FRASE_MODULO } from "@/lib/impressao-3d/frases-modulos";
+
 
 let total = 0;
 function teste(nome: string, fn: () => void | Promise<void>) {
@@ -3332,14 +3342,14 @@ await teste("sem preferência o menu é IDÊNTICO ao do snapshot (Mora Lab e ven
   assert.deepEqual(GRUPOS_ATUAIS.map((g) => g.titulo), ["Dashboards", ...menuDoDono(ATUAIS).map((g) => g.titulo), "Empresa"]);
   assert.deepEqual(gruposDoMenu(ATUAIS, false, true).map((g) => g.titulo), menuDoDono(ATUAIS).map((g) => g.titulo), "equipe: sem Visão Geral e sem Empresa");
 });
-await teste("Visão Geral, Módulos e Configurações nunca somem, mesmo que a preferência diga oculto", () => {
+await teste("Visão Geral, Módulos, Equipe e cofundadores e Configurações nunca somem, mesmo que a preferência diga oculto", () => {
   const pref = {
     itens: ["dashboard", "modulos", "configuracoes", "socios", "leads"].map((chave, ordem) => ({ chave, visivel: false, ordem })),
     abasOcultas: {},
   };
   const hrefs = aplicarPreferenciaMenu(GRUPOS_ATUAIS, pref).flatMap((g) => g.itens.map((i) => i.href));
-  for (const h of ["/dashboard", "/modulos", "/configuracoes"]) assert.ok(hrefs.includes(h), h);
-  assert.ok(!hrefs.includes("/socios") && !hrefs.includes("/leads"), "os demais podem ser ocultados");
+  for (const h of ["/dashboard", "/modulos", "/socios", "/configuracoes"]) assert.ok(hrefs.includes(h), h);
+  assert.ok(!hrefs.includes("/leads"), "os demais podem ser ocultados");
   for (const f of ITENS_FIXOS) assert.equal(itemFixo(f), true);
   const prep = prepararPreferencia(pref, { itensVisiveis: ["dashboard", "modulos", "configuracoes", "socios", "leads"], chavesComAbas: [] }, null);
   assert.ok(prep.ok);
@@ -3494,21 +3504,25 @@ await teste("as páginas leem as abas no servidor e os boards só mostram as vis
 });
 
 console.log("\nEtapa D — Visão Geral, Módulos, Clientes e Financeiro");
-await teste("Primeiros passos: só por dado real, link para a tela certa, módulo desligado leva a Módulos, some quando tudo pronto", () => {
+await teste("Primeiros passos: só por dado real, só de módulos ligados, link para a tela certa, some quando tudo pronto", () => {
   const todosFalsos = { precificacao: false, impressora: false, material: false, entrada_estoque: false, produto: false, orcamento: false, pedido: false };
   const todosLigados = PASSOS.map((p) => p.modulo);
   const passos = montarPassos({ ...todosFalsos, impressora: true }, todosLigados);
   assert.deepEqual(passos.filter((p) => p.concluido).map((p) => p.chave), ["impressora"]);
   assert.equal(passos.find((p) => p.chave === "pedido")!.destino, "/impressao-3d/pedidos");
   assert.equal(passos.find((p) => p.chave === "precificacao")!.destino, "/impressao-3d/precificacao");
+  // Módulo desligado: o passo nem aparece (não cobra Orçamentos/Pedidos de quem não os usa).
   const semPedidos = montarPassos({ ...todosFalsos, pedido: true }, todosLigados.filter((m) => m !== "p3d_pedidos"));
-  assert.equal(semPedidos.find((p) => p.chave === "pedido")!.concluido, false, "módulo desligado não conta como feito");
-  assert.equal(semPedidos.find((p) => p.chave === "pedido")!.destino, "/modulos");
+  assert.equal(semPedidos.find((p) => p.chave === "pedido"), undefined, "módulo desligado não gera passo");
+  assert.equal(semPedidos.length, PASSOS.length - 1);
+  const enxuta = montarPassos(todosFalsos, ["p3d_estoque", "p3d_impressoras", "p3d_precificacao"]);
+  assert.deepEqual(enxuta.map((p) => p.chave), ["precificacao", "impressora", "material", "entrada_estoque"], "empresa enxuta: só os passos dos 3 módulos");
+  assert.ok(enxuta.every((p) => p.destino !== "/modulos"));
+  assert.equal(todosConcluidos(montarPassos(todosFalsos, [])), true, "sem módulos do nicho não há o que cobrar");
   const tudo = Object.fromEntries(Object.keys(todosFalsos).map((k) => [k, true])) as typeof todosFalsos;
   assert.equal(todosConcluidos(montarPassos(tudo, todosLigados)), true);
-  assert.equal(precificacaoAjustada({ tarifa_kwh: 0.9, valor_hora_mao_obra: 30 }), true);
-  assert.equal(precificacaoAjustada({ tarifa_kwh: 0, valor_hora_mao_obra: 30 }), false);
-  assert.equal(precificacaoAjustada({ tarifa_kwh: 0.9, valor_hora_mao_obra: 0 }), false);
+  assert.equal(precificacaoAjustada({ tarifa_kwh: 0.9 }), true);
+  assert.equal(precificacaoAjustada({ tarifa_kwh: 0 }), false);
   assert.equal(precificacaoAjustada(null), false);
   const fonte = lerFonte("lib/impressao-3d/primeiros-passos.ts");
   assert.ok(fonte.includes('.gt("preco_compra", 0)') && fonte.includes('.eq("tipo", "entrada")'));
@@ -3557,6 +3571,220 @@ await teste("Financeiro por padrão: pré-marcado só quando aparece (ligado + e
 await teste("documentação da Etapa D", () => {
   const doc = lerFonte("docs/nicho-impressao-3d.md");
   for (const t of ["Etapa D", "menu_preferencias", "Personalizar navegação", "abas_ocultas", "visao_geral", "Primeiros passos", "Restaurar padrão"]) {
+    assert.ok(doc.includes(t), `doc sem "${t}"`);
+  }
+});
+
+console.log("\nEtapa E — Calculadora rápida, cadastros simples, equipe e começo enxuto");
+const CFG = { ...CONFIG_PADRAO, tarifa_kwh: 0.9, valor_hora_mao_obra: 30, desperdicio_pct: 8, falha_pct: 7, impostos_pct: 6, taxa_pagamento_pct: 2, comissao_pct: 3, taxa_fixa_pagamento: 1 };
+function rapido(parcial: Partial<EstadoRapido> = {}): EstadoRapido {
+  return { ...estadoInicialRapido(CFG), peso_g: "25", horas: "1", minutos: "30", quantidade: "1", material_id: "mat-1", impressora_id: "imp-1", ...parcial };
+}
+await teste("multiplicador ↔ markup_pct: ×5 = 400 (e de volta); padrão ×5", () => {
+  assert.equal(multiplicadorParaMarkupPct(5), 400);
+  assert.equal(multiplicadorParaMarkupPct(1), 0);
+  assert.equal(multiplicadorParaMarkupPct(2.5), 150);
+  assert.equal(markupPctParaMultiplicador(400), 5);
+  assert.equal(markupPctParaMultiplicador(150), 2.5);
+  assert.equal(multiplicadorInicial(null), 5);
+  assert.equal(multiplicadorInicial({ modo_preco: "margem", markup_pct: 50 }), 5, "config em margem: ×5");
+  assert.equal(multiplicadorInicial({ modo_preco: "markup", markup_pct: 400 }), 5);
+  assert.equal(multiplicadorInicial({ modo_preco: "markup", markup_pct: 200 }), 3, "config markup própria vale");
+  const r = montarEntradaRapida(rapido());
+  assert.deepEqual(r.erros, []);
+  assert.equal(r.entrada.modo_preco, "markup");
+  assert.equal(r.entrada.markup_pct, 400);
+  assert.ok(!("margem_pct" in r.entrada));
+  assert.match(explicarMultiplicador(5) ?? "", /×5 = lucro de 4× o custo \(margem de 80%\)/);
+  assert.equal(explicarMultiplicador(0.5), null);
+});
+await teste("x peças multiplica peso e tempo; tempo em horas + minutos; quantidade vai junto", () => {
+  const r = montarEntradaRapida(rapido({ peso_g: "25", horas: "1", minutos: "30", quantidade: "4" }));
+  assert.equal(r.entrada.peso_peca_g, 100);
+  assert.equal(r.entrada.horas_impressao, 6);
+  assert.equal(r.entrada.quantidade, 4);
+  assert.equal(montarEntradaRapida(rapido({ horas: "", minutos: "20", quantidade: "3" })).entrada.horas_impressao, 1, "20 min × 3 = 1 h sem erro de ponto flutuante");
+  assert.equal(montarEntradaRapida(rapido({ peso_g: "12,5", quantidade: "2" })).entrada.peso_peca_g, 25, "vírgula pt-BR");
+  assert.ok(montarEntradaRapida(rapido({ quantidade: "0" })).erros.length > 0);
+  assert.ok(montarEntradaRapida(rapido({ quantidade: "1,5" })).erros.length > 0);
+});
+await teste("modo rápido força 0 em tudo que não é material + depreciação + energia", () => {
+  const { entrada } = montarEntradaRapida(rapido());
+  for (const k of ZEROS_MODO_RAPIDO) assert.strictEqual(entrada[k], 0, `${k} explícito 0`);
+  assert.equal(ZEROS_MODO_RAPIDO.length, 15);
+  for (const k of ["desperdicio_pct", "falha_pct", "manutencao_hora", "manutencao_ciclo", "mao_obra_horas", "acabamento_horas", "montagem_horas", "embalagem_custo", "despesas_fixas_pct", "impostos_pct", "taxa_pagamento_pct", "comissao_pct", "taxa_fixa_pagamento", "preco_minimo", "arredondar_para"]) {
+    assert.ok((ZEROS_MODO_RAPIDO as readonly string[]).includes(k), k);
+  }
+  assert.equal(entrada.material_id, "mat-1");
+  assert.equal(entrada.impressora_id, "imp-1");
+  assert.equal(entrada.tarifa_kwh, 0.9);
+  assert.ok(!("preco_manual" in entrada) && !("outros_custos" in entrada));
+});
+await teste("\"Incluir também\" troca os zeros pelos valores da configuração; o resto continua 0", () => {
+  const valores = valoresIniciaisExtras(CFG, { manutencao_hora: 0.5, manutencao_ciclo: 2 });
+  assert.equal(valores.desperdicio_pct, "8");
+  assert.equal(valores.falha_pct, "7");
+  assert.equal(valores.impostos_pct, "6");
+  assert.equal(valores.manutencao_hora, "0.5");
+  assert.equal(valores.valor_hora_mao_obra, "30");
+  const base = rapido({ valores });
+  const desp = montarEntradaRapida({ ...base, extras: { ...base.extras, desperdicio: true } }).entrada;
+  assert.equal(desp.desperdicio_pct, 8);
+  assert.equal(desp.falha_pct, 0);
+  assert.equal(desp.impostos_pct, 0);
+  const imp = montarEntradaRapida({ ...base, extras: { ...base.extras, impostos: true } }).entrada;
+  assert.deepEqual([imp.impostos_pct, imp.taxa_pagamento_pct, imp.comissao_pct, imp.taxa_fixa_pagamento], [6, 2, 3, 1]);
+  assert.equal(imp.desperdicio_pct, 0);
+  const mo = montarEntradaRapida({ ...base, valores: { ...valores, mao_obra_horas: "0,5", acabamento_horas: "0,25" }, extras: { ...base.extras, mao_obra: true } }).entrada;
+  assert.deepEqual([mo.valor_hora_mao_obra, mo.mao_obra_horas, mo.acabamento_horas, mo.montagem_horas], [30, 0.5, 0.25, 0]);
+  const man = montarEntradaRapida({ ...base, extras: { ...base.extras, manutencao: true, embalagem: true, falhas: true } }).entrada;
+  assert.deepEqual([man.manutencao_hora, man.manutencao_ciclo, man.embalagem_custo, man.falha_pct], [0.5, 2, 0, 7]);
+  assert.equal(montarEntradaRapida({ ...base, valores: { ...valores, desperdicio_pct: "abc" }, extras: { ...base.extras, desperdicio: true } }).erros.length, 1, "valor ilegível vira erro");
+  assert.equal(EXTRAS_RAPIDOS.length, 6);
+  assert.equal(valoresIniciaisExtras(CFG, null).manutencao_hora, "", "sem impressora, manutenção vazia");
+});
+await teste("margem alternativa: modo_preco margem + margem_pct, sem markup", () => {
+  const r = montarEntradaRapida(rapido({ modo: "margem", margem_pct: "40" }));
+  assert.deepEqual(r.erros, []);
+  assert.equal(r.entrada.modo_preco, "margem");
+  assert.equal(r.entrada.margem_pct, 40);
+  assert.ok(!("markup_pct" in r.entrada));
+  assert.ok(montarEntradaRapida(rapido({ modo: "margem", margem_pct: "100" })).erros.length > 0);
+  assert.ok(montarEntradaRapida(rapido({ modo: "margem", margem_pct: "" })).erros.length > 0);
+  assert.ok(montarEntradaRapida(rapido({ multiplicador: "0,5" })).erros.length > 0, "multiplicador abaixo de 1");
+  assert.match(explicarMargem(40) ?? "", /Margem de 40%/);
+  assert.equal(explicarMargem(100), null);
+});
+await teste("W → kW: 120 W = 0,12 kW (e de volta); custo/hora ao vivo da impressora", () => {
+  assert.equal(wattsParaKw(120), 0.12);
+  assert.equal(wattsParaKw(0), 0);
+  assert.equal(wattsParaKw(1500), 1.5);
+  assert.equal(kwParaWatts(0.12), 120);
+  assert.equal(kwParaWatts(0.35), 350);
+  const c = custoHoraImpressora({ aquisicao: 2500, residual: 500, vidaUtilHoras: 5000, watts: 120, tarifaKwh: 1 });
+  assert.equal(c.depreciacao, 0.4);
+  assert.equal(c.energia, 0.12);
+  assert.equal(c.total, 0.52);
+  assert.equal(custoHoraImpressora({ aquisicao: 100, residual: 0, vidaUtilHoras: 0, watts: 100, tarifaKwh: 1 }).depreciacao, 0, "sem vida útil: 0");
+});
+await teste("sem impressora: energia e depreciação 0 explícitos com aviso; sem tempo e sem material avisam", () => {
+  const sem = montarEntradaRapida(rapido({ impressora_id: "" }));
+  assert.ok(!("impressora_id" in sem.entrada));
+  assert.deepEqual([sem.entrada.potencia_media_kw, sem.entrada.valor_aquisicao, sem.entrada.valor_residual], [0, 0, 0]);
+  assert.ok(sem.avisos.some((a) => /energia e depreciação/.test(a)));
+  assert.ok(montarEntradaRapida(rapido({ impressora_id: "" }), { semImpressoras: true }).avisos.some((a) => /Nenhuma impressora cadastrada/.test(a)));
+  const com = montarEntradaRapida(rapido());
+  assert.ok(!("potencia_media_kw" in com.entrada) && !("valor_aquisicao" in com.entrada), "com impressora a RPC resolve");
+  const soPeso = montarEntradaRapida(rapido({ horas: "", minutos: "" }));
+  assert.equal(soPeso.entrada.horas_impressao, 0);
+  assert.equal(soPeso.pronta, true, "só o peso já calcula");
+  assert.ok(soPeso.avisos.some((a) => /tempo/.test(a)));
+  assert.equal(montarEntradaRapida(rapido({ peso_g: "", horas: "", minutos: "" })).pronta, false);
+  assert.equal(montarEntradaRapida(rapido({ peso_g: "", horas: "2" })).pronta, true, "só o tempo também");
+});
+await teste("material: do estoque (material_id) ou informado na hora (preço + peso do rolo)", () => {
+  const manual = montarEntradaRapida(rapido({ materialModo: "manual", preco_rolo: "89,90", peso_rolo_g: "1000" }));
+  assert.equal(manual.entrada.preco_rolo, 89.9);
+  assert.equal(manual.entrada.peso_rolo_g, 1000);
+  assert.ok(!("material_id" in manual.entrada));
+  assert.ok(montarEntradaRapida(rapido({ materialModo: "manual", preco_rolo: "0", peso_rolo_g: "1000" })).erros.length > 0);
+  assert.ok(montarEntradaRapida(rapido({ material_id: "" })).avisos.some((a) => /material/.test(a)));
+});
+await teste("resumo para WhatsApp: peça, quantidade, preço por peça e total; nunca custo ou lucro", () => {
+  const t = resumoWhatsapp({ nomePeca: "Suporte de headset", quantidade: 4, precoUnidade: "R$ 12,50", precoTotal: "R$ 50,00" });
+  assert.equal(t, "*Suporte de headset*\nQuantidade: 4 peças\nPreço por peça: R$ 12,50\nTotal: R$ 50,00");
+  assert.match(resumoWhatsapp({ nomePeca: "", quantidade: 1, precoUnidade: "R$ 1,00", precoTotal: "R$ 1,00" }), /Quantidade: 1 peça\n/);
+  assert.ok(!/custo|lucro|margem/i.test(t));
+});
+await teste("a tela NUNCA recalcula preço: só monta a entrada e mostra o retorno de p3d_simular_preco", () => {
+  for (const arq of ARQUIVOS_CALCULADORA_RAPIDA) assert.deepEqual(precoCalculadoNoCliente(lerFonte(arq)), [], `${arq} calcula preço no cliente`);
+  // O detector pega mesmo as formas óbvias (a auditoria falha com elas).
+  assert.ok(precoCalculadoNoCliente("const preco = custo * multiplicador;").length > 0);
+  assert.ok(precoCalculadoNoCliente("const sugerido = custo_total * (1 + markup_pct / 100);").length > 0);
+  assert.ok(precoCalculadoNoCliente("const p = custoPeca / (1 - margem);").length > 0);
+  assert.ok(precoCalculadoNoCliente("const x = calculo.preco_final * 1.1;").length > 0);
+  assert.deepEqual(precoCalculadoNoCliente("// custo * multiplicador\nconst a = 1;"), [], "comentário não conta");
+  const tela = lerFonte("components/impressao-3d/calculadora-rapida.tsx");
+  assert.ok(tela.includes("simularPreco(") && tela.includes('"precificacao"') && tela.includes("setTimeout") && tela.includes("ATRASO_MS = 400"), "debounce de 400 ms chamando a RPC");
+  assert.ok(tela.includes("exibido.calculo.por_unidade.preco") && tela.includes("exibido.calculo.preco_final"), "preço vem do retorno");
+  assert.ok(tela.includes("Estimado") && tela.includes("Copiar resumo") && tela.includes("Criar orçamento com este cálculo"));
+  assert.ok(tela.includes("usarEmOrcamento.podeUsar"), "orçamento só com módulo ligado e edição");
+  assert.ok(tela.includes("salvarTarifaPadrao(") && tela.includes("Salvar como padrão"));
+});
+await teste("Calculadora de preço: item de menu, rótulo e modo avançado (nada removido)", () => {
+  const item = MODULOS.find((m) => m.chave === "p3d_precificacao")!;
+  assert.equal(item.menu[0].label, "Calculadora de preço");
+  assert.deepEqual(item.abas?.map((a) => a.chave), ["calculadora", "simulador", "config"]);
+  const board = lerFonte("components/impressao-3d/precificacao-board.tsx");
+  assert.ok(board.includes("Modo avançado") && board.includes("<CalculadoraRapida") && board.includes("<Simulador") && board.includes("<ConfigForm"), "simulador completo e configurações continuam");
+  const acao = lerFonte("app/(dashboard)/impressao-3d/precificacao/actions.ts");
+  assert.ok(/salvarTarifaPadrao[\s\S]*getAcessoEdicao\("p3d_precificacao"\)[\s\S]*\.eq\("workspace_id", acesso\.workspaceId\)/.test(acao), "tarifa: guarda de edição + empresa ativa");
+  assert.ok(acao.includes("tarifa_kwh: tarifa"), "grava só a tarifa");
+  const op = lerFonte("lib/impressao-3d/opcoes.ts");
+  assert.ok(op.includes("getOpcoesMateriaisComCusto") && op.includes("ver && custo > 0 ? custo : null"), "custo/g só com o extra custos");
+});
+await teste("cadastro de material: rolos comprados dão entrada (custo_total = rolos × preço); zero rolos só cadastra", () => {
+  assert.deepEqual(entradaDeRolosComprados({ rolos: 3, pesoRoloG: 1000, precoPago: 79.9 }), { gramas: 3000, custoTotal: 239.7 });
+  assert.deepEqual(entradaDeRolosComprados({ rolos: 2, pesoRoloG: 750, precoPago: null }), { gramas: 1500, custoTotal: null });
+  assert.equal(entradaDeRolosComprados({ rolos: 0, pesoRoloG: 1000, precoPago: 80 }), null);
+  assert.equal(saldoEmRolos(2500, "g", 1000), 2.5);
+  assert.equal(saldoEmRolos(2500, "ml", 1000), null);
+  assert.equal(saldoEmRolos(2500, "g", null), null);
+  const acao = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
+  assert.ok(acao.includes('formData.get("rolos_comprados")') && acao.includes('"p3d_movimentar_estoque"') && acao.includes("p_custo_total: entrada.custoTotal"));
+  assert.ok(acao.includes("verCustos ? preco_compra : null"), "custo da entrada só com o extra custos");
+  assert.ok(!/estoque_atual|custo_medio/.test(acao.slice(acao.indexOf("export async function criarMaterial"), acao.indexOf("export async function atualizarMaterial"))), "saldo só pela RPC");
+  const tela = lerFonte("components/impressao-3d/estoque-board.tsx");
+  assert.ok(tela.includes('name="rolos_comprados"') && tela.includes("Mais opções") && tela.includes("<details"));
+  for (const campo of ["marca", "diametro_mm", "estoque_minimo", "fornecedor_id", "localizacao"]) {
+    assert.ok(tela.indexOf(`name="${campo}"`) > tela.indexOf("Mais opções"), `${campo} em "Mais opções"`);
+  }
+});
+await teste("cadastro de impressora: watts na tela, kW no banco; custo/hora ao vivo; resto em Mais opções", () => {
+  const tela = lerFonte("components/impressao-3d/impressoras-board.tsx");
+  assert.ok(tela.includes('name="potencia_media_kw" value={wattsParaKw(watts)}') && tela.includes("kwParaWatts(item.potencia_media_kw)"));
+  assert.ok(tela.includes("custoHoraImpressora(") && tela.includes("Mais opções"));
+  for (const campo of ["marca", "modelo", "volume_x_mm", "bico_mm", "valor_residual", "manutencao_hora", "integracao_tipo"]) {
+    assert.ok(tela.indexOf(`name="${campo}"`) > tela.indexOf("Mais opções"), `${campo} em "Mais opções"`);
+  }
+  assert.ok(lerFonte("app/(dashboard)/impressao-3d/impressoras/page.tsx").includes('getAcessoModulo("p3d_precificacao")'), "tarifa só para quem abre a Precificação");
+});
+await teste("Equipe e cofundadores: item visível e fixo, cartão em Configurações, atalho do nicho, convite com link", () => {
+  assert.equal(ITENS_EMPRESA.find((i) => i.href === "/socios")?.label, "Equipe e cofundadores");
+  assert.equal(itemFixo("socios"), true);
+  const oculto = { itens: [{ chave: "socios", visivel: false, ordem: 0 }], abasOcultas: {} };
+  const hrefs = aplicarPreferenciaMenu(gruposDoMenu(["leads"], true, false), oculto).flatMap((g) => g.itens.map((i) => i.href));
+  assert.ok(hrefs.includes("/socios"), "preferência não esconde a Equipe do fundador");
+  assert.ok(!gruposDoMenu(["leads"], false, true).flatMap((g) => g.itens.map((i) => i.href)).includes("/socios"), "sócio/funcionário não veem");
+  assert.equal(decidirAcesso({ path: "/socios", resolucao: { status: "ok", workspaceId: WS_A, papel: "cofundador", corrigirCookie: false }, habilitados: ["p3d_estoque", "p3d_impressoras", "p3d_precificacao"], funcionarioSemVinculo: false }).tipo, "seguir", "cofundador abre a Equipe numa empresa enxuta de Impressão 3D");
+  assert.equal(decidirAcesso({ path: "/socios", resolucao: { status: "ok", workspaceId: WS_A, papel: "dono", corrigirCookie: false }, habilitados: ["p3d_estoque", "p3d_impressoras", "p3d_precificacao"], funcionarioSemVinculo: false }).tipo, "seguir");
+  assert.ok(lerFonte("app/(dashboard)/configuracoes/page.tsx").includes('href="/socios"') && lerFonte("app/(dashboard)/configuracoes/page.tsx").includes("Equipe e cofundadores"));
+  assert.ok(atalhosConfiguracaoNicho([]).some((a) => a.href === "/socios" && a.titulo === "Equipe e cofundadores"));
+  const pagina = lerFonte("app/(dashboard)/socios/page.tsx");
+  assert.ok(pagina.includes("Equipe e cofundadores") && pagina.includes("mesmo poder do fundador") && pagina.includes("Aprovações"));
+  const convite = lerFonte("components/socios/convidar-membro.tsx");
+  assert.ok(convite.includes("Convidar cofundador") && convite.includes("/convite/${r.token}") && convite.includes("Copiar"));
+  assert.ok(lerFonte("app/(dashboard)/socios/actions.ts").includes('"convidar_membro"'));
+  assert.ok(lerFonte("components/socios/equipe-section.tsx").includes("Convites pendentes") && lerFonte("components/socios/equipe-section.tsx").includes("cancelarConvite") && lerFonte("components/socios/equipe-section.tsx").includes("removerMembro"));
+});
+await teste("começo enxuto: cartão \"Precisa de mais?\" e frase de 1 linha por módulo na página Módulos", () => {
+  assert.deepEqual([...MODULOS_OPCIONAIS], ["p3d_orcamentos", "p3d_pedidos", "p3d_producao", "p3d_fornecedores", "p3d_qualidade", "p3d_expedicao", "p3d_dashboard", "p3d_relatorios"]);
+  assert.equal(modulosOpcionaisFaltando(["p3d_estoque", "p3d_impressoras", "p3d_precificacao"]).length, 8, "empresa nova: todos faltam");
+  assert.deepEqual(modulosOpcionaisFaltando(["p3d_orcamentos", "p3d_pedidos"]), ["p3d_producao", "p3d_fornecedores", "p3d_qualidade", "p3d_expedicao", "p3d_dashboard", "p3d_relatorios"]);
+  assert.deepEqual(modulosOpcionaisFaltando([...MODULOS_OPCIONAIS]), [], "tudo ligado: o cartão some");
+  const home = lerFonte("components/dashboard-home/dashboard-home-board.tsx");
+  assert.ok(home.includes("Precisa de mais?") && home.includes('href="/modulos"') && home.includes("maisModulos.length > 0"));
+  assert.ok(lerFonte("lib/dashboard-home/get-overview.ts").includes('config.nichoChave === "impressao_3d" ? modulosOpcionaisFaltando(habilitados) : []'));
+  for (const m of MODULOS.filter((x) => x.chave.startsWith("p3d_"))) {
+    const frase = FRASE_MODULO[m.chave];
+    assert.ok(frase && !frase.includes("\n") && /ficam guardados ao remover/.test(frase), `${m.chave}: frase de uma linha com a garantia dos dados`);
+  }
+  const mod = lerFonte("components/modulos/modulos-board.tsx");
+  assert.ok(mod.includes("m.frase ?? m.descricao") && lerFonte("app/(dashboard)/modulos/page.tsx").includes("FRASE_MODULO[m.chave]"));
+});
+await teste("documentação da Etapa E", () => {
+  const doc = lerFonte("docs/nicho-impressao-3d.md");
+  for (const t of ["Etapa E", "Calculadora de preço", "Modo avançado", "Incluir também", "markup_pct", "Equipe e cofundadores", "enxuta"]) {
     assert.ok(doc.includes(t), `doc sem "${t}"`);
   }
 });

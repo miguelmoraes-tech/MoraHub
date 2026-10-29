@@ -1,4 +1,4 @@
-# Nicho Impressão 3D (Etapas A, B, C-1 e D)
+# Nicho Impressão 3D (Etapas A, B, C-1, D e E)
 
 Impressoras, Estoque, Produtos e catálogo, Precificação e Orçamentos para quem
 trabalha com impressão 3D sob demanda, loja de produtos ou print farm. Usa o
@@ -602,10 +602,10 @@ não aparecem, e o servidor confere a permissão de novo ao gravar.
 ## Primeiros passos (Visão Geral)
 
 Para empresa com nicho Impressão 3D, a Visão Geral do dono mostra um checklist marcado **só por dados reais**:
-parâmetros de precificação ajustados (tarifa de energia > 0 e valor da hora > 0), 1ª impressora, 1º material com
-preço, 1ª entrada de estoque, 1º produto, 1º orçamento e 1º pedido. Cada item leva à tela certa (módulo desligado
-leva a Módulos e nunca conta como feito). Some quando tudo está concluído e pode ser ocultado em Personalizar
-navegação (Visão Geral → Primeiros passos).
+tarifa de energia informada (> 0), 1ª impressora, 1º material com preço, 1ª entrada de estoque, 1º produto,
+1º orçamento e 1º pedido. Cada item leva à tela certa. **Desde a Etapa E só entram os passos de módulos LIGADOS**
+(a empresa enxuta não é cobrada por Orçamentos ou Pedidos que não usa). Some quando tudo está concluído e pode ser
+ocultado em Personalizar navegação (Visão Geral → Primeiros passos).
 
 ## Testes e auditoria (Etapa D)
 
@@ -616,3 +616,90 @@ abertura, Primeiros passos, Módulos, Clientes e Financeiro. `auditar-isolamento
 `menu_preferencias` fora de `configuracoes/navegacao/actions.ts`, em upsert nela, em campo fora do contrato
 (`itens`, `abas_ocultas`, `workspace_id`, `user_id`, `updated_at`), em delete que não filtre `user_id` e em escrita
 de módulos/permissões a partir da navegação.
+
+
+# Etapa E: nicho enxuto (calculadora de preço, cadastros simples, equipe e cofundadores)
+
+Feedback de uso real: o nicho estava complexo demais. O principal é (1) cadastrar materiais com o que se paga e
+(2) uma calculadora com peso, tempo e quantidade que mostra o custo por peça e o preço sugerido. **Nada foi
+removido**: o que existia passa a ficar atrás de "Modo avançado" / "Mais opções".
+
+## Empresa nova enxuta
+
+Empresa nova de Impressão 3D nasce só com `p3d_estoque`, `p3d_impressoras` e `p3d_precificacao`; os demais módulos
+são opcionais pela página **Módulos** (Leads, Renegados, Vendedores e Agenda não ligam mais nesse nicho). Isso é
+**dado do banco** (`nicho_modulos`), já aplicado; empresas existentes não mudaram. Novas configurações de
+precificação nascem em `modo_preco = 'markup'` com `markup_pct = 400` (= multiplicador ×5).
+
+- **Primeiros passos** só mostra passos de módulos ligados (`montarPassos` filtra); o passo de precificação passa a
+  ser "tarifa de energia informada" (o valor da hora é opcional e só entra em "Incluir também").
+- Visão Geral: cartão discreto **"Precisa de mais?"** (Orçamentos, Pedidos, Produção, Fornecedores, Qualidade,
+  Expedição, Dashboard e Relatórios que ainda estão desligados) que leva a Módulos; some quando todos estão ligados
+  (`modulosOpcionaisFaltando`).
+- Página **Módulos**: cada módulo do nicho mostra uma frase de 1 linha (para que serve e que os dados ficam
+  guardados ao remover) — `lib/impressao-3d/frases-modulos.ts`.
+
+## Calculadora de preço (`/impressao-3d/precificacao`)
+
+O item de menu e o rótulo do módulo `p3d_precificacao` passam a **Calculadora de preço**. A tela abre na
+**Calculadora rápida**; o botão **Modo avançado** leva ao Simulador completo e às Configurações da empresa (as abas
+`simulador` e `config` continuam existindo e podem ser ocultadas em Personalizar navegação; `calculadora` é a nova
+aba padrão).
+
+Campos: Material (do estoque, com o custo por g do cadastro, ou "informar na hora" com preço e peso do rolo);
+Impressora (opcional; sem ela energia e depreciação ficam zeradas, com aviso e link para cadastrar); peso por peça
+(g, do fatiador); tempo por peça (h e min); quantidade (x); tarifa de energia editável com **Salvar como padrão**
+(`salvarTarifaPadrao`: atualiza só `tarifa_kwh` de `p3d_config_precificacao`, por quem edita); multiplicador
+(padrão ×5, ou o da configuração se ela for markup) ou **Margem %**. Só o peso (sem tempo) é aceito, com aviso.
+
+**A tela nunca calcula preço.** `montarEntradaRapida` (`lib/impressao-3d/calculadora-rapida.ts`, puro) monta
+`p_entrada` e a tela mostra o retorno de `p3d_simular_preco` (atualiza ao digitar, debounce de 400 ms):
+
+| Entrada da tela | `p_entrada` |
+| --- | --- |
+| peso/tempo por peça × x | `peso_peca_g`, `horas_impressao` (lote inteiro), `quantidade` |
+| multiplicador | `modo_preco: 'markup'`, `markup_pct = (mult − 1) × 100` (×5 → 400) |
+| margem | `modo_preco: 'margem'`, `margem_pct` |
+| material | `material_id` ou `preco_rolo` + `peso_rolo_g` |
+| impressora | `impressora_id`; sem ela `potencia_media_kw`, `valor_aquisicao`, `valor_residual` = 0 |
+
+No modo rápido o cálculo é só material + depreciação + energia + multiplicador: `desperdicio_pct`, `falha_pct`,
+`manutencao_hora`, `manutencao_ciclo`, `mao_obra_horas`, `acabamento_horas`, `montagem_horas`, `embalagem_custo`,
+`despesas_fixas_pct`, `impostos_pct`, `taxa_pagamento_pct`, `comissao_pct`, `taxa_fixa_pagamento`, `preco_minimo` e
+`arredondar_para` vão como **0 explícito** (o que vem em `p_entrada` vence config/impressora/material). A seção
+**Incluir também** (desperdício, falhas, manutenção, mão de obra/acabamento, embalagem, impostos e taxas) vem com as
+caixas desmarcadas; ao marcar, os campos aparecem pré-preenchidos com a configuração da empresa (manutenção, com a
+impressora escolhida) e são enviados no lugar do zero. Despesas fixas, preço mínimo e arredondamento só no modo
+avançado.
+
+Resultado (sempre "Estimado"): custo por peça com a composição, custo do lote, **preço sugerido por peça** e do lote,
+lucro e margem real, avisos da RPC e da tela. **Copiar resumo** gera o texto para WhatsApp (peça, quantidade, preço
+por peça e total, sem custos). **Criar orçamento com este cálculo** aparece só com Orçamentos ligado e edição
+(`usarSimulacaoEmOrcamento`; o servidor recalcula ao salvar).
+
+## Cadastros simples
+
+- **Material** (Estoque): visíveis nome/descrição, tipo, material (PLA, PETG...), cor (com seletor), preço pago, peso
+  do rolo e "quantos rolos comprei". Com rolos > 0 a criação dá a entrada de estoque por `p3d_movimentar_estoque`
+  (`custo_total = rolos × preço`, só com o extra `custos`; zero rolos só cadastra). Marca, diâmetro, estoque mínimo,
+  fornecedor, localização e unidade ficam em **Mais opções** (continuam sendo enviados). A lista mostra cor, saldo
+  (g e rolos aproximados), custo por g e alerta de mínimo.
+- **Impressora**: visíveis nome, preço pago, vida útil estimada (h), potência média em **watts** (grava
+  `potencia_media_kw = W / 1000`) e o custo/hora ao vivo (depreciação e energia, "Estimado"). O resto (marca, modelo,
+  volume, bico, valor residual, manutenção, integração...) fica em **Mais opções**.
+
+## Equipe e cofundadores
+
+O item de menu "Sócios" virou **Equipe e cofundadores** (`/socios`): visível para fundador e cofundador, **fixo**
+(nunca pode ser ocultado em Personalizar navegação), com cartão em Configurações e atalho em "Configurações do
+nicho". A tela oferece **Convidar cofundador** e **Convidar sócio ou funcionário** (RPC `convidar_membro`), mostra o
+link `/convite/<token>` com botão copiar (o app não envia e-mail), convites pendentes com cancelar e pessoas atuais
+com remover, e explica: cofundador tem o mesmo poder do fundador e, com 2 ou mais fundadores, as alterações passam
+pela aprovação de todos em Aprovações (com 1 fundador, valem na hora).
+
+## Testes e auditoria (Etapa E)
+
+`testar-acesso.mts` (seção *Etapa E*): multiplicador ↔ `markup_pct`, x peças, zeros forçados, "Incluir também",
+margem, W → kW, entrada por rolos, resumo de WhatsApp, Equipe e cofundadores, começo enxuto. `auditar-isolamento.mts`
+**falha se a Calculadora de preço calcular preço no cliente** (`lib/impressao-3d/auditoria-preco.ts`: custo ×
+multiplicador, custo ÷ (1 − margem), preço atribuído por multiplicação...) ou se deixar de chamar a RPC.

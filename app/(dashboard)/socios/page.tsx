@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getEmpresaPainel } from "@/lib/empresa-ativa";
 import { getRotulos } from "@/lib/rotulos";
+import { getFundadores } from "@/lib/aprovacoes";
+import { fraseDaRegra } from "@/lib/aprovacoes-shared";
 import { getModulosHabilitados, getModulosPermiteMembros } from "@/lib/modulos/habilitados";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import {
@@ -42,6 +44,7 @@ export default async function SociosPage() {
     { data: convites },
     { data: setores },
     { data: codigoVendedor },
+    fundadores,
   ] = await Promise.all([
     chaves.length
       ? supabase.from("modulos").select("chave, nome, permissoes_extras").in("chave", chaves)
@@ -54,7 +57,9 @@ export default async function SociosPage() {
       .eq("workspace_id", ws)
       .order("created_at", { ascending: true }),
     supabase.rpc("meu_codigo_vendedor", { p_workspace_id: ws }),
+    getFundadores(ws),
   ]);
+  const regra = fraseDaRegra(fundadores.length);
 
   const porChave = new Map(
     ((catalogo ?? []) as { chave: string; nome: string; permissoes_extras: unknown }[]).map((m) => [
@@ -75,10 +80,15 @@ export default async function SociosPage() {
     <ToastProvider>
       <div className="mx-auto max-w-4xl px-6 py-8">
         <div className="mb-6">
-          <h1 className="text-lg font-semibold text-zinc-100">Sócios</h1>
+          <h1 className="text-lg font-semibold text-zinc-100">Equipe e cofundadores</h1>
           <p className="text-sm text-zinc-500">
-            Convide sócios, funcionários e cofundadores e escolha o que cada um vê e edita. Os
+            Convide cofundadores, sócios e funcionários e escolha o que cada um vê e edita. Os
             setores dão um código para a pessoa pedir acesso sozinha.
+          </p>
+          <p className="mt-2 text-xs text-zinc-500">
+            <strong className="text-zinc-300">Cofundador</strong> tem o mesmo poder do fundador.{" "}
+            {regra ??
+              "Hoje você é o único fundador: suas alterações valem na hora. Com 2 ou mais fundadores, as alterações da empresa passam pela aprovação de todos em Aprovações."}
           </p>
         </div>
         <SociosBoard

@@ -5,7 +5,7 @@ import { getModulosHabilitados } from "@/lib/modulos/habilitados";
 import { isFollowupPendente } from "@/lib/leads";
 import { todayISO } from "@/lib/vencimentos/dates";
 import { RESUMO_P3D_VAZIO, getResumoImpressao3d, type ResumoImpressao3d } from "@/lib/impressao-3d/resumo";
-import { lerFatosPassos, montarPassos, todosConcluidos, type Passo } from "@/lib/impressao-3d/primeiros-passos";
+import { lerFatosPassos, modulosOpcionaisFaltando, montarPassos, todosConcluidos, type Passo } from "@/lib/impressao-3d/primeiros-passos";
 import { getConfigEmpresa } from "@/lib/rotulos";
 import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { ABAS_VISAO_GERAL, CHAVE_VISAO_GERAL } from "@/lib/modulos/registry";
@@ -49,6 +49,8 @@ export interface DashboardHomeOverview {
    * tudo concluído ou seção oculta na preferência de navegação.
    */
   primeirosPassos: Passo[] | null;
+  /** Módulos opcionais do nicho ainda desligados (cartão "Precisa de mais?"); vazio = sem cartão. */
+  maisModulos: string[];
   /** Seções visíveis da Visão Geral (preferência de navegação, chave "visao_geral"). */
   secoes: string[];
 }
@@ -70,6 +72,7 @@ const VAZIO: DashboardHomeOverview = {
   juridico: { processosAbertos: 0, compliancePendente: 0 },
   impressao3d: RESUMO_P3D_VAZIO,
   primeirosPassos: null,
+  maisModulos: [],
   secoes: ABAS_VISAO_GERAL.map((a) => a.chave),
 };
 
@@ -214,6 +217,7 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
     getAbasVisiveis(CHAVE_VISAO_GERAL),
   ]);
   let primeirosPassos: Passo[] | null = null;
+  const maisModulos = config.nichoChave === "impressao_3d" ? modulosOpcionaisFaltando(habilitados) : [];
   if (config.nichoChave === "impressao_3d" && secoes.includes("primeiros_passos")) {
     const passos = montarPassos(await lerFatosPassos(supabase, workspaceId, habilitados), habilitados);
     primeirosPassos = todosConcluidos(passos) ? null : passos;
@@ -271,6 +275,7 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
     },
     impressao3d,
     primeirosPassos,
+    maisModulos,
     secoes,
   };
 }

@@ -40,7 +40,7 @@ export const ROTULOS_PADRAO: Record<string, RotuloModulo> = {
   p3d_impressoras: { singular: "Impressora", plural: "Impressoras" },
   p3d_estoque: { singular: "Material", plural: "Estoque" },
   p3d_produtos: { singular: "Produto", plural: "Produtos e catálogo" },
-  p3d_precificacao: { singular: "Precificação", plural: "Precificação" },
+  p3d_precificacao: { singular: "Cálculo de preço", plural: "Calculadora de preço" },
   p3d_orcamentos: { singular: "Orçamento", plural: "Orçamentos 3D" },
   p3d_fornecedores: { singular: "Fornecedor", plural: "Fornecedores e compras" },
   p3d_pedidos: { singular: "Pedido", plural: "Pedidos e vendas" },

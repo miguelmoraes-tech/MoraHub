@@ -68,14 +68,24 @@ export function ConvidarMembro({ modulos }: { modulos: ModuloPermissivel[] }) {
 
   if (!aberto) {
     return (
-      <button
-        type="button"
-        onClick={() => setAberto(true)}
-        className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
-      >
-        <UserPlus className="h-4 w-4" />
-        Convidar
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => { setPapel("cofundador"); setAberto(true); }}
+          className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
+        >
+          <UserPlus className="h-4 w-4" />
+          Convidar cofundador
+        </button>
+        <button
+          type="button"
+          onClick={() => { setPapel("socio"); setAberto(true); }}
+          className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3.5 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
+        >
+          <UserPlus className="h-4 w-4" />
+          Convidar sócio ou funcionário
+        </button>
+      </div>
     );
   }
 

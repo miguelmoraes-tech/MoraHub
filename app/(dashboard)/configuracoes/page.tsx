@@ -46,6 +46,16 @@ export default async function ConfiguracoesPage() {
       </div>
 
       <Link
+        href="/socios"
+        className="block rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
+      >
+        <p className="text-sm font-semibold text-zinc-100">Equipe e cofundadores</p>
+        <p className="mt-1 text-xs text-zinc-500">
+          Convide cofundadores, sócios e funcionários por link e escolha o que cada um acessa. Cofundador tem o mesmo poder do fundador.
+        </p>
+      </Link>
+
+      <Link
         href="/configuracoes/navegacao"
         className="block rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
       >

@@ -50,8 +50,20 @@ export default async function ImpressorasPage() {
     }
   }
 
+  // Tarifa para o custo/hora ao vivo do cadastro: só para quem abre a Precificação.
+  let tarifaKwh: number | null = null;
+  if (await getAcessoModulo("p3d_precificacao")) {
+    const { data: config } = await supabase
+      .from("p3d_config_precificacao")
+      .select("tarifa_kwh")
+      .eq("workspace_id", ws)
+      .maybeSingle();
+    if (config && Number.isFinite(Number(config.tarifa_kwh))) tarifaKwh = Number(config.tarifa_kwh);
+  }
+
   return (
     <ImpressorasBoard
+      tarifaKwh={tarifaKwh}
       abas={abas}
       impressoras={(impressoras ?? []) as unknown as Impressora[]}
       pecas={(pecas ?? []) as unknown as PecaDesgaste[]}

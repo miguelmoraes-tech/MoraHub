@@ -46,8 +46,8 @@ export function atalhosConfiguracaoNicho(habilitados: readonly string[]): Atalho
       icone: "blocks",
     },
     {
-      titulo: "Equipe e permissões",
-      descricao: "Sócios e funcionários, o que cada um vê e edita (inclusive o extra de custos).",
+      titulo: "Equipe e cofundadores",
+      descricao: "Convide cofundadores, sócios e funcionários e escolha o que cada um vê e edita.",
       href: "/socios",
       icone: "users",
     }

@@ -4,7 +4,7 @@ import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { CONFIG_PADRAO } from "@/lib/impressao-3d/regras";
-import { getOpcoesImpressoras, getOpcoesMateriais } from "@/lib/impressao-3d/opcoes";
+import { getOpcoesImpressoras, getOpcoesMateriais, getOpcoesMateriaisComCusto } from "@/lib/impressao-3d/opcoes";
 import { PrecificacaoBoard } from "@/components/impressao-3d/precificacao-board";
 import type { ConfigPrecificacao } from "@/lib/impressao-3d/tipos";
 
@@ -29,9 +29,10 @@ export default async function PrecificacaoPage() {
     ({ data: config } = await lerConfig());
   }
 
-  const [impressoras, materiais, acessoOrcamentos] = await Promise.all([
+  const [impressoras, materiais, materiaisComCusto, acessoOrcamentos] = await Promise.all([
     getOpcoesImpressoras(),
     getOpcoesMateriais(),
+    getOpcoesMateriaisComCusto(config?.base_custo_material === "medio" ? "medio" : "cadastro"),
     getAcessoModulo("p3d_orcamentos", "edicao"),
   ]);
 
@@ -53,6 +54,7 @@ export default async function PrecificacaoPage() {
       configSalva={!!config}
       impressoras={impressoras}
       materiais={materiais}
+      materiaisComCusto={materiaisComCusto}
       podeEditar={podeEditar}
       usarEmOrcamento={{ podeUsar: !!acessoOrcamentos, rascunhos }}
     />

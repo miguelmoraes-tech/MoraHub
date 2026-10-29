@@ -22,6 +22,7 @@ import {
   depreciacaoPorHora, desgastePorHora, horasParaManutencao, manutencaoVencida, pecaVencida,
 } from "@/lib/impressao-3d/regras";
 import { formatHoras, formatMoeda, formatNumero } from "@/lib/impressao-3d/numeros";
+import { custoHoraImpressora, kwParaWatts, wattsParaKw } from "@/lib/impressao-3d/calculadora-rapida";
 import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
 import { formatDate } from "@/lib/format";
 import { abaInicial } from "@/lib/modulos/preferencias";
@@ -33,106 +34,133 @@ const TOM_STATUS: Record<StatusImpressora, ChipTone> = {
   inativa: "zinc",
 };
 
-function CamposImpressora({ item }: { item?: Impressora }) {
+function CamposImpressora({ item, tarifaKwh }: { item?: Impressora; tarifaKwh: number | null }) {
   const [aquisicao, setAquisicao] = useState(item?.valor_aquisicao ?? 0);
   const [residual, setResidual] = useState(item?.valor_residual ?? 0);
   const [vida, setVida] = useState(item?.vida_util_horas ?? 0);
-  const deprec = depreciacaoPorHora(aquisicao, residual, vida);
+  const [watts, setWatts] = useState(item ? kwParaWatts(item.potencia_media_kw) : 0);
+  const custoHora = custoHoraImpressora({
+    aquisicao, residual, vidaUtilHoras: vida, watts, tarifaKwh: tarifaKwh ?? 0,
+  });
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Entrada rotulo="Nome *" name="nome" required defaultValue={item?.nome} className="col-span-2" />
-      <Entrada rotulo="Marca" name="marca" defaultValue={item?.marca ?? ""} />
-      <Entrada rotulo="Modelo" name="modelo" defaultValue={item?.modelo ?? ""} />
-      <Seletor rotulo="Tecnologia" name="tecnologia" defaultValue={item?.tecnologia ?? "fdm"}>
-        {Object.entries(TECNOLOGIA_ROTULO).map(([v, l]) => (
-          <option key={v} value={v}>{l}</option>
-        ))}
-      </Seletor>
-      <Seletor rotulo="Status" name="status" defaultValue={item?.status ?? "disponivel"}>
-        {Object.entries(STATUS_IMPRESSORA_ROTULO).map(([v, l]) => (
-          <option key={v} value={v}>{l}</option>
-        ))}
-      </Seletor>
-      <Numero rotulo="Volume X (mm)" name="volume_x_mm" defaultValue={item?.volume_x_mm ?? ""} />
-      <Numero rotulo="Volume Y (mm)" name="volume_y_mm" defaultValue={item?.volume_y_mm ?? ""} />
-      <Numero rotulo="Volume Z (mm)" name="volume_z_mm" defaultValue={item?.volume_z_mm ?? ""} />
-      <Numero rotulo="Bico (mm)" name="bico_mm" defaultValue={item?.bico_mm ?? ""} />
-      <Numero
-        rotulo="Potência média (kW)"
-        name="potencia_media_kw"
-        defaultValue={item?.potencia_media_kw ?? ""}
-        ajuda="Consumo médio durante a impressão. Ex.: 0,12 kW."
-      />
-      <Numero
-        rotulo="Valor de aquisição (R$)"
-        name="valor_aquisicao"
-        defaultValue={item?.valor_aquisicao ?? ""}
-        onChange={(e) => setAquisicao(Number(e.target.value) || 0)}
-      />
-      <Numero
-        rotulo="Valor residual (R$)"
-        name="valor_residual"
-        defaultValue={item?.valor_residual ?? ""}
-        onChange={(e) => setResidual(Number(e.target.value) || 0)}
-        ajuda="Quanto ela ainda vale no fim da vida útil. Não pode passar da aquisição."
-      />
-      <Numero
-        rotulo="Vida útil (horas)"
-        name="vida_util_horas"
-        defaultValue={item?.vida_util_horas ?? ""}
-        onChange={(e) => setVida(Number(e.target.value) || 0)}
-      />
-      <div className="col-span-2 flex flex-col justify-end sm:col-span-1">
-        <p className="text-xs font-medium text-zinc-400">Depreciação por hora</p>
-        <p className="text-sm text-zinc-200">
-          {formatMoeda(deprec, 4)}/h <span className="text-[11px] text-amber-500">Estimado</span>
-        </p>
-        <p className="text-[11px] text-zinc-600">(aquisição − residual) ÷ vida útil</p>
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Entrada rotulo="Nome *" name="nome" required defaultValue={item?.nome} className="col-span-2" placeholder="Ex.: Ender 3 V2" />
+        <Numero
+          rotulo="Preço pago (R$)"
+          name="valor_aquisicao"
+          defaultValue={item?.valor_aquisicao ?? ""}
+          onChange={(e) => setAquisicao(Number(e.target.value) || 0)}
+          ajuda="Quanto custou a impressora (nota de compra)."
+        />
+        <Numero
+          rotulo="Vida útil estimada (horas)"
+          name="vida_util_horas"
+          defaultValue={item?.vida_util_horas ?? ""}
+          onChange={(e) => setVida(Number(e.target.value) || 0)}
+          ajuda="Quantas horas de impressão ela deve aguentar. Uma estimativa comum: 5.000 h."
+        />
+        <Numero
+          rotulo="Potência média (watts)"
+          step="1"
+          value={watts || ""}
+          onChange={(e) => setWatts(Number(e.target.value) || 0)}
+          ajuda="Consumo médio imprimindo (ficha técnica ou medidor de tomada). Ex.: 120 W."
+        />
+        {/* O banco guarda em kW: a tela pede watts e grava W ÷ 1000. */}
+        <input type="hidden" name="potencia_media_kw" value={wattsParaKw(watts)} />
+        <div className="col-span-2 flex flex-col justify-end sm:col-span-3">
+          <p className="text-xs font-medium text-zinc-400">Custo por hora de impressão</p>
+          <p className="text-sm text-zinc-200">
+            Depreciação {formatMoeda(custoHora.depreciacao, 4)}/h
+            {tarifaKwh != null && <> · Energia {formatMoeda(custoHora.energia, 4)}/h</>}
+            {" "}<span className="text-[11px] text-amber-500">Estimado</span>
+          </p>
+          <p className="text-[11px] text-zinc-600">
+            Depreciação = (preço pago − valor residual) ÷ vida útil.
+            {tarifaKwh != null
+              ? ` Energia = watts ÷ 1000 × tarifa (${formatMoeda(tarifaKwh, 4)}/kWh).`
+              : " A energia usa a tarifa da calculadora de preço."}
+          </p>
+        </div>
       </div>
-      <Entrada rotulo="Data de aquisição" name="data_aquisicao" type="date" defaultValue={item?.data_aquisicao ?? ""} />
-      <Numero
-        rotulo="Horas de uso"
-        name="horas_uso"
-        defaultValue={item?.horas_uso ?? ""}
-        ajuda="Informado à mão. A produção real (Etapa B) passará a alimentar este número."
-      />
-      <Numero rotulo="Manutenção (R$/hora)" name="manutencao_hora" defaultValue={item?.manutencao_hora ?? ""} />
-      <Numero rotulo="Manutenção (R$/ciclo)" name="manutencao_ciclo" defaultValue={item?.manutencao_ciclo ?? ""} />
-      <Numero
-        rotulo="Intervalo de manutenção (h)"
-        name="intervalo_manutencao_horas"
-        defaultValue={item?.intervalo_manutencao_horas ?? ""}
-        ajuda="Gera o alerta quando as horas desde a última manutenção chegam a este valor."
-      />
-      <Numero
-        rotulo="Horas na última manutenção"
-        name="horas_ultima_manutencao"
-        defaultValue={item?.horas_ultima_manutencao ?? ""}
-      />
-      <Seletor rotulo="Integração (cadastro)" name="integracao_tipo" defaultValue={item?.integracao_tipo ?? ""}>
-        <option value="">Nenhuma</option>
-        {Object.entries(INTEGRACAO_ROTULO).map(([v, l]) => (
-          <option key={v} value={v}>{l}</option>
-        ))}
-      </Seletor>
-      <Entrada
-        rotulo="Endereço da integração"
-        name="integracao_url"
-        defaultValue={item?.integracao_url ?? ""}
-        className="col-span-2"
-        ajuda="Só o endereço, para consulta. Não guarde token nem senha aqui."
-      />
-      <AreaTexto rotulo="Observações" name="observacoes" defaultValue={item?.observacoes ?? ""} className="col-span-2 sm:col-span-4" />
+
+      <details className="rounded-lg border border-zinc-800">
+        <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200">
+          Mais opções (marca, modelo, volume, bico, valor residual, manutenção, integração...)
+        </summary>
+        <div className="grid grid-cols-2 gap-3 border-t border-zinc-800 p-3 sm:grid-cols-4">
+          <Entrada rotulo="Marca" name="marca" defaultValue={item?.marca ?? ""} />
+          <Entrada rotulo="Modelo" name="modelo" defaultValue={item?.modelo ?? ""} />
+          <Seletor rotulo="Tecnologia" name="tecnologia" defaultValue={item?.tecnologia ?? "fdm"}>
+            {Object.entries(TECNOLOGIA_ROTULO).map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </Seletor>
+          <Seletor rotulo="Status" name="status" defaultValue={item?.status ?? "disponivel"}>
+            {Object.entries(STATUS_IMPRESSORA_ROTULO).map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </Seletor>
+          <Numero rotulo="Volume X (mm)" name="volume_x_mm" defaultValue={item?.volume_x_mm ?? ""} />
+          <Numero rotulo="Volume Y (mm)" name="volume_y_mm" defaultValue={item?.volume_y_mm ?? ""} />
+          <Numero rotulo="Volume Z (mm)" name="volume_z_mm" defaultValue={item?.volume_z_mm ?? ""} />
+          <Numero rotulo="Bico (mm)" name="bico_mm" defaultValue={item?.bico_mm ?? ""} />
+          <Numero
+            rotulo="Valor residual (R$)"
+            name="valor_residual"
+            defaultValue={item?.valor_residual ?? ""}
+            onChange={(e) => setResidual(Number(e.target.value) || 0)}
+            ajuda="Quanto ela ainda vale no fim da vida útil. Não pode passar do preço pago."
+          />
+          <Entrada rotulo="Data de aquisição" name="data_aquisicao" type="date" defaultValue={item?.data_aquisicao ?? ""} />
+          <Numero
+            rotulo="Horas de uso"
+            name="horas_uso"
+            defaultValue={item?.horas_uso ?? ""}
+            ajuda="Informado à mão. A produção real (Etapa B) passará a alimentar este número."
+          />
+          <Numero rotulo="Manutenção (R$/hora)" name="manutencao_hora" defaultValue={item?.manutencao_hora ?? ""} />
+          <Numero rotulo="Manutenção (R$/ciclo)" name="manutencao_ciclo" defaultValue={item?.manutencao_ciclo ?? ""} />
+          <Numero
+            rotulo="Intervalo de manutenção (h)"
+            name="intervalo_manutencao_horas"
+            defaultValue={item?.intervalo_manutencao_horas ?? ""}
+            ajuda="Gera o alerta quando as horas desde a última manutenção chegam a este valor."
+          />
+          <Numero
+            rotulo="Horas na última manutenção"
+            name="horas_ultima_manutencao"
+            defaultValue={item?.horas_ultima_manutencao ?? ""}
+          />
+          <Seletor rotulo="Integração (cadastro)" name="integracao_tipo" defaultValue={item?.integracao_tipo ?? ""}>
+            <option value="">Nenhuma</option>
+            {Object.entries(INTEGRACAO_ROTULO).map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </Seletor>
+          <Entrada
+            rotulo="Endereço da integração"
+            name="integracao_url"
+            defaultValue={item?.integracao_url ?? ""}
+            className="col-span-2"
+            ajuda="Só o endereço, para consulta. Não guarde token nem senha aqui."
+          />
+          <AreaTexto rotulo="Observações" name="observacoes" defaultValue={item?.observacoes ?? ""} className="col-span-2 sm:col-span-4" />
+        </div>
+      </details>
     </div>
   );
 }
 
 function FormImpressora({
   item,
+  tarifaKwh,
   aoFechar,
 }: {
   item?: Impressora;
+  tarifaKwh: number | null;
   aoFechar: () => void;
 }) {
   const acao = item ? atualizarImpressora.bind(null, item.id) : criarImpressora;
@@ -141,7 +169,7 @@ function FormImpressora({
 
   return (
     <form action={formAction} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-      <CamposImpressora item={item} />
+      <CamposImpressora item={item} tarifaKwh={tarifaKwh} />
       <ErroForm state={state} />
       <div className="flex justify-end gap-2">
         <BotaoTexto onClick={aoFechar}>Cancelar</BotaoTexto>
@@ -351,7 +379,9 @@ function Linha({
   podeEditar,
   trabalhoAtual,
   abas,
+  tarifaKwh,
 }: {
+  tarifaKwh: number | null;
   item: Impressora;
   pecas: PecaDesgaste[];
   manutencoes: Manutencao[];
@@ -440,7 +470,7 @@ function Linha({
           </div>
           {aba === "dados" &&
             (podeEditar ? (
-              <FormImpressora item={item} aoFechar={() => setAberto(false)} />
+              <FormImpressora item={item} tarifaKwh={tarifaKwh} aoFechar={() => setAberto(false)} />
             ) : (
               <p className="text-xs text-zinc-500">Somente leitura: peça edição ao administrador para alterar os dados.</p>
             ))}
@@ -452,7 +482,7 @@ function Linha({
   );
 }
 
-function NovaImpressora() {
+function NovaImpressora({ tarifaKwh }: { tarifaKwh: number | null }) {
   const [aberto, setAberto] = useState(false);
   if (!aberto) {
     return (
@@ -461,7 +491,7 @@ function NovaImpressora() {
       </BotaoNovo>
     );
   }
-  return <FormImpressora aoFechar={() => setAberto(false)} />;
+  return <FormImpressora tarifaKwh={tarifaKwh} aoFechar={() => setAberto(false)} />;
 }
 
 export function ImpressorasBoard({
@@ -471,7 +501,10 @@ export function ImpressorasBoard({
   podeEditar,
   trabalhosAtuais,
   abas,
+  tarifaKwh,
 }: {
+  /** Tarifa de energia da empresa (R$/kWh) para o custo/hora ao vivo; null sem acesso a Precificação. */
+  tarifaKwh: number | null;
   impressoras: Impressora[];
   pecas: PecaDesgaste[];
   manutencoes: Manutencao[];
@@ -502,7 +535,7 @@ export function ImpressorasBoard({
           <h1 className="text-lg font-semibold text-zinc-100">Impressoras</h1>
           <p className="text-sm text-zinc-500">{filtradas.length} impressora(s)</p>
         </div>
-        {podeEditar && <NovaImpressora />}
+        {podeEditar && <NovaImpressora tarifaKwh={tarifaKwh} />}
       </div>
       {!podeEditar && (
         <div className="mb-4">
@@ -552,6 +585,7 @@ export function ImpressorasBoard({
                 podeEditar={podeEditar}
                 abas={abas}
                 trabalhoAtual={trabalhosAtuais[i.id] ?? null}
+                tarifaKwh={tarifaKwh}
               />
             ))}
           </div>

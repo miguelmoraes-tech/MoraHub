@@ -17,6 +17,7 @@ import {
   type Material, type MovimentoEstoque, type TipoMaterial, type TipoMovimento,
 } from "@/lib/impressao-3d/tipos";
 import { abaixoDoMinimo, custoPorGrama, gramasDeRolos } from "@/lib/impressao-3d/regras";
+import { entradaDeRolosComprados, saldoEmRolos } from "@/lib/impressao-3d/cadastro-simples";
 import type { OpcaoFornecedor, Opcoes } from "@/lib/impressao-3d/opcoes";
 import {
   formatDataHora, formatMoeda, formatNumero,
@@ -35,96 +36,136 @@ function CamposMaterial({
   const [unidade, setUnidade] = useState(item?.unidade ?? "g");
   const [preco, setPreco] = useState(item?.preco_compra ?? 0);
   const [peso, setPeso] = useState(item?.peso_liquido_rolo_g ?? 0);
+  const [rolos, setRolos] = useState(0);
   const [corHex, setCorHex] = useState(item?.cor_hex ?? "");
+  const entrada = entradaDeRolosComprados({ rolos, pesoRoloG: peso, precoPago: verCustos ? preco : null });
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Seletor rotulo="Tipo" name="tipo" defaultValue={item?.tipo ?? "filamento"}>
-        {Object.entries(TIPO_MATERIAL_ROTULO).map(([v, l]) => (
-          <option key={v} value={v}>{l}</option>
-        ))}
-      </Seletor>
-      <Entrada rotulo="Nome *" name="nome" required defaultValue={item?.nome} className="col-span-2" />
-      <Seletor
-        rotulo="Unidade do estoque"
-        name="unidade"
-        value={unidade}
-        onChange={(e) => setUnidade(e.target.value as Material["unidade"])}
-      >
-        {Object.entries(UNIDADE_ROTULO).map(([v, l]) => (
-          <option key={v} value={v}>{l}</option>
-        ))}
-      </Seletor>
-      <Entrada rotulo="Marca" name="marca" defaultValue={item?.marca ?? ""} />
-      <Entrada rotulo="Material (PLA, PETG...)" name="material" defaultValue={item?.material ?? ""} />
-      <Entrada rotulo="Cor" name="cor" defaultValue={item?.cor ?? ""} />
-      <Campo rotulo="Cor (amostra)" ajuda="Formato #RRGGBB. Vazio = sem cor.">
-        <div className="flex items-center gap-2">
-          <input
-            type="color"
-            aria-label="Escolher cor"
-            value={/^#[0-9A-Fa-f]{6}$/.test(corHex) ? corHex : "#808080"}
-            onChange={(e) => setCorHex(e.target.value)}
-            className="h-8 w-10 shrink-0 cursor-pointer rounded border border-zinc-800 bg-zinc-950"
-          />
-          <input
-            name="cor_hex"
-            value={corHex}
-            onChange={(e) => setCorHex(e.target.value)}
-            placeholder="#RRGGBB"
-            maxLength={7}
-            className={CLASSE_CAMPO}
-          />
-        </div>
-      </Campo>
-      <Numero rotulo="Diâmetro (mm)" name="diametro_mm" defaultValue={item?.diametro_mm ?? ""} />
-      <Numero
-        rotulo="Peso líquido do rolo (g)"
-        name="peso_liquido_rolo_g"
-        defaultValue={item?.peso_liquido_rolo_g ?? ""}
-        onChange={(e) => setPeso(Number(e.target.value) || 0)}
-        ajuda="Sem o carretel. Base da entrada por rolos e do custo por grama."
-      />
-      {verCustos && (
-        <Numero
-          rotulo="Preço de compra (R$)"
-          name="preco_compra"
-          defaultValue={item?.preco_compra ?? ""}
-          onChange={(e) => setPreco(Number(e.target.value) || 0)}
-          ajuda="Preço de um rolo (ou de uma unidade de compra)."
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Entrada
+          rotulo="Nome / descrição *"
+          name="nome"
+          required
+          defaultValue={item?.nome}
+          className="col-span-2"
+          placeholder="Ex.: PLA preto Voolt"
         />
-      )}
-      {verCustos && (
-        <div className="flex flex-col justify-end">
-          <p className="text-xs font-medium text-zinc-400">Custo de cadastro</p>
-          <p className="text-sm text-zinc-200">
-            {formatMoeda(custoPorGrama(preco, peso), 4)}/{unidade}
-          </p>
-          <p className="text-[11px] text-zinc-600">preço ÷ peso líquido</p>
-        </div>
-      )}
-      <Numero
-        rotulo={`Estoque mínimo (${unidade})`}
-        name="estoque_minimo"
-        defaultValue={item?.estoque_minimo ?? ""}
-        ajuda="0 = sem alerta."
-      />
-      <Entrada rotulo="Localização" name="localizacao" defaultValue={item?.localizacao ?? ""} />
-      {fornecedores.acessivel ? (
-        <Seletor rotulo="Fornecedor" name="fornecedor_id" defaultValue={item?.fornecedor_id ?? ""}>
-          <option value="">Sem fornecedor</option>
-          {fornecedores.itens
-            .filter((f) => f.ativo || f.id === item?.fornecedor_id)
-            .map((f) => (
-              <option key={f.id} value={f.id}>{f.nome}{f.ativo ? "" : " (inativo)"}</option>
-            ))}
+        <Seletor rotulo="Tipo" name="tipo" defaultValue={item?.tipo ?? "filamento"}>
+          {Object.entries(TIPO_MATERIAL_ROTULO).map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
         </Seletor>
-      ) : (
-        // Sem acesso a Fornecedores: o vínculo atual é mantido ao salvar.
-        <input type="hidden" name="fornecedor_id" value={item?.fornecedor_id ?? ""} />
+        <Entrada
+          rotulo="Material"
+          name="material"
+          defaultValue={item?.material ?? ""}
+          placeholder="PLA, PETG, ABS..."
+        />
+        <Entrada rotulo="Cor" name="cor" defaultValue={item?.cor ?? ""} placeholder="Preto" />
+        <Campo rotulo="Seletor de cor" ajuda="Só para identificar na lista.">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              aria-label="Escolher cor"
+              value={/^#[0-9A-Fa-f]{6}$/.test(corHex) ? corHex : "#808080"}
+              onChange={(e) => setCorHex(e.target.value)}
+              className="h-8 w-10 shrink-0 cursor-pointer rounded border border-zinc-800 bg-zinc-950"
+            />
+            <input
+              name="cor_hex"
+              value={corHex}
+              onChange={(e) => setCorHex(e.target.value)}
+              placeholder="#RRGGBB"
+              maxLength={7}
+              className={CLASSE_CAMPO}
+            />
+          </div>
+        </Campo>
+        {verCustos && (
+          <Numero
+            rotulo="Preço pago (R$)"
+            name="preco_compra"
+            defaultValue={item?.preco_compra ?? ""}
+            onChange={(e) => setPreco(Number(e.target.value) || 0)}
+            ajuda="Quanto você pagou em UM rolo (está na nota de compra)."
+          />
+        )}
+        <Numero
+          rotulo="Peso do rolo (g)"
+          name="peso_liquido_rolo_g"
+          defaultValue={item?.peso_liquido_rolo_g ?? ""}
+          onChange={(e) => setPeso(Number(e.target.value) || 0)}
+          ajuda="Só o filamento, sem o carretel. Na etiqueta: normalmente 1000 g."
+        />
+        {!item && (
+          <Numero
+            rotulo="Quantos rolos comprei"
+            name="rolos_comprados"
+            step="1"
+            onChange={(e) => setRolos(Number(e.target.value) || 0)}
+            ajuda={
+              entrada
+                ? `Entrada de ${formatNumero(entrada.gramas, 1)} g no estoque${
+                    entrada.custoTotal != null ? ` por ${formatMoeda(entrada.custoTotal)}` : ""
+                  }.`
+                : "0 = só cadastra, sem dar entrada no estoque."
+            }
+          />
+        )}
+        {verCustos && (
+          <div className="flex flex-col justify-end">
+            <p className="text-xs font-medium text-zinc-400">Custo por g</p>
+            <p className="text-sm text-zinc-200">{formatMoeda(custoPorGrama(preco, peso), 4)}/{unidade}</p>
+            <p className="text-[11px] text-zinc-600">preço pago ÷ peso do rolo</p>
+          </div>
+        )}
+      </div>
+      {!item && !verCustos && (
+        <p className="text-[11px] text-zinc-500">Sem a permissão de custos, a entrada é registrada sem valor.</p>
       )}
+
+      <details className="rounded-lg border border-zinc-800">
+        <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200">
+          Mais opções (marca, diâmetro, estoque mínimo, fornecedor, localização)
+        </summary>
+        <div className="grid grid-cols-2 gap-3 border-t border-zinc-800 p-3 sm:grid-cols-4">
+          <Seletor
+            rotulo="Unidade do estoque"
+            name="unidade"
+            value={unidade}
+            onChange={(e) => setUnidade(e.target.value as Material["unidade"])}
+          >
+            {Object.entries(UNIDADE_ROTULO).map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </Seletor>
+          <Entrada rotulo="Marca" name="marca" defaultValue={item?.marca ?? ""} />
+          <Numero rotulo="Diâmetro (mm)" name="diametro_mm" defaultValue={item?.diametro_mm ?? ""} />
+          <Numero
+            rotulo={`Estoque mínimo (${unidade})`}
+            name="estoque_minimo"
+            defaultValue={item?.estoque_minimo ?? ""}
+            ajuda="0 = sem alerta."
+          />
+          <Entrada rotulo="Localização" name="localizacao" defaultValue={item?.localizacao ?? ""} />
+          {fornecedores.acessivel ? (
+            <Seletor rotulo="Fornecedor" name="fornecedor_id" defaultValue={item?.fornecedor_id ?? ""}>
+              <option value="">Sem fornecedor</option>
+              {fornecedores.itens
+                .filter((f) => f.ativo || f.id === item?.fornecedor_id)
+                .map((f) => (
+                  <option key={f.id} value={f.id}>{f.nome}{f.ativo ? "" : " (inativo)"}</option>
+                ))}
+            </Seletor>
+          ) : (
+            // Sem acesso a Fornecedores: o vínculo atual é mantido ao salvar.
+            <input type="hidden" name="fornecedor_id" value={item?.fornecedor_id ?? ""} />
+          )}
+        </div>
+      </details>
       {item && (
-        <p className="col-span-2 self-end text-[11px] text-zinc-600 sm:col-span-4">
+        <p className="text-[11px] text-zinc-600">
           O saldo e o custo médio não são editados aqui: use Entrada, Ajuste ou Perda.
         </p>
       )}
@@ -295,13 +336,13 @@ function LinhaMaterial({
               {!item.ativo && <StatusChip tone="zinc">Arquivado</StatusChip>}
             </p>
             <p className="truncate text-xs text-zinc-500">
-              {[item.marca, item.material, item.cor].filter(Boolean).join(" · ") || "Sem detalhes"}
+              {[item.material, item.cor, item.marca].filter(Boolean).join(" · ") || "Sem detalhes"}
               {item.localizacao && ` · ${item.localizacao}`}
               {item.fornecedor_id && fornecedores.acessivel && ` · ${fornecedores.itens.find((f) => f.id === item.fornecedor_id)?.nome ?? "fornecedor"}`}
             </p>
             {verCustos && (
               <p className="truncate text-xs text-zinc-500">
-                Custo/{item.unidade}: cadastro {formatMoeda(item.custo_cadastro ?? 0, 4)} · médio{" "}
+                Custo por {item.unidade}: cadastro {formatMoeda(item.custo_cadastro ?? 0, 4)} · médio{" "}
                 {item.custo_medio > 0 ? formatMoeda(item.custo_medio, 4) : "— (sem entradas)"}
               </p>
             )}
@@ -312,6 +353,11 @@ function LinhaMaterial({
             <p className={`text-sm font-semibold ${baixo ? "text-rose-400" : "text-zinc-100"}`}>
               {formatNumero(item.estoque_atual, 1)} {item.unidade}
             </p>
+            {saldoEmRolos(item.estoque_atual, item.unidade, item.peso_liquido_rolo_g) != null && (
+              <p className="text-[11px] text-zinc-500">
+                ≈ {formatNumero(saldoEmRolos(item.estoque_atual, item.unidade, item.peso_liquido_rolo_g) ?? 0, 1)} rolo(s)
+              </p>
+            )}
             <p className="text-[11px] text-zinc-500">
               mín. {item.estoque_minimo > 0 ? `${formatNumero(item.estoque_minimo, 1)} ${item.unidade}` : "—"}
             </p>

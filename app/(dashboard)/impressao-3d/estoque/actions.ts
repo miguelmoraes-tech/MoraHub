@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { mensagemEscrita, mensagemRpc } from "@/lib/impressao-3d/erros";
 import { SEM_PERMISSAO, SEM_PERMISSAO_CUSTOS, gramasDeRolos, podeVerCustos } from "@/lib/impressao-3d/regras";
 import { parseNumero } from "@/lib/impressao-3d/numeros";
+import { entradaDeRolosComprados } from "@/lib/impressao-3d/cadastro-simples";
 import {
   MaterialSchema,
   MovimentoSchema,
@@ -30,13 +31,50 @@ export async function criarMaterial(_prev: ActionState, formData: FormData): Pro
   if (!acesso) return { error: SEM_PERMISSAO };
 
   const { preco_compra, ...resto } = parsed.data;
-  const supabase = await createClient();
-  const { error } = await supabase.from("p3d_materiais").insert({
-    workspace_id: acesso.workspaceId,
-    ...resto,
-    ...(podeVerCustos(acesso) ? { preco_compra } : {}),
+
+  // "Quantos rolos comprei": dá a entrada de estoque junto com o cadastro. Zero/vazio = só cadastra.
+  const rolos = parseNumero(formData.get("rolos_comprados"));
+  if (rolos !== null && (Number.isNaN(rolos) || rolos < 0)) {
+    return { error: "Quantos rolos comprei: informe um número válido (zero ou maior)." };
+  }
+  const verCustos = podeVerCustos(acesso);
+  const entrada = entradaDeRolosComprados({
+    rolos: rolos ?? 0,
+    pesoRoloG: resto.peso_liquido_rolo_g ?? 0,
+    precoPago: verCustos ? preco_compra : null,
   });
-  if (error) return { error: mensagemEscrita(error, "Não foi possível salvar o material.") };
+  if (entrada && (resto.unidade !== "g" || !((resto.peso_liquido_rolo_g ?? 0) > 0))) {
+    return { error: "Para dar entrada por rolos, informe o peso do rolo (g) e deixe a unidade em gramas." };
+  }
+
+  const supabase = await createClient();
+  const { data: criado, error } = await supabase
+    .from("p3d_materiais")
+    .insert({
+      workspace_id: acesso.workspaceId,
+      ...resto,
+      ...(verCustos ? { preco_compra } : {}),
+    })
+    .select("id")
+    .single();
+  if (error || !criado) return { error: mensagemEscrita(error, "Não foi possível salvar o material.") };
+
+  if (entrada) {
+    const { error: erroEntrada } = await supabase.rpc("p3d_movimentar_estoque", {
+      p_ws: acesso.workspaceId,
+      p_material_id: criado.id,
+      p_tipo: "entrada",
+      p_quantidade: entrada.gramas,
+      ...(entrada.custoTotal !== null ? { p_custo_total: entrada.custoTotal } : {}),
+      p_observacao: `Compra de ${rolos} rolo(s) no cadastro`,
+    });
+    if (erroEntrada) {
+      revalidatePath(ROTA);
+      return {
+        error: `Material cadastrado, mas a entrada de estoque falhou: ${mensagemRpc(erroEntrada, "tente dar a entrada pelo botão Entrada.")}`,
+      };
+    }
+  }
 
   revalidatePath(ROTA);
   return { ok: true };

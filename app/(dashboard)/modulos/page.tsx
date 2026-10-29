@@ -5,6 +5,7 @@ import { HOME_DONO } from "@/lib/modulos/registry";
 import { ModulosBoard, type ModuloCatalogo } from "@/components/modulos/modulos-board";
 import { getConfigEmpresa } from "@/lib/rotulos";
 import { criarRotulos } from "@/lib/rotulos-shared";
+import { FRASE_MODULO } from "@/lib/impressao-3d/frases-modulos";
 
 /** Catálogo de módulos da empresa. Só o dono vê e altera. */
 export default async function ModulosPage() {
@@ -53,6 +54,7 @@ export default async function ModulosPage() {
     nome: rotulos.personalizado(m.chave) ? rotulos.plural(m.chave) : m.nome,
     recomendado: recomendados.has(m.chave),
     descricao: m.descricao,
+    frase: FRASE_MODULO[m.chave] ?? null,
     icone: m.icone,
     categoria: m.categoria,
     ativo: m.ativo,
