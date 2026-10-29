@@ -58,9 +58,11 @@ function SignupForm() {
 
         {step === 1 ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {SIGNUP_OPCOES.map((option) => {
+            {SIGNUP_OPCOES.map((option, i) => {
               const Icon = option.icon;
               const styles = ACCOUNT_TYPE_STYLES[option.tipo];
+              // Com número ímpar de opções, a última ocupa a linha inteira.
+              const ultimaSozinha = i === SIGNUP_OPCOES.length - 1 && SIGNUP_OPCOES.length % 2 === 1;
               return (
                 <button
                   key={option.tipo}
@@ -69,7 +71,9 @@ function SignupForm() {
                     setAccountType(option.tipo);
                     setStep(2);
                   }}
-                  className={`flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-colors ${styles.card}`}
+                  className={`flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-colors ${styles.card} ${
+                    ultimaSozinha ? "sm:col-span-2" : ""
+                  }`}
                 >
                   <span
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-950 ${styles.iconBg}`}

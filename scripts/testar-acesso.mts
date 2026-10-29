@@ -76,6 +76,16 @@ import {
   statusExibido,
   textoDoResultado,
 } from "@/lib/aprovacoes-shared";
+import { SIGNUP_OPCOES, SWITCHER_ACCOUNT_TYPES } from "@/lib/account-types";
+import {
+  ACCOUNT_TYPE_HOME_ROUTE,
+  MODE_HOME_ROUTE,
+  accountTypeHubMode,
+  accountTypeToHubMode,
+} from "@/lib/hub-mode";
+import { garantirTipoAtivo, tipoContaDaMetadata } from "@/lib/perfil";
+import { NOVA_EMPRESA } from "@/lib/empresa";
+import { ACESSO_VENDEDOR_CODIGO } from "@/lib/vendedor-access";
 
 let total = 0;
 function teste(nome: string, fn: () => void | Promise<void>) {
@@ -1457,6 +1467,155 @@ await teste("perfis_tipos_ativos nunca sofre UPDATE/DELETE direto: renomear empr
   assert.ok(lerFonte("lib/actions/empresa.ts").includes('.rpc("renomear_empresa"'));
   const perfil = lerFonte("lib/perfil.ts");
   assert.ok(!/perfis_tipos_ativos"\)\s*\.(update|delete|upsert)/.test(perfil));
+});
+
+// ===========================================================================
+// Conta Pessoal volta ao cadastro: Empreendedor, Funcionário e Pessoal
+// ===========================================================================
+
+console.log("\nCadastro — três tipos de conta: Empreendedor, Funcionário e Pessoal");
+const NO_PESSOAL = ["/pessoal", "/pessoal/contas", "/pessoal/transacoes", "/pessoal/juridico", "/api/pessoal/x"];
+const ROTAS_DE_EMPRESA = [
+  "/clientes", "/leads", "/renegados", "/agenda", "/vendedores", "/financeiro", "/rh", "/marketing",
+  "/juridico", "/contas-pagar", "/vendedor/leads", "/api/export/leads", "/api/export/clientes",
+];
+const SEM_EMPRESA: ResolucaoEmpresa = { status: "sem_empresa" };
+
+await teste("o cadastro oferece exatamente três tipos, nesta ordem: empreendedor, funcionário, pessoal", () => {
+  assert.deepEqual(SIGNUP_OPCOES.map((o) => o.tipo), ["empresarial", "comercial", "pessoal"]);
+  assert.deepEqual(
+    SIGNUP_OPCOES.map((o) => o.label),
+    ["Sou empreendedor", "Sou funcionário", "Conta Pessoal"]
+  );
+  for (const o of SIGNUP_OPCOES) assert.ok(o.description.length > 0 && o.icon);
+});
+await teste("a página de cadastro monta os cartões a partir de SIGNUP_OPCOES e a opção Pessoal grava tipoConta 'pessoal'", () => {
+  const pagina = lerFonte("app/signup/page.tsx");
+  assert.ok(pagina.includes("SIGNUP_OPCOES.map("));
+  assert.ok(pagina.includes('name="tipoConta"'));
+  assert.ok(pagina.includes("setAccountType(option.tipo)"));
+  // Três cartões: o último ocupa a linha inteira (sem buraco no grid).
+  assert.ok(pagina.includes("sm:col-span-2"));
+});
+await teste("o schema do cadastro aceita 'pessoal' e a metadata do cadastro a reconhece", () => {
+  const auth = lerFonte("lib/actions/auth.ts");
+  const schema = auth.slice(auth.indexOf("const SignupSchema"), auth.indexOf("export type SignupState"));
+  assert.ok(/"pessoal"/.test(schema));
+  assert.equal(tipoContaDaMetadata({ user_metadata: { tipo_conta_padrao: "pessoal" } }), "pessoal");
+  assert.equal(tipoContaDaMetadata({ user_metadata: { tipo_conta_padrao: "empresarial" } }), "empresarial");
+  assert.equal(tipoContaDaMetadata({ user_metadata: { tipo_conta_padrao: "comercial" } }), "comercial");
+});
+await teste("signup(Pessoal): cria o perfil, ativa o tipo 'pessoal' (garantirTipoAtivo), grava o modo e vai para /pessoal — sem RPC", () => {
+  const auth = lerFonte("lib/actions/auth.ts");
+  const signup = auth.slice(auth.indexOf("export async function signup"), auth.indexOf("export async function logout"));
+  assert.ok(signup.includes("garantirPerfil("));
+  // Todo tipo diferente de empresarial vira o primeiro tipo ativo; 'pessoal' cai aqui.
+  assert.ok(/if \(tipoConta !== "empresarial"\) \{\s*await garantirTipoAtivo\(supabase, data\.user\.id, tipoConta\);/.test(signup));
+  // Pessoal não passa pelo desvio de funcionário nem pelo de empreendedor nem pelo de colaborador.
+  assert.equal(accountTypeToHubMode("pessoal"), "pessoal");
+  assert.equal(MODE_HOME_ROUTE.pessoal, "/pessoal");
+  assert.ok(signup.includes("const mode = accountTypeToHubMode(tipoConta);"));
+  assert.ok(signup.includes("redirect(MODE_HOME_ROUTE[mode]);"));
+  assert.ok(!signup.includes(".rpc("), "o cadastro não chama RPC");
+});
+await teste("garantirTipoAtivo('pessoal'): insere o tipo na primeira vez e não duplica na segunda", async () => {
+  const inserts: Record<string, unknown>[] = [];
+  const falso = (existente: boolean) =>
+    ({
+      from: (tabela: string) => {
+        assert.equal(tabela, "perfis_tipos_ativos");
+        const cadeia = {
+          select: () => cadeia,
+          eq: () => cadeia,
+          limit: () => cadeia,
+          maybeSingle: async () => ({ data: existente ? { id: "x" } : null, error: null }),
+          insert: async (linha: Record<string, unknown>) => {
+            inserts.push(linha);
+            return { error: null };
+          },
+        };
+        return cadeia;
+      },
+    }) as never;
+  assert.deepEqual(await garantirTipoAtivo(falso(false), "u1", "pessoal"), { ok: true, criado: true });
+  assert.deepEqual(inserts, [{ user_id: "u1", tipo: "pessoal" }]);
+  assert.deepEqual(await garantirTipoAtivo(falso(true), "u1", "pessoal"), { ok: true, criado: false });
+  assert.equal(inserts.length, 1);
+});
+await teste("Empreendedor e Funcionário seguem como estavam no cadastro", () => {
+  const auth = lerFonte("lib/actions/auth.ts");
+  const signup = auth.slice(auth.indexOf("export async function signup"), auth.indexOf("export async function logout"));
+  assert.ok(signup.includes("redirect(ACESSO_VENDEDOR_CODIGO);"));
+  assert.ok(signup.includes("redirect(NOVA_EMPRESA);"));
+  assert.equal(ACESSO_VENDEDOR_CODIGO, "/acesso-vendedor");
+  assert.equal(NOVA_EMPRESA, "/nova-empresa");
+  const empreendedor = SIGNUP_OPCOES.find((o) => o.tipo === "empresarial");
+  const funcionario = SIGNUP_OPCOES.find((o) => o.tipo === "comercial");
+  assert.equal(empreendedor?.label, "Sou empreendedor");
+  assert.equal(funcionario?.label, "Sou funcionário");
+});
+
+console.log("\nConta Pessoal — proxy, seletor de modos e guard de /pessoal");
+await teste("só Pessoal (sem empresa): abre /pessoal/* e /api/pessoal/*", () => {
+  for (const p of NO_PESSOAL) assert.equal(vaiPara(decide(p, SEM_EMPRESA, [])), "seguir", p);
+});
+await teste("só Pessoal (sem empresa): nenhuma rota de empresa abre — todas voltam ao início", () => {
+  for (const p of ROTAS_DE_EMPRESA) assert.equal(vaiPara(decide(p, SEM_EMPRESA, [])), "/dashboard", p);
+});
+await teste("só Pessoal (sem empresa): pode ir a /nova-empresa (virar Empreendedor) e ao início, que oferece 'Criar minha empresa'", () => {
+  assert.equal(vaiPara(decide(NOVA_EMPRESA, SEM_EMPRESA, [])), "seguir");
+  assert.equal(vaiPara(decide("/dashboard", SEM_EMPRESA, [])), "seguir");
+  assert.ok(lerFonte("app/(dashboard)/dashboard/page.tsx").includes("Criar minha empresa"));
+});
+await teste("só Pessoal: as telas de gestão (/modulos, /socios, /configuracoes, /aprovacoes) se recusam sem empresa do painel", () => {
+  for (const [arq, marca] of [
+    ["app/(dashboard)/modulos/page.tsx", "if (!workspaceId) redirect(HOME_DONO);"],
+    ["app/(dashboard)/socios/page.tsx", "if (!empresa) redirect(HOME_DONO);"],
+    ["app/(dashboard)/configuracoes/page.tsx", "if (!empresa) redirect(HOME_DONO);"],
+    ["app/(dashboard)/aprovacoes/page.tsx", "if (!empresa) redirect(HOME_DONO);"],
+  ]) assert.ok(lerFonte(arq).includes(marca), arq);
+});
+await teste("Pessoal que criou empresa: dono abre /pessoal e as rotas da empresa; /nova-empresa segue livre para criar outra", () => {
+  for (const p of NO_PESSOAL) assert.equal(vaiPara(decide(p, ok("dono"))), "seguir", p);
+  assert.equal(vaiPara(decide("/clientes", ok("dono"))), "seguir");
+  assert.equal(vaiPara(decide(NOVA_EMPRESA, ok("dono"))), "seguir");
+});
+await teste("criar a empresa não apaga nem troca os dados pessoais: sem escrita em tabelas /pessoal e sem mexer em 'pessoal' de perfis_tipos_ativos", () => {
+  const empresa = lerFonte("lib/actions/empresa.ts");
+  assert.ok(!/from\(\s*["'`]pessoal_/.test(empresa));
+  assert.ok(!/perfis_tipos_ativos/.test(empresa.replace(/\/\*[\s\S]*?\*\//g, "")));
+  const tipos = lerFonte("lib/actions/tipos-ativos.ts");
+  // Quem não tem empresa passa pela tela de criação; quem tem só ativa o modo.
+  assert.ok(tipos.includes('tipo === "empresarial" && !(await temEmpresaPropria(supabase, user.id))'));
+  assert.ok(tipos.includes("redirect(NOVA_EMPRESA)"));
+});
+await teste("funcionário sem vínculo e vendedor continuam sem /pessoal (nada mudou para eles)", () => {
+  for (const p of NO_PESSOAL) {
+    assert.equal(vaiPara(decide(p, SEM_EMPRESA, [], true)), ACESSO_VENDEDOR_CODIGO, p);
+    assert.equal(vaiPara(decide(p, ok("comercial"))), VENDEDOR_HOME, p);
+  }
+});
+await teste("seletor de modos: lista Empresa e Pessoal; Pessoal leva a /pessoal e liga o modo 'pessoal'", () => {
+  assert.deepEqual([...SWITCHER_ACCOUNT_TYPES], ["empresarial", "pessoal"]);
+  assert.equal(ACCOUNT_TYPE_HOME_ROUTE.pessoal, "/pessoal");
+  assert.equal(accountTypeHubMode("pessoal"), "pessoal");
+  assert.equal(accountTypeHubMode("empresarial"), "business");
+  const seletor = lerFonte("components/mode-switcher.tsx");
+  // Quem ainda não tem o tipo vê "Criar conta pessoal" (ativarTipoConta), não um atalho direto.
+  assert.ok(seletor.includes("ativarTipoConta.bind(null, option.value)"));
+});
+await teste("guard de /pessoal: exige o tipo 'pessoal' ativo; sem ele (ou com falha de leitura) volta ao início", () => {
+  const guard = lerFonte("app/(dashboard)/pessoal/layout.tsx");
+  assert.ok(guard.includes('.from("perfis_tipos_ativos")') && guard.includes('.eq("tipo", "pessoal")'));
+  assert.ok(guard.includes("if (!user) redirect(\"/login\");"));
+  assert.ok(guard.includes("if (error) redirect(HOME_DONO);"));
+  // Só regulariza quem se cadastrou como Pessoal; os demais saem.
+  assert.ok(guard.includes('=== "pessoal"') && guard.includes("if (!cadastradoComoPessoal) redirect(HOME_DONO);"));
+  assert.ok(guard.includes("garantirTipoAtivo(supabase, user.id, \"pessoal\")"));
+  // O guard não escreve direto na tabela (a única escrita continua em lib/perfil.ts).
+  assert.ok(!/\.(insert|update|delete|upsert)\(/.test(guard));
+  // O destino do guard não leva de volta a /pessoal: sem ciclo.
+  assert.equal(vaiPara(decide("/dashboard", SEM_EMPRESA, [])), "seguir");
 });
 
 console.log(`\n${total} testes`);
