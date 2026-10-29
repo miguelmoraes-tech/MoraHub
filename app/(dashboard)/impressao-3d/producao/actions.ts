@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAcessoEdicao } from "@/lib/empresa-ativa";
+import { getAcessoEdicao, getAcessoModulo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { mensagemEscrita, mensagemRpc } from "@/lib/impressao-3d/erros";
-import { SEM_PERMISSAO } from "@/lib/impressao-3d/regras";
+import { SEM_PERMISSAO, podeVerCustos } from "@/lib/impressao-3d/regras";
 import { avisosConclusao, lerConclusao, lerFalha, lerInicio } from "@/lib/impressao-3d/regras-operacao";
 import { formParaObjeto, primeiroErro, textoReq } from "@/lib/impressao-3d/validacao";
 import {
@@ -194,12 +194,14 @@ export async function registrarFalhaProducao(trabalhoId: string, formData: FormD
   if (error) return { error: mensagemRpc(error, "Não foi possível registrar a falha.") };
 
   const r = lerFalha(data);
+  // Custo da falha é do extra "custos" de Qualidade: sem ele a mensagem leva só quantidades.
+  const verCustos = podeVerCustos(await getAcessoModulo("p3d_qualidade"));
   const avisos: string[] = [];
   if (r.estoque_negativo) avisos.push("O estoque do material ficou NEGATIVO após a baixa da falha.");
   avisos.push(
     r.baixou_estoque
-      ? `Material perdido baixado do estoque (custo ${formatMoeda(r.custo_material)}). Custo de máquina estimado: ${formatMoeda(r.custo_maquina_estimado)}.`
-      : `Estoque NÃO foi baixado de novo: o material deste trabalho já saiu do estoque na conclusão. Custo de máquina estimado: ${formatMoeda(r.custo_maquina_estimado)}.`
+      ? `Material perdido baixado do estoque (${formatNumero(d.peso_perdido_g, 1)} g).${verCustos ? ` Custo do material: ${formatMoeda(r.custo_material)}; custo de máquina estimado: ${formatMoeda(r.custo_maquina_estimado)}.` : ""}`
+      : `Estoque NÃO foi baixado de novo: o material deste trabalho já saiu do estoque na conclusão.${verCustos ? ` Custo de máquina estimado: ${formatMoeda(r.custo_maquina_estimado)}.` : ""}`
   );
   if (r.reimpressao_id) avisos.push("Uma reimpressão foi criada na fila de produção.");
   revalidarTudo();

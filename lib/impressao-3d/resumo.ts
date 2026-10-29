@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { abaixoDoMinimo, manutencaoVencida } from "@/lib/impressao-3d/regras";
 import { prazoVencido, urgentesNaFila } from "@/lib/impressao-3d/regras-operacao";
 import type { Prioridade, StatusPedido, StatusProducao } from "@/lib/impressao-3d/tipos-operacao";
-import { todayISO } from "@/lib/vencimentos/dates";
+import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
 
 /**
  * Números do nicho Impressão 3D para a Visão Geral do dono: só contagens (sem
@@ -115,7 +115,7 @@ export async function getResumoImpressao3d(
   const orcamentos = (orcamentosRes.data ?? []) as { status: string }[];
 
   const pedidosAbertos = (pedidosRes.data ?? []) as { status: StatusPedido; prazo_entrega: string | null }[];
-  const hoje = todayISO();
+  const hoje = hojeSaoPaulo();
   const trabalhos = (producaoRes.data ?? []) as { status: StatusProducao; prioridade: Prioridade; qualidade: string }[];
 
   return {

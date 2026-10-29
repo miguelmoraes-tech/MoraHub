@@ -23,7 +23,7 @@ módulos `p3d_*` são **dados** no banco (`nichos`, `nicho_modulos`, `modulos`).
 | `p3d_fornecedores` | `/impressao-3d/fornecedores` (e `/compras/[id]`) | — | — |
 | `p3d_pedidos` | `/impressao-3d/pedidos` (e `/[id]`) | `custos` | — |
 | `p3d_producao` | `/impressao-3d/producao` | — | — |
-| `p3d_qualidade` | `/impressao-3d/qualidade` | — | — |
+| `p3d_qualidade` | `/impressao-3d/qualidade` | `custos` ("Ver custos das falhas") | — |
 | `p3d_expedicao` | `/impressao-3d/expedicao` | — | — |
 
 - Menu, proxy e Visão Geral seguem **registro ∩ `workspace_modulos` ∩ permissão**.
@@ -319,6 +319,13 @@ desperdício, mostra esse valor **separado** ("já contido no consumo") e **não
   exige ≥ 1 defeito e pode "reimprimir" (a RPC dispara a falha e a reimpressão). Reprovado
   trava o pedido em "pronto" até ser resolvido.
 - **Histórico** de inspeções e falhas (somente leitura).
+- **Extra `custos` ("Ver custos das falhas")**: sem ele o servidor **não seleciona**
+  `custo_material` nem `custo_maquina_estimado` das falhas, e a tela mostra só quantidades
+  (g, horas, contagens): nenhuma soma em R$ de custo ou desperdício. A mensagem de "Registrar
+  falha" em Produção também só leva custo para quem tem o extra de Qualidade. O rótulo do extra vem
+  do catálogo (`modulos.permissoes_extras`), e a matriz de sócios o lê de lá.
+- **Quem só tem Qualidade** lê `p3d_producao` (policy própria) e inspeciona a lista de concluídos
+  pendentes normalmente. A escrita continua só por RPC.
 - **Indicadores** (dados reais): **taxa real = trabalhos com ao menos uma falha ÷ (trabalhos
   concluídos + com falha)**, comparada com a **taxa estimada** (`falha_pct` da Precificação,
   só se a pessoa vê Precificação). Falha parcial conta no numerador; reimpressão é um
@@ -357,6 +364,8 @@ Nunca enviados em insert/update direto:
 - `p3d_producao`: `status`, `numero`, `horas_reais`, `peso_real_g`, `qualidade`,
   `iniciado_em`, `concluido_em`, `consumo_registrado_em`, `reimpressao_de`.
 - `p3d_envios`: `status`, `postado_em`, `entregue_em`, `recebedor`.
+- `p3d_falhas`: `custo_material` e `custo_maquina_estimado` só são selecionadas com o extra
+  `custos` de Qualidade (a auditoria falha em select de custo sem `verCustos`).
 - Somente leitura (escrita só por RPC): `p3d_pedido_pagamentos`, `p3d_pedido_historico`,
   `p3d_inspecoes`, `p3d_falhas`.
 
@@ -368,23 +377,19 @@ Os textos das RPCs e das regras do banco (`raise exception`) são mostrados como
 
 ## Limitações da Etapa B
 
-- **Qualidade depende de Produção para listar trabalhos**: `p3d_inspecoes` e `p3d_falhas`
-  são lidas por quem tem Produção **ou** Qualidade, mas a lista de trabalhos concluídos
-  vem de `p3d_producao` (módulo Produção). Quem só tem Qualidade vê histórico e falhas, e a
-  tela avisa que precisa de leitura em Produção para inspecionar e para os indicadores.
 - Listas auxiliares (fornecedores, produtos, pedidos, impressoras, materiais, clientes) só
   carregam com acesso ao módulo dono da lista; senão aparecem vazias e a tela avisa.
 - Trabalhos de pedido só nascem por "Gerar produção"; a tela não vincula trabalho avulso a
   pedido à mão.
 - Listas de Produção e Qualidade carregam os últimos 2.000 registros (a tela avisa quando
   corta); o histórico de preços, os últimos 3.000.
-- Custos de falha (`custo_material`, `custo_maquina_estimado`) aparecem para quem vê
-  Qualidade: o contrato não define o extra `custos` para esse módulo. O custo de máquina é
-  **estimado**.
+- O custo de máquina da falha é **estimado**; custos de falha só aparecem com o extra `custos`
+  de Qualidade.
 - Registrar falha pela tela só existe em Produção (trabalho imprimindo ou concluído); em
   Qualidade a falha nasce da inspeção reprovada.
-- Data de hoje: o servidor usa UTC (`todayISO`), como o resto do app; perto da meia-noite
-  de Brasília "hoje" pode adiantar um dia nos alertas de prazo.
+- "Hoje" nos alertas de prazo (pedidos vencidos, trabalhos) e nos padrões de data do nicho é a
+  data em **America/Sao_Paulo** (`hojeSaoPaulo`, `lib/impressao-3d/datas.ts`), não a de UTC. O
+  resto do app (Financeiro etc.) segue usando UTC.
 - Sem integração com transportadoras/Correios e sem consulta automática de rastreio.
 
 ## Testes (Etapa B)

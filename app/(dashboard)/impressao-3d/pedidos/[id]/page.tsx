@@ -10,7 +10,7 @@ import {
   COLUNAS_PEDIDO, COLUNAS_PEDIDO_HISTORICO, COLUNAS_PEDIDO_ITEM, COLUNAS_PEDIDO_PAGAMENTO,
   type Pedido, type PedidoHistorico, type PedidoItem, type PedidoPagamento, type Trabalho,
 } from "@/lib/impressao-3d/tipos-operacao";
-import { todayISO } from "@/lib/vencimentos/dates";
+import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
 
 export default async function PedidoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -76,7 +76,7 @@ export default async function PedidoDetalhePage({ params }: { params: Promise<{ 
       verCustos={verCustos}
       podeGerarProducao={!!podeProducao}
       podeLancarFinanceiro={!!podeFinanceiro}
-      hoje={todayISO()}
+      hoje={hojeSaoPaulo()}
     />
   );
 }

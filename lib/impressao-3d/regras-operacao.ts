@@ -367,13 +367,13 @@ export function resumirDesperdicio(
   for (const f of falhas) {
     if (f.baixou_estoque) {
       r.adicionalG += f.peso_perdido_g;
-      r.adicionalCusto += f.custo_material;
+      r.adicionalCusto += f.custo_material ?? 0;
     } else {
       r.jaContidoG += f.peso_perdido_g;
-      r.jaContidoCusto += f.custo_material;
+      r.jaContidoCusto += f.custo_material ?? 0;
     }
     r.horasPerdidas += f.horas_perdidas;
-    r.custoMaquina += f.custo_maquina_estimado;
+    r.custoMaquina += f.custo_maquina_estimado ?? 0;
   }
   return r;
 }

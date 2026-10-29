@@ -6,7 +6,7 @@ import { podeVerCustos } from "@/lib/impressao-3d/regras";
 import { getOpcoesClientes } from "@/lib/impressao-3d/opcoes";
 import { PedidosBoard } from "@/components/impressao-3d/pedidos-board";
 import { COLUNAS_PEDIDO, type Pedido } from "@/lib/impressao-3d/tipos-operacao";
-import { todayISO } from "@/lib/vencimentos/dates";
+import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
 
 export default async function PedidosPage() {
   const acesso = await getAcessoModulo("p3d_pedidos");
@@ -35,7 +35,7 @@ export default async function PedidosPage() {
       clientes={clientes}
       podeEditar={acesso.nivel === "edicao"}
       verCustos={verCustos}
-      hoje={todayISO()}
+      hoje={hojeSaoPaulo()}
     />
   );
 }

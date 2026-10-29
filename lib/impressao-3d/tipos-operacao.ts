@@ -302,8 +302,9 @@ export interface Falha {
   descricao: string | null;
   peso_perdido_g: number;
   horas_perdidas: number;
-  custo_material: number;
-  custo_maquina_estimado: number;
+  /** Só chega com o extra "custos" de Qualidade (o servidor não seleciona sem ele). */
+  custo_material?: number;
+  custo_maquina_estimado?: number;
   baixou_estoque: boolean;
   impressora_id: string | null;
   material_id: string | null;
@@ -360,7 +361,9 @@ export const COLUNAS_PEDIDO_HISTORICO = "id, pedido_id, de, para, motivo, create
 export const COLUNAS_TRABALHO =
   "id, numero, descricao, quantidade, status, qualidade, prioridade, prazo, pedido_id, pedido_item_id, produto_id, variacao_id, arquivo_id, impressora_id, material_id, horas_estimadas, peso_estimado_g, horas_reais, peso_real_g, iniciado_em, concluido_em, consumo_registrado_em, reimpressao_de, observacoes, created_at";
 export const COLUNAS_INSPECAO = "id, producao_id, resultado, defeitos, observacoes, created_at";
+/** Falhas SEM custo: é o que sai do servidor para quem não tem o extra "custos" de Qualidade. */
 export const COLUNAS_FALHA =
-  "id, producao_id, tipo_defeito, descricao, peso_perdido_g, horas_perdidas, custo_material, custo_maquina_estimado, baixou_estoque, impressora_id, material_id, produto_id, reimpressao_producao_id, created_at";
+  "id, producao_id, tipo_defeito, descricao, peso_perdido_g, horas_perdidas, baixou_estoque, impressora_id, material_id, produto_id, reimpressao_producao_id, created_at";
+export const COLUNAS_FALHA_CUSTOS = `${COLUNAS_FALHA}, custo_material, custo_maquina_estimado`;
 export const COLUNAS_ENVIO =
   "id, pedido_id, status, transportadora, servico, codigo_rastreio, url_rastreio, custo_frete, peso_kg, volumes, previsao_entrega, postado_em, entregue_em, recebedor, observacoes, created_at";

@@ -5,7 +5,7 @@ import { HOME_DONO } from "@/lib/modulos/registry";
 import { getOpcoesMateriais, getOpcoesPedidos, getOpcoesProdutos } from "@/lib/impressao-3d/opcoes";
 import { ProducaoBoard, type ImpressoraProducao } from "@/components/impressao-3d/producao-board";
 import { COLUNAS_TRABALHO, type Trabalho } from "@/lib/impressao-3d/tipos-operacao";
-import { todayISO } from "@/lib/vencimentos/dates";
+import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
 
 const LIMITE_TRABALHOS = 2000;
 
@@ -44,7 +44,7 @@ export default async function ProducaoPage() {
       produtos={produtos}
       pedidos={pedidos}
       podeEditar={acesso.nivel === "edicao"}
-      hoje={todayISO()}
+      hoje={hojeSaoPaulo()}
     />
   );
 }

@@ -134,26 +134,19 @@ function Indicadores({
   materiais,
   produtos,
   truncado,
+  verCustos,
 }: {
-  trabalhos: Trabalho[] | null;
+  trabalhos: Trabalho[];
   falhas: Falha[];
   taxaEstimadaPct: number | null | undefined;
   impressoras: Opcoes<OpcaoImpressora>;
   materiais: Opcoes<OpcaoMaterial>;
   produtos: Opcoes<OpcaoProduto>;
   truncado: boolean;
+  verCustos: boolean;
 }) {
   const desperdicio = useMemo(() => resumirDesperdicio(falhas), [falhas]);
   const porDefeito = useMemo(() => agruparPorDefeito(falhas), [falhas]);
-
-  if (trabalhos === null) {
-    return (
-      <Aviso tom="alerta">
-        Os indicadores comparam falhas com trabalhos concluídos e com falha, que vêm do módulo Produção. Sem acesso a Produção só é
-        possível ver as falhas e as inspeções.
-      </Aviso>
-    );
-  }
 
   const concluidos = trabalhos.filter((t) => t.status === "concluida").length;
   const falhos = trabalhos.filter((t) => t.status === "falhou").length;
@@ -225,21 +218,21 @@ function Indicadores({
             <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
               <div>
                 <dt className="text-xs text-zinc-500">Material perdido além do consumo (baixou estoque)</dt>
-                <dd className="font-semibold text-zinc-100">{formatGramas(desperdicio.adicionalG)} · {formatMoeda(desperdicio.adicionalCusto)}</dd>
+                <dd className="font-semibold text-zinc-100">{formatGramas(desperdicio.adicionalG)}{verCustos && ` · ${formatMoeda(desperdicio.adicionalCusto)}`}</dd>
               </div>
               <div>
                 <dt className="text-xs text-zinc-500">Falhas após a conclusão (já contido no consumo)</dt>
-                <dd className="font-semibold text-zinc-100">{formatGramas(desperdicio.jaContidoG)} · {formatMoeda(desperdicio.jaContidoCusto)}</dd>
+                <dd className="font-semibold text-zinc-100">{formatGramas(desperdicio.jaContidoG)}{verCustos && ` · ${formatMoeda(desperdicio.jaContidoCusto)}`}</dd>
               </div>
               <div>
                 <dt className="text-xs text-zinc-500">Tempo de máquina perdido</dt>
-                <dd className="font-semibold text-zinc-100">{formatHoras(desperdicio.horasPerdidas)} · {formatMoeda(desperdicio.custoMaquina)} <span className="text-[10px] text-amber-500">estimado</span></dd>
+                <dd className="font-semibold text-zinc-100">{formatHoras(desperdicio.horasPerdidas)}{verCustos && <> · {formatMoeda(desperdicio.custoMaquina)} <span className="text-[10px] text-amber-500">estimado</span></>}</dd>
               </div>
             </dl>
             <Aviso>
-              O custo de material de uma falha registrada <strong>depois da conclusão</strong> (estoque não baixado de novo) já está
+              O material de uma falha registrada <strong>depois da conclusão</strong> (estoque não baixado de novo) já está
               dentro do consumo do trabalho concluído. Por isso ele aparece separado e <strong>não soma</strong> ao desperdício
-              adicional: somar os dois contaria o mesmo material duas vezes.
+              adicional: somar os dois contaria o mesmo material duas vezes.{!verCustos && " Valores em R$ ficam ocultos sem a permissão \"Ver custos das falhas\"."}
             </Aviso>
           </div>
         )}
@@ -283,11 +276,11 @@ export function QualidadeBoard({
   produtos,
   podeEditar,
   truncado,
+  verCustos,
 }: {
   inspecoes: Inspecao[];
   falhas: Falha[];
-  /** null = sem acesso ao módulo Produção. */
-  trabalhos: Trabalho[] | null;
+  trabalhos: Trabalho[];
   /** undefined = sem acesso a Precificação; null = sem configuração. */
   taxaEstimadaPct: number | null | undefined;
   impressoras: Opcoes<OpcaoImpressora>;
@@ -295,6 +288,8 @@ export function QualidadeBoard({
   produtos: Opcoes<OpcaoProduto>;
   podeEditar: boolean;
   truncado: boolean;
+  /** Extra "custos" de Qualidade ("Ver custos das falhas"). */
+  verCustos: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -317,15 +312,15 @@ export function QualidadeBoard({
     });
   };
 
-  const pendentes = (trabalhos ?? []).filter((t) => t.status === "concluida" && t.qualidade === "pendente");
-  const trabalhoPorId = useMemo(() => new Map((trabalhos ?? []).map((t) => [t.id, t])), [trabalhos]);
+  const pendentes = trabalhos.filter((t) => t.status === "concluida" && t.qualidade === "pendente");
+  const trabalhoPorId = useMemo(() => new Map(trabalhos.map((t) => [t.id, t])), [trabalhos]);
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       <div className="mb-6">
         <h1 className="text-lg font-semibold text-zinc-100">Qualidade</h1>
         <p className="text-sm text-zinc-500">
-          {trabalhos === null ? "Sem acesso a Produção" : `${pendentes.length} aguardando inspeção`} · {falhas.length} falha(s) registrada(s)
+          {pendentes.length} aguardando inspeção · {falhas.length} falha(s) registrada(s)
         </p>
       </div>
       {!podeEditar && (
@@ -357,11 +352,7 @@ export function QualidadeBoard({
 
       {aba === "pendentes" && (
         <Cartao titulo="Trabalhos concluídos aguardando inspeção" icone={<ShieldCheck className="h-4 w-4" />}>
-          {trabalhos === null ? (
-            <Aviso tom="alerta">
-              Listar os trabalhos concluídos exige acesso ao módulo Produção. Peça a permissão de leitura em Produção para inspecionar.
-            </Aviso>
-          ) : pendentes.length === 0 ? (
+          {pendentes.length === 0 ? (
             <Vazio>Nenhum trabalho concluído aguardando inspeção.</Vazio>
           ) : (
             <div className="space-y-2">
@@ -433,7 +424,7 @@ export function QualidadeBoard({
                         <StatusChip tone={f.baixou_estoque ? "amber" : "zinc"}>{f.baixou_estoque ? "Baixou estoque" : "Estoque não baixado de novo"}</StatusChip>
                       </p>
                       <p className="text-xs text-zinc-500">
-                        {formatDataHora(f.created_at)} · {formatGramas(f.peso_perdido_g)} · {formatHoras(f.horas_perdidas)} · material {formatMoeda(f.custo_material)} · máquina {formatMoeda(f.custo_maquina_estimado)} (estimado)
+                        {formatDataHora(f.created_at)} · {formatGramas(f.peso_perdido_g)} · {formatHoras(f.horas_perdidas)} {verCustos && ` · material ${formatMoeda(f.custo_material ?? 0)} · máquina ${formatMoeda(f.custo_maquina_estimado ?? 0)} (estimado)`}
                         {f.descricao && ` · ${f.descricao}`}
                       </p>
                     </div>
@@ -454,6 +445,7 @@ export function QualidadeBoard({
           materiais={materiais}
           produtos={produtos}
           truncado={truncado}
+          verCustos={verCustos}
         />
       )}
     </div>

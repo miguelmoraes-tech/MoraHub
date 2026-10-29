@@ -123,13 +123,14 @@ import {
   urgentesNaFila, validarOpcoesRecebimento,
 } from "@/lib/impressao-3d/regras-operacao";
 import {
-  COLUNAS_PEDIDO, COLUNAS_PEDIDO_ITEM, TIPOS_DEFEITO, type Prioridade,
+  COLUNAS_FALHA, COLUNAS_FALHA_CUSTOS, COLUNAS_PEDIDO, COLUNAS_PEDIDO_ITEM, TIPOS_DEFEITO, type Prioridade,
 } from "@/lib/impressao-3d/tipos-operacao";
 import {
   CompraItemSchema, CompraSchema, ConclusaoSchema, EnvioSchema, FalhaSchema, FornecedorSchema, InspecaoSchema,
   PagamentoSchema, PedidoItemSchema, PedidoLimitadoSchema, PedidoSchema, RecebimentoSchema, TrabalhoSchema,
 } from "@/lib/impressao-3d/validacao-operacao";
 import { RESUMO_P3D_VAZIO } from "@/lib/impressao-3d/resumo";
+import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
 
 let total = 0;
 function teste(nome: string, fn: () => void | Promise<void>) {
@@ -2602,6 +2603,84 @@ await teste("o snapshot das empresas atuais continua sem nenhuma rota do nicho (
   }
   assert.ok(Object.keys(dourado.rotaPermitida).every((p) => !p.startsWith("/impressao-3d")));
   assert.ok(menuDoDono(ATUAIS).every((g) => g.titulo !== "Impressão 3D"));
+});
+
+console.log("\nImpressão 3D (Etapa B, ajuste) — extra custos de Qualidade, leitura de Produção e data em São Paulo");
+await teste("hoje é a data de America/Sao_Paulo, não a de UTC (21h–24h de Brasília ainda são o dia anterior em UTC)", () => {
+  assert.equal(hojeSaoPaulo(new Date("2026-03-10T02:30:00Z")), "2026-03-09", "23h30 de Brasília");
+  assert.equal(hojeSaoPaulo(new Date("2026-03-10T03:00:00Z")), "2026-03-10", "meia-noite de Brasília");
+  assert.equal(hojeSaoPaulo(new Date("2026-03-10T14:00:00Z")), "2026-03-10");
+  assert.equal(hojeSaoPaulo(new Date("2026-12-31T23:59:00Z")), "2026-12-31");
+  assert.equal(hojeSaoPaulo(new Date("2027-01-01T02:59:00Z")), "2026-12-31", "virada do ano");
+  assert.match(hojeSaoPaulo(), /^\d{4}-\d{2}-\d{2}$/);
+  // O alerta usa a data de São Paulo: às 23h30 de 09/03 o prazo de 09/03 ainda não venceu.
+  assert.equal(prazoVencido({ status: "confirmado", prazo_entrega: "2026-03-09" }, hojeSaoPaulo(new Date("2026-03-10T02:30:00Z"))), false);
+  assert.equal(prazoVencido({ status: "confirmado", prazo_entrega: "2026-03-09" }, hojeSaoPaulo(new Date("2026-03-10T03:00:00Z"))), true);
+});
+await teste("nenhum alerta de prazo do nicho usa a data em UTC (todayISO)", () => {
+  for (const arq of [
+    "lib/impressao-3d/resumo.ts",
+    "app/(dashboard)/impressao-3d/pedidos/page.tsx",
+    "app/(dashboard)/impressao-3d/pedidos/[id]/page.tsx",
+    "app/(dashboard)/impressao-3d/producao/page.tsx",
+  ]) {
+    const t = lerFonte(arq);
+    assert.ok(!t.includes("todayISO"), `${arq} ainda usa todayISO`);
+    assert.ok(t.includes("hojeSaoPaulo"), arq);
+  }
+});
+await teste("extra 'custos' de Qualidade: o servidor só seleciona custo_material/custo_maquina_estimado das falhas com o extra", () => {
+  assert.ok(!COLUNAS_FALHA.includes("custo_material") && !COLUNAS_FALHA.includes("custo_maquina_estimado"), "coluna base sem custo");
+  assert.ok(COLUNAS_FALHA_CUSTOS.includes("custo_material") && COLUNAS_FALHA_CUSTOS.includes("custo_maquina_estimado"));
+  const pagina = lerFonte("app/(dashboard)/impressao-3d/qualidade/page.tsx");
+  assert.ok(pagina.includes("podeVerCustos(acesso)") && pagina.includes("verCustos ? COLUNAS_FALHA_CUSTOS : COLUNAS_FALHA"));
+  assert.ok(!/select\("[^"]*custo_/.test(pagina), "nenhum select literal com custo");
+  const tela = lerFonte("components/impressao-3d/qualidade-board.tsx");
+  // Todo valor em R$ da tela está atrás de verCustos.
+  const semGuarda = tela.split("\n").filter((l) => /formatMoeda\(/.test(l) && !/verCustos/.test(l));
+  assert.deepEqual(semGuarda, [], "formatMoeda fora de verCustos na tela de Qualidade");
+  assert.ok(tela.includes("verCustos &&") && tela.includes("Ver custos das falhas"));
+  // Quem tem o extra, e o fundador, veem; sem o extra, não.
+  const comExtra = guard("p3d_qualidade", "socio", "leitura", { habilitados: P3D, permiteMembros: [...CATALOGO, ...P3D], permissoes: [perm("p3d_qualidade", "leitura", ["custos"])] });
+  const semExtra = guard("p3d_qualidade", "socio", "leitura", { habilitados: P3D, permiteMembros: [...CATALOGO, ...P3D], permissoes: [perm("p3d_qualidade", "leitura")] });
+  assert.equal(podeVerCustos(comExtra), true);
+  assert.equal(podeVerCustos(semExtra), false);
+  assert.equal(podeVerCustos(guard("p3d_qualidade", "dono", "leitura", { habilitados: P3D })), true);
+});
+await teste("o custo da falha também não vaza pela mensagem de Produção sem o extra de Qualidade", () => {
+  const acoes = lerFonte("app/(dashboard)/impressao-3d/producao/actions.ts");
+  assert.ok(acoes.includes('podeVerCustos(await getAcessoModulo("p3d_qualidade"))'));
+  const mensagens = acoes.slice(acoes.indexOf("const verCustos"));
+  for (const linha of mensagens.split("\n").filter((l) => /custo_material|custo_maquina_estimado/.test(l)))
+    assert.ok(/verCustos/.test(linha), `custo fora de verCustos: ${linha.trim().slice(0, 60)}`);
+});
+await teste("resumo de desperdício sem as colunas de custo não quebra (soma 0) e continua separando o que já está no consumo", () => {
+  const r = resumirDesperdicio([
+    { baixou_estoque: true, peso_perdido_g: 10, horas_perdidas: 1 },
+    { baixou_estoque: false, peso_perdido_g: 5, horas_perdidas: 0.5 },
+  ]);
+  assert.deepEqual([r.adicionalG, r.jaContidoG, r.horasPerdidas, r.adicionalCusto, r.custoMaquina], [10, 5, 1.5, 0, 0]);
+});
+await teste("matriz de sócios: o extra 'Ver custos das falhas' vem do catálogo (modulos.permissoes_extras), sem lista fixa no código", () => {
+  assert.deepEqual(
+    extrasDoCatalogo([{ nome: "Ver custos das falhas", chave: "custos" }]),
+    [{ chave: "custos", rotulo: "Ver custos das falhas" }]
+  );
+  const socios = lerFonte("lib/socios-shared.ts");
+  assert.ok(!socios.includes("Ver custos das falhas"), "o rótulo vem do banco");
+  assert.ok(MODULO_ROTULO.p3d_qualidade);
+});
+await teste("Qualidade lê os trabalhos sem exigir acesso ao módulo Produção (policy própria); não há mais aviso de 'precisa de Produção'", () => {
+  const pagina = lerFonte("app/(dashboard)/impressao-3d/qualidade/page.tsx");
+  assert.ok(pagina.includes('.from("p3d_producao")') && !pagina.includes('getAcessoModulo("p3d_producao")'), "sem portão de Produção");
+  assert.ok(!pagina.includes("acessoProducao"));
+  const tela = lerFonte("components/impressao-3d/qualidade-board.tsx");
+  assert.ok(!/exige acesso ao módulo Produção|leitura em Produção|Sem acesso a Produção/.test(tela), "aviso removido");
+  assert.ok(!tela.includes("trabalhos === null") && !tela.includes("Trabalho[] | null"), "trabalhos nunca é null");
+  assert.ok(pagina.includes('["concluida", "falhou"]'));
+  // Escrita continua só por RPC: a tela de Qualidade não grava em p3d_producao.
+  const acoes = lerFonte("app/(dashboard)/impressao-3d/qualidade/actions.ts");
+  assert.ok(!/\.from\("p3d_producao"\)/.test(acoes) && acoes.includes('.rpc("p3d_registrar_inspecao"'));
 });
 
 console.log(`\n${total} testes`);

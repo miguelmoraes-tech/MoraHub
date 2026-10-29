@@ -22,6 +22,7 @@ import {
   depreciacaoPorHora, desgastePorHora, horasParaManutencao, manutencaoVencida, pecaVencida,
 } from "@/lib/impressao-3d/regras";
 import { formatHoras, formatMoeda, formatNumero } from "@/lib/impressao-3d/numeros";
+import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
 import { formatDate } from "@/lib/format";
 
 const TOM_STATUS: Record<StatusImpressora, ChipTone> = {
@@ -260,7 +261,7 @@ function FormManutencao({ impressora, aoFechar }: { impressora: Impressora; aoFe
             <option key={v} value={v}>{l}</option>
           ))}
         </Seletor>
-        <Entrada rotulo="Data" name="data" type="date" defaultValue={new Date().toISOString().slice(0, 10)} />
+        <Entrada rotulo="Data" name="data" type="date" defaultValue={hojeSaoPaulo()} />
         <Numero rotulo="Custo (R$)" name="custo" defaultValue="" />
         <Numero
           rotulo="Horas de uso no momento"

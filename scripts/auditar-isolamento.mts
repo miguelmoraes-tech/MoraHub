@@ -493,3 +493,51 @@ console.log(`\nImpressão 3D: chamadas .rpc("p3d_...") verificadas: ${rpcsVerifi
 console.log(`RPC sem guarda, interna ou em componente: ${rpcSemGuarda.length}`);
 for (const s of rpcSemGuarda) console.log("  ! " + s);
 if (rpcSemGuarda.length) process.exitCode = 1;
+
+// --- Nicho Impressão 3D: extra "custos" de Qualidade ----------------------------
+// custo_material e custo_maquina_estimado das falhas só podem ser selecionados atrás de
+// podeVerCustos/verCustos (o servidor não envia sem o extra). A constante base não pode ter custo,
+// e quem usa COLUNAS_FALHA_CUSTOS precisa conferir verCustos no mesmo arquivo.
+const custoFalhaSemExtra: string[] = [];
+const tiposOp = readFileSync(join(raiz, "lib/impressao-3d/tipos-operacao.ts"), "utf8");
+const baseFalha = /export const COLUNAS_FALHA =\s*"([^"]*)"/.exec(tiposOp)?.[1] ?? "";
+if (!baseFalha) custoFalhaSemExtra.push("lib/impressao-3d/tipos-operacao.ts: COLUNAS_FALHA não encontrada");
+if (/custo_material|custo_maquina_estimado/.test(baseFalha)) {
+  custoFalhaSemExtra.push("COLUNAS_FALHA (base) inclui coluna de custo");
+}
+for (const pasta of ["app", "components", "lib"]) {
+  for (const arq of arquivos(join(raiz, pasta))) {
+    const rel = relative(raiz, arq).replace(/\\/g, "/");
+    if (rel === "lib/impressao-3d/tipos-operacao.ts") continue;
+    const texto = readFileSync(arq, "utf8").replace(/\r\n/g, "\n");
+    const re = /\.from\(\s*["'`]p3d_falhas["'`]\s*\)\s*\.select\(/g;
+    for (let m = re.exec(texto); m; m = re.exec(texto)) {
+      const linha = texto.slice(0, m.index).split("\n").length;
+      const args = argumentos(texto, m.index + m[0].length);
+      if (/custo_material|custo_maquina_estimado/.test(args)) {
+        custoFalhaSemExtra.push(`${rel}:${linha} p3d_falhas seleciona coluna de custo direto (use COLUNAS_FALHA_CUSTOS atrás de verCustos)`);
+      }
+      if (/COLUNAS_FALHA_CUSTOS/.test(args) && !/verCustos\s*\?/.test(args)) {
+        custoFalhaSemExtra.push(`${rel}:${linha} COLUNAS_FALHA_CUSTOS sem condicionar a verCustos`);
+      }
+    }
+    if (/COLUNAS_FALHA_CUSTOS/.test(texto) && !/podeVerCustos\(/.test(texto)) {
+      custoFalhaSemExtra.push(`${rel} usa COLUNAS_FALHA_CUSTOS sem podeVerCustos`);
+    }
+  }
+}
+console.log(`\nImpressão 3D: custo de falha fora do extra "custos" de Qualidade: ${custoFalhaSemExtra.length}`);
+for (const s of custoFalhaSemExtra) console.log("  ! " + s);
+if (custoFalhaSemExtra.length) process.exitCode = 1;
+
+// --- Nicho Impressão 3D: data dos alertas em America/Sao_Paulo --------------------
+const dataEmUtc: string[] = [];
+for (const pasta of ["app/(dashboard)/impressao-3d", "components/impressao-3d", "lib/impressao-3d"]) {
+  for (const arq of arquivos(join(raiz, pasta))) {
+    const rel = relative(raiz, arq).replace(/\\/g, "/");
+    if (/todayISO|toISOString\(\)\.slice\(0,\s*10\)/.test(readFileSync(arq, "utf8"))) dataEmUtc.push(`${rel} calcula "hoje" em UTC (use hojeSaoPaulo)`);
+  }
+}
+console.log(`\nImpressão 3D: "hoje" calculado em UTC: ${dataEmUtc.length}`);
+for (const s of dataEmUtc) console.log("  ! " + s);
+if (dataEmUtc.length) process.exitCode = 1;
