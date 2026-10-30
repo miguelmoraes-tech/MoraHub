@@ -875,3 +875,27 @@ Para ir mantendo o estoque em dia sem precisar entender de entrada, ajuste ou pe
   tem Automações ou Dashboard); o sino também reavalia sozinho ao abrir.
 - **Código**: contas e textos em `lib/impressao-3d/ajuste-estoque.ts` (puro, testado); auditoria em
   `lib/impressao-3d/auditoria-estoque.ts`, que falha se qualquer tela ou action escrever esses campos direto.
+
+## Estoque → Material: preço pago, kits e conferência com saída
+
+Ajustes vindos do uso real:
+
+- **Conferir estoque** abre em tela cheia com **Confirmar** e **Cancelar** fixos no topo e no rodapé (no celular, respeitando a
+  área segura). Confirmar salva só as linhas alteradas (um ajuste por linha), marca as partes de kit que acabaram, mostra
+  "N itens atualizados" e volta à lista. Cancelar ou **Esc** volta sem salvar; com alterações pendentes pede confirmação
+  para descartar.
+- **O destaque é o preço pago**, não o peso: cada item mostra **"Pago R$ X"** (soma de todas as entradas, da visão
+  `p3d_materiais_resumo`) em negrito e grande, e nos filamentos **"R$ Y/kg"** (custo médio por g × 1000; sem custo médio, o do
+  cadastro). O saldo vira texto curto e cinza ("1 kg em estoque", "9 de 12 disponíveis"). Sem o extra **custos**, não há
+  preços e o saldo volta a ser o texto principal. A lista é ordenada por nome; quem vê custos pode ordenar por **valor pago**.
+  Kits e conjuntos não mostram "custo por unidade".
+- **Kits/conjuntos**: no cadastro, "É um kit/conjunto" + "Quantas peças/cores tem no kit" grava `kit = true`, `kit_itens` e a
+  unidade `un` (o servidor força); o preço pago é o valor do kit e o saldo é o número de kits. **Cores do kit**
+  (`p3d_material_partes`): cor (seletor + nome), **Acabou** (com confirmação leve) e **Desfazer**, data em que acabou (preenchida
+  pelo banco) e observação, **Adicionar cor**. Quando todas acabam, a tela **sugere** "Marcar kit como zerado" (ajuste de -1
+  com a observação "Kit acabou"); nunca faz sozinha. Na conferência, os kits mostram as cores com "Acabou".
+- **Investimento no topo da aba Material** (só com o extra **custos**): **Total investido** (grande), **Valor em estoque hoje**
+  (saldo × custo médio dos itens ativos) e **Gasto por pessoa** (clique abre materiais, equipamentos e total). Vêm de
+  `p3d_resumo_investimento`; a tela só mostra. Erro do banco aparece como veio.
+- **Auditoria**: falha se uma tela somar `total_investido`/`valor_em_estoque` ou calcular saldo × custo médio
+  (`lib/impressao-3d/auditoria-estoque.ts`), além da regra de não escrever `estoque_atual`/`custo_medio` direto.

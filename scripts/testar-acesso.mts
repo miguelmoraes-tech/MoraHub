@@ -198,7 +198,12 @@ import {
   MOTIVOS_AJUSTE, ajustesDaConferencia, diferencaContagem, lerContagem, motivoValido, observacaoConferencia,
   observacaoDoAjuste, precisaAjustar, saldoParaExibir, textoDiferenca,
 } from "@/lib/impressao-3d/ajuste-estoque";
-import { achadosEstoqueDireto } from "@/lib/impressao-3d/auditoria-estoque";
+import { achadosEstoqueDireto, achadosTotaisNoCliente } from "@/lib/impressao-3d/auditoria-estoque";
+import {
+  AJUSTE_KIT_ACABOU, OBSERVACAO_KIT_ACABOU, contagemPartes, criterioOrdemValido, lerResumoInvestimento, lerResumosMateriais,
+  ordenarMateriais, partesAlteradas, resumoConferencia, saldoCurto, saldoCurtoKit, textoAcabouEm, textoDisponiveis, textoPago,
+  textoPrecoKg, todasAcabaram, validarKit,
+} from "@/lib/impressao-3d/estoque-uso";
 import { ARQUIVOS_CALCULADORA_RAPIDA, precoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
 import { FRASE_MODULO } from "@/lib/impressao-3d/frases-modulos";
 
@@ -1767,7 +1772,7 @@ await teste("o registro cobre as 10 chaves (5 da Etapa A + 5 da Etapa B), cada u
   }
   const tabelas = MODULOS.filter((m) => P3D.includes(m.chave)).flatMap((m) => m.tabelas).sort();
   assert.deepEqual(tabelas, [
-    "p3d_config_precificacao", "p3d_impressoras", "p3d_manutencoes", "p3d_materiais",
+    "p3d_config_precificacao", "p3d_impressoras", "p3d_manutencoes", "p3d_materiais", "p3d_material_partes",
     "p3d_movimentos_estoque", "p3d_orcamento_itens", "p3d_orcamentos", "p3d_pecas_desgaste",
     "p3d_produto_arquivos", "p3d_produto_variacoes", "p3d_produtos",
     "p3d_compra_itens", "p3d_compras", "p3d_envios", "p3d_falhas", "p3d_fornecedores", "p3d_inspecoes",
@@ -3822,7 +3827,7 @@ await teste("cadastro de filamento: valor do kg → preco_compra + rolo de 1000 
   for (const campo of ["marca", "diametro_mm", "estoque_minimo", "fornecedor_id", "localizacao", "unidade"]) {
     assert.ok(tela.indexOf(`name="${campo}"`) > tela.indexOf("Mais opções"), `${campo} em "Mais opções"`);
   }
-  assert.ok(tela.includes("Custo por kg") && tela.includes("descreverSaldo("), "lista: saldo em kg/g e custo por kg");
+  assert.ok(tela.includes("textoPrecoKg(") && tela.includes("saldoCurto("), "lista: preço pago e R$/kg em destaque, saldo em kg/g secundário");
 });
 await teste("cadastro de impressora: watts na tela, kW no banco; custo/hora ao vivo; resto em Mais opções", () => {
   const tela = lerFonte("components/impressao-3d/impressoras-board.tsx");
@@ -4743,7 +4748,7 @@ await teste("telas: ajuste só por p3d_movimentar_estoque com a diferença; zero
 });
 await teste("telas: saldo em destaque (g e kg), Atualizar quantidade, Editar em 1 clique, Conferir estoque, histórico com quem fez", () => {
   const b = lerFonte("components/impressao-3d/estoque-board.tsx");
-  assert.ok(b.includes("Tem agora") && b.includes("saldo.secundario") && b.includes("Atualizar quantidade") && b.includes("Conferir estoque"));
+  assert.ok(b.includes("textoPago(") && b.includes("saldoCurto(") && b.includes("Atualizar quantidade") && b.includes("Conferir estoque"));
   assert.ok(b.includes("<Pencil") && b.includes("Editar</span>"), "Editar com texto, 1 clique");
   assert.ok(b.includes("<details open={!!item}"), "na edição, estoque mínimo e localização já aparecem");
   assert.ok(b.includes("Feito por") && b.includes("m.user_id"));
@@ -4754,6 +4759,127 @@ await teste("telas: saldo em destaque (g e kg), Atualizar quantidade, Editar em 
   const cadastro = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
   const atual = cadastro.slice(cadastro.indexOf("export async function atualizarMaterial"), cadastro.indexOf("export async function registrarCompraMaterial"));
   assert.ok(!/estoque_atual|custo_medio|ultimo_custo/.test(atual), "editar o cadastro não mexe em saldo nem custo médio");
+});
+
+console.log("\nEstoque — preço pago em destaque, kits, conferência com saída e investimento");
+await teste("preço pago em destaque: 'Pago R$ X', R$/kg só no filamento, saldo curto e secundário", () => {
+  const nb = (t: string) => t.replace(/ /g, " ");
+  assert.equal(nb(textoPago(29)), "Pago R$ 29,00");
+  assert.equal(nb(textoPago(1234.5)), "Pago R$ 1.234,50");
+  assert.equal(textoPago(0), "Sem compra registrada");
+  assert.equal(textoPago(null), "Sem compra registrada");
+  assert.equal(textoPago(undefined), "Sem compra registrada");
+  assert.equal(nb(textoPrecoKg(0.0799, 0.07) ?? ""), "R$ 79,90/kg", "custo médio por g × 1000");
+  assert.equal(nb(textoPrecoKg(0, 0.08) ?? ""), "R$ 80,00/kg", "sem custo médio, o do cadastro");
+  assert.equal(textoPrecoKg(0, 0), null);
+  assert.equal(textoPrecoKg(null, null), null);
+  assert.equal(saldoCurto(1000, "g"), "1 kg em estoque");
+  assert.equal(saldoCurto(2480, "g"), "2,48 kg em estoque");
+  assert.equal(saldoCurto(480, "g"), "480 g em estoque");
+  assert.equal(saldoCurto(12, "un"), "12 un em estoque");
+  assert.equal(saldoCurtoKit(1), "1 kit em estoque");
+  assert.equal(saldoCurtoKit(3), "3 kits em estoque");
+});
+await teste("kits: 'X de Y disponíveis', todas acabaram sugere zerar, data em que acabou", () => {
+  const partes = Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, nome: `Cor ${i + 1}`, disponivel: i >= 3 }));
+  assert.deepEqual(contagemPartes(partes), { disponiveis: 9, total: 12 });
+  assert.equal(textoDisponiveis(partes, 12), "9 de 12 disponíveis");
+  assert.equal(textoDisponiveis([], 12), "kit de 12 peças", "sem partes cadastradas mostra o tamanho do kit");
+  assert.equal(textoDisponiveis([], null), "kit sem partes cadastradas");
+  assert.equal(todasAcabaram(partes), false);
+  assert.equal(todasAcabaram(partes.map((p) => ({ ...p, disponivel: false }))), true);
+  assert.equal(todasAcabaram([]), false, "sem partes não há o que sugerir");
+  assert.equal(textoAcabouEm({ disponivel: false, acabou_em: "2026-10-05" }), "Acabou em 05/10/2026");
+  assert.equal(textoAcabouEm({ disponivel: false, acabou_em: null }), "Acabou");
+  assert.equal(textoAcabouEm({ disponivel: true, acabou_em: null }), null);
+  assert.equal(AJUSTE_KIT_ACABOU, -1);
+  assert.equal(OBSERVACAO_KIT_ACABOU, "Kit acabou");
+});
+await teste("kit no cadastro: exige inteiro > 0; sem kit zera kit_itens; a unidade é forçada para 'un' pelo servidor", () => {
+  assert.deepEqual(validarKit({ kit: undefined, kitItens: "12" }), { kit: false, kit_itens: null });
+  assert.deepEqual(validarKit({ kit: "on", kitItens: "12" }), { kit: true, kit_itens: 12 });
+  assert.ok("error" in validarKit({ kit: "on", kitItens: "" }));
+  assert.ok("error" in validarKit({ kit: "on", kitItens: "0" }));
+  assert.ok("error" in validarKit({ kit: "on", kitItens: "2,5" }));
+  assert.ok("error" in validarKit({ kit: "on", kitItens: "9999" }));
+  const act = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
+  assert.equal((act.match(/kit\.kit \? \{ unidade: "un" as const \}/g) ?? []).length, 2, "criar e atualizar forçam 'un'");
+});
+await teste("ordenação: por nome (padrão) ou por valor pago (maior primeiro, sem valor por último, empate pelo nome)", () => {
+  const itens = [{ id: "a", nome: "Zinco" }, { id: "b", nome: "abelha" }, { id: "c", nome: "Cobre" }, { id: "d", nome: "Bronze" }];
+  const pagos = new Map([["a", { total: 100 }], ["b", { total: 50 }], ["c", { total: 100 }]]);
+  assert.deepEqual(ordenarMateriais(itens, "nome", pagos).map((i) => i.id), ["b", "d", "c", "a"]);
+  assert.deepEqual(ordenarMateriais(itens, "valor_pago", pagos).map((i) => i.id), ["c", "a", "b", "d"]);
+  assert.equal(criterioOrdemValido("valor_pago"), "valor_pago");
+  assert.equal(criterioOrdemValido("peso"), "nome");
+  assert.equal(itens[0].id, "a", "não altera a lista original");
+});
+await teste("conferência: partes alteradas, resumo 'N itens atualizados' (cada item uma vez) e diferença com sinal", () => {
+  const iniciais = [{ id: "p1", disponivel: true }, { id: "p2", disponivel: true }, { id: "p3", disponivel: false }];
+  assert.deepEqual(partesAlteradas(iniciais, { p1: false, p2: true, p3: true }), [{ id: "p1", disponivel: false }, { id: "p3", disponivel: true }]);
+  assert.deepEqual(partesAlteradas(iniciais, {}), []);
+  assert.equal(resumoConferencia([], []), "Nenhuma alteração.");
+  assert.equal(resumoConferencia(["a"], []), "1 item atualizado.");
+  assert.equal(resumoConferencia(["a", "b"], ["b", "c"]), "3 itens atualizados.", "item com ajuste e parte conta uma vez");
+  assert.equal(diferencaContagem(3, 2), -1);
+  assert.deepEqual(ajustesDaConferencia([{ id: "kit", saldo: 1, contagem: "0" }]), { ajustes: [{ id: "kit", diferenca: -1, contagem: 0 }] });
+});
+await teste("investimento: lê p3d_resumo_investimento e a view de resumo; formato inesperado = sem número inventado", () => {
+  const r = lerResumoInvestimento({
+    total_investido: "2600.5", materiais: 600.5, equipamentos: 2000, valor_em_estoque: 410,
+    por_comprador: [{ comprador_user_id: null, comprador_nome: "Ana", materiais: 600.5, equipamentos: 0, total: 600.5 }],
+  });
+  assert.ok(r);
+  assert.equal(r.total_investido, 2600.5);
+  assert.equal(r.valor_em_estoque, 410);
+  assert.equal(r.por_comprador[0].nome, "Ana");
+  assert.equal(lerResumoInvestimento(null), null);
+  assert.equal(lerResumoInvestimento([]), null);
+  assert.equal(lerResumoInvestimento({ materiais: 1 }), null, "sem total_investido não mostra nada");
+  const m = lerResumosMateriais([{ material_id: "x", total_investido: "29", compras: 1 }, { material_id: null }, "lixo"]);
+  assert.deepEqual([...m], [["x", { total: 29, compras: 1 }]]);
+  assert.deepEqual([...lerResumosMateriais(null)], []);
+});
+await teste("auditoria: a tela não soma total investido nem calcula valor em estoque (saldo × custo)", () => {
+  assert.equal(achadosTotaisNoCliente("const t = itens.reduce((s, i) => s + i.total_investido, 0);").length, 1);
+  assert.equal(achadosTotaisNoCliente("const v = materiais.reduce((s, m) => s + m.valor_em_estoque, 0);").length, 1);
+  assert.equal(achadosTotaisNoCliente("const v = m.estoque_atual * m.custo_medio;").length, 1);
+  assert.equal(achadosTotaisNoCliente("const v = m.custo_medio * saldo;").length, 1);
+  assert.equal(achadosTotaisNoCliente("const n = partes.filter((p) => p.disponivel).length;").length, 0, "contar partes não é valor");
+  assert.equal(achadosTotaisNoCliente("// itens.reduce((s, i) => s + i.total_investido, 0)").length, 0);
+  const audit = lerFonte("scripts/auditar-isolamento.mts");
+  assert.ok(audit.includes("achadosTotaisNoCliente"));
+  for (const arq of ["components/impressao-3d/estoque-board.tsx", "components/impressao-3d/investimento-estoque.tsx", "components/impressao-3d/partes-kit.tsx", "components/impressao-3d/atualizar-quantidade.tsx"])
+    assert.equal(achadosTotaisNoCliente(lerFonte(arq)).length, 0, arq);
+});
+await teste("telas: conferir tem Confirmar/Cancelar fixos no topo e no rodapé, Esc cancela e pede confirmação se houver alterações", () => {
+  const f = lerFonte("components/impressao-3d/atualizar-quantidade.tsx");
+  assert.ok(f.includes('role="dialog"') && f.includes('aria-modal="true"') && f.includes("fixed inset-0"));
+  assert.ok(f.includes("<header") && f.includes("<footer") && (f.match(/\{barra\}/g) ?? []).length === 2, "mesma barra no topo e no rodapé");
+  assert.ok(f.includes(">\n        Cancelar\n") || f.includes("Cancelar"), "Cancelar");
+  assert.ok(f.includes("Confirmar") && f.includes('type="submit"') && f.includes("min-h-11"));
+  assert.ok(f.includes('e.key === "Escape"') && f.includes("window.confirm(") && f.includes("Descartar as alterações"));
+  assert.ok(f.includes("resumoConferencia(") && f.includes("toast.success(resumoRef.current"), "resumo 'N itens atualizados' ao confirmar");
+  assert.ok(f.includes("parte:${c.id}") && f.includes("Cores que acabaram"), "kits: marcar partes que acabaram");
+  assert.ok(f.includes("env(safe-area-inset-bottom)"), "rodapé respeita a área segura do celular");
+  const act = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
+  assert.ok(act.includes('chave.startsWith("parte:")') && act.includes('.from("p3d_material_partes")') && act.includes('.eq("workspace_id", acesso.workspaceId)'));
+});
+await teste("telas: preço pago em destaque (negrito, grande), saldo secundário; ordenar por valor pago; sem custo por unidade de kit", () => {
+  const b = lerFonte("components/impressao-3d/estoque-board.tsx");
+  assert.ok(b.includes("text-xl font-bold") && b.includes("textoPago(pago?.total)") && b.includes("textoPrecoKg("));
+  assert.ok(b.includes('<option value="valor_pago">Valor pago</option>') && b.includes("ordenarMateriais("));
+  assert.ok(b.includes('item.unidade !== "g" && !item.kit'), "kit não mostra custo por unidade");
+  assert.ok(b.includes("textoDisponiveis(") && b.includes("É um kit/conjunto") && b.includes("Quantas peças/cores tem no kit"));
+  assert.ok(b.includes("ResumoInvestimentoCards") && b.includes("Cores do kit"));
+  const p = lerFonte("app/(dashboard)/impressao-3d/estoque/page.tsx");
+  assert.ok(p.includes('"p3d_materiais_resumo"') && p.includes('rpc("p3d_resumo_investimento"'));
+  assert.ok(/verCustos\s*\?\s*supabase\s*\.from\("p3d_materiais_resumo"\)/.test(p.replace(/\n\s*/g, " ")) && p.includes("verCustos ? supabase.rpc"), "sem custos, nada é consultado");
+  const c = lerFonte("components/impressao-3d/investimento-estoque.tsx");
+  assert.ok(c.includes("Total investido") && c.includes("Valor em estoque hoje") && c.includes("Gasto por pessoa") && c.includes("aria-expanded"));
+  const k = lerFonte("components/impressao-3d/partes-kit.tsx");
+  assert.ok(k.includes("Adicionar cor") && k.includes("Acabou") && k.includes("Desfazer") && k.includes("Marcar kit como zerado") && k.includes("confirmar:"));
+  assert.ok(lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts").includes("export async function marcarKitZerado"));
 });
 
 console.log(`\n${total} testes`);

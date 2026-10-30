@@ -162,7 +162,20 @@ export interface Material {
   estoque_minimo: number;
   localizacao: string | null;
   fornecedor_id: string | null;
+  /** Kit/conjunto: só em unidade "un"; o saldo é o número de kits e as cores/peças ficam em p3d_material_partes. */
+  kit: boolean;
+  kit_itens: number | null;
   ativo: boolean;
+}
+
+export interface MaterialParte {
+  id: string;
+  material_id: string;
+  nome: string;
+  cor_hex: string | null;
+  disponivel: boolean;
+  acabou_em: string | null;
+  observacao: string | null;
 }
 
 export interface MovimentoEstoque {

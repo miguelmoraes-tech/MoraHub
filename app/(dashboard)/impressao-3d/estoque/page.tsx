@@ -4,15 +4,17 @@ import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { podeVerCustos } from "@/lib/impressao-3d/regras";
+import { lerResumoInvestimento, lerResumosMateriais } from "@/lib/impressao-3d/estoque-uso";
+import { mensagemRpc } from "@/lib/impressao-3d/erros";
 import { getPessoasCompradoras } from "@/lib/impressao-3d/compradores";
 import { getOpcoesFornecedores, getOpcoesProdutos } from "@/lib/impressao-3d/opcoes";
 import { getModulosHabilitados } from "@/lib/modulos/habilitados";
 import { EstoqueBoard } from "@/components/impressao-3d/estoque-board";
-import type { Material, MovimentoEstoque, MovimentoPeca, PecaEstoque } from "@/lib/impressao-3d/tipos";
+import type { Material, MaterialParte, MovimentoEstoque, MovimentoPeca, PecaEstoque } from "@/lib/impressao-3d/tipos";
 import type { NumerosReferencia } from "@/lib/impressao-3d/pecas";
 
 const COLUNAS_MATERIAL =
-  "id, workspace_id, tipo, nome, marca, material, cor, cor_hex, diametro_mm, unidade, peso_liquido_rolo_g, estoque_atual, estoque_minimo, localizacao, fornecedor_id, ativo";
+  "id, workspace_id, tipo, nome, marca, material, cor, cor_hex, diametro_mm, unidade, peso_liquido_rolo_g, estoque_atual, estoque_minimo, localizacao, fornecedor_id, kit, kit_itens, ativo";
 const COLUNAS_MOVIMENTO =
   "id, material_id, tipo, delta, saldo_apos, observacao, user_id, comprador_user_id, comprador_nome, data_compra, created_at";
 const COLUNAS_PECA = "id, produto_id, variacao_id, quantidade, estoque_minimo, localizacao";
@@ -28,7 +30,7 @@ export default async function EstoquePage() {
   const ws = acesso.workspaceId;
 
   // Custo só sai do servidor para quem tem o extra "custos" (só de tela).
-  const [{ data: materiais }, { data: movimentos }, fornecedores, produtos, habilitados, { data: pecas }, { data: movimentosPecas }, acessoProdutosEdicao, acessoProducao, acessoPedidos, pessoas] = await Promise.all([
+  const [{ data: materiais }, { data: movimentos }, fornecedores, produtos, habilitados, { data: pecas }, { data: movimentosPecas }, acessoProdutosEdicao, acessoProducao, acessoPedidos, pessoas, { data: partes }, resumoMateriais, resumoGeral] = await Promise.all([
     supabase
       .from("p3d_materiais")
       .select(verCustos ? `${COLUNAS_MATERIAL}, preco_compra, custo_cadastro, custo_medio, ultimo_custo` : COLUNAS_MATERIAL)
@@ -58,7 +60,19 @@ export default async function EstoquePage() {
     getAcessoModulo("p3d_producao"),
     getAcessoModulo("p3d_pedidos"),
     getPessoasCompradoras(ws),
+    supabase
+      .from("p3d_material_partes")
+      .select("id, material_id, nome, cor_hex, disponivel, acabou_em, observacao")
+      .eq("workspace_id", ws)
+      .order("created_at", { ascending: true }),
+    // Quanto foi pago em cada item e o resumo do investimento: dado de custo, só com o extra "custos".
+    verCustos
+      ? supabase.from("p3d_materiais_resumo").select("material_id, total_investido, compras").eq("workspace_id", ws)
+      : Promise.resolve({ data: null }),
+    verCustos ? supabase.rpc("p3d_resumo_investimento", { p_ws: ws }) : Promise.resolve({ data: null, error: null }),
   ]);
+  const resumo = verCustos ? lerResumoInvestimento(resumoGeral.data) : null;
+  const erroResumo = verCustos && resumoGeral.error ? mensagemRpc(resumoGeral.error, "Não foi possível carregar o resumo do investimento.") : null;
 
   const listaPecas = ((pecas ?? []) as unknown as Partial<PecaEstoque>[]).map((p) => ({ custo_medio: null, ...p })) as PecaEstoque[];
   const listaMovimentosPecas = ((movimentosPecas ?? []) as unknown as Partial<MovimentoPeca>[]).map((m) => ({
@@ -100,6 +114,8 @@ export default async function EstoquePage() {
     custo_cadastro: null,
     custo_medio: 0,
     ultimo_custo: 0,
+    kit: false,
+    kit_itens: null,
     ...m,
   })) as Material[];
   const listaMovimentos = ((movimentos ?? []) as unknown as Partial<MovimentoEstoque>[]).map((m) => ({
@@ -122,6 +138,10 @@ export default async function EstoquePage() {
       limiteMovimentos={LIMITE_MOVIMENTOS}
       fornecedores={fornecedores}
       compradores={{ pessoas, usuarioId: acesso.userId }}
+      partes={(partes ?? []) as unknown as MaterialParte[]}
+      pagoPorMaterial={Object.fromEntries(lerResumosMateriais(resumoMateriais.data))}
+      resumo={resumo}
+      erroResumo={erroResumo}
       // Gastos por pessoa: com Relatórios ligado é uma aba lá; sem ele, atalho aqui só para fundador/cofundador.
       atalhoGastos={acesso.ehDono && !habilitados.includes("p3d_relatorios") ? "/impressao-3d/estoque/gastos" : undefined}
       pecas={{

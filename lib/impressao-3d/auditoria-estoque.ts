@@ -34,3 +34,21 @@ export function achadosEstoqueDireto(texto: string): AchadoEstoque[] {
   }
   return achados;
 }
+
+/**
+ * Totais em reais vêm do banco (p3d_materiais_resumo, p3d_resumo_investimento): a tela não soma
+ * total_investido, valor_em_estoque nem custo × saldo.
+ */
+export function achadosTotaisNoCliente(texto: string): AchadoEstoque[] {
+  const limpo = texto.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const achados: AchadoEstoque[] = [];
+  const regras: { regra: string; re: RegExp }[] = [
+    { regra: "soma de total_investido/valor_em_estoque no cliente", re: /\.reduce\([^\n]*(total_investido|valor_em_estoque)/ },
+    { regra: "valor em estoque calculado no cliente (saldo × custo)", re: /(estoque_atual|saldo)\w*\s*\*\s*[\w.]*custo_medio|custo_medio\s*\*\s*[\w.]*(estoque_atual|saldo)/ },
+  ];
+  for (const { regra, re } of regras) {
+    const m = re.exec(limpo);
+    if (m) achados.push({ regra, trecho: m[0].slice(0, 80) });
+  }
+  return achados;
+}

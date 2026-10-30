@@ -2609,6 +2609,13 @@ export type Database = {
             referencedRelation: "p3d_materiais"
             referencedColumns: ["id", "workspace_id"]
           },
+          {
+            foreignKeyName: "p3d_compra_itens_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais_resumo"
+            referencedColumns: ["material_id", "workspace_id"]
+          },
         ]
       }
       p3d_compras: {
@@ -2971,6 +2978,13 @@ export type Database = {
             referencedColumns: ["id", "workspace_id"]
           },
           {
+            foreignKeyName: "p3d_falhas_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais_resumo"
+            referencedColumns: ["material_id", "workspace_id"]
+          },
+          {
             foreignKeyName: "p3d_falhas_producao_id_workspace_id_fkey"
             columns: ["producao_id", "workspace_id"]
             isOneToOne: false
@@ -3300,6 +3314,8 @@ export type Database = {
           estoque_minimo: number
           fornecedor_id: string | null
           id: string
+          kit: boolean
+          kit_itens: number | null
           localizacao: string | null
           marca: string | null
           material: string | null
@@ -3325,6 +3341,8 @@ export type Database = {
           estoque_minimo?: number
           fornecedor_id?: string | null
           id?: string
+          kit?: boolean
+          kit_itens?: number | null
           localizacao?: string | null
           marca?: string | null
           material?: string | null
@@ -3350,6 +3368,8 @@ export type Database = {
           estoque_minimo?: number
           fornecedor_id?: string | null
           id?: string
+          kit?: boolean
+          kit_itens?: number | null
           localizacao?: string | null
           marca?: string | null
           material?: string | null
@@ -3377,6 +3397,57 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "perfis_tipos_ativos"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      p3d_material_partes: {
+        Row: {
+          acabou_em: string | null
+          cor_hex: string | null
+          created_at: string
+          disponivel: boolean
+          id: string
+          material_id: string
+          nome: string
+          observacao: string | null
+          workspace_id: string
+        }
+        Insert: {
+          acabou_em?: string | null
+          cor_hex?: string | null
+          created_at?: string
+          disponivel?: boolean
+          id?: string
+          material_id: string
+          nome: string
+          observacao?: string | null
+          workspace_id: string
+        }
+        Update: {
+          acabou_em?: string | null
+          cor_hex?: string | null
+          created_at?: string
+          disponivel?: boolean
+          id?: string
+          material_id?: string
+          nome?: string
+          observacao?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_material_partes_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_material_partes_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais_resumo"
+            referencedColumns: ["material_id", "workspace_id"]
           },
         ]
       }
@@ -3442,6 +3513,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "p3d_materiais"
             referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_movimentos_estoque_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais_resumo"
+            referencedColumns: ["material_id", "workspace_id"]
           },
         ]
       }
@@ -4224,6 +4302,13 @@ export type Database = {
             referencedColumns: ["id", "workspace_id"]
           },
           {
+            foreignKeyName: "p3d_producao_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais_resumo"
+            referencedColumns: ["material_id", "workspace_id"]
+          },
+          {
             foreignKeyName: "p3d_producao_pedido_id_workspace_id_fkey"
             columns: ["pedido_id", "workspace_id"]
             isOneToOne: false
@@ -4302,6 +4387,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "p3d_materiais"
             referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_producao_materiais_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais_resumo"
+            referencedColumns: ["material_id", "workspace_id"]
           },
           {
             foreignKeyName: "p3d_producao_materiais_producao_id_workspace_id_fkey"
@@ -4424,6 +4516,13 @@ export type Database = {
             referencedColumns: ["id", "workspace_id"]
           },
           {
+            foreignKeyName: "p3d_produto_variacoes_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais_resumo"
+            referencedColumns: ["material_id", "workspace_id"]
+          },
+          {
             foreignKeyName: "p3d_produto_variacoes_produto_id_workspace_id_fkey"
             columns: ["produto_id", "workspace_id"]
             isOneToOne: false
@@ -4501,6 +4600,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "p3d_materiais"
             referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_produtos_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais_resumo"
+            referencedColumns: ["material_id", "workspace_id"]
           },
           {
             foreignKeyName: "p3d_produtos_workspace_id_fkey"
@@ -6318,6 +6424,30 @@ export type Database = {
             referencedRelation: "p3d_materiais"
             referencedColumns: ["id", "workspace_id"]
           },
+          {
+            foreignKeyName: "p3d_compra_itens_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais_resumo"
+            referencedColumns: ["material_id", "workspace_id"]
+          },
+        ]
+      }
+      p3d_materiais_resumo: {
+        Row: {
+          compras: number | null
+          material_id: string | null
+          total_investido: number | null
+          workspace_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_materiais_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -6801,6 +6931,7 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: undefined
       }
+      p3d_resumo_investimento: { Args: { p_ws: string }; Returns: Json }
       p3d_salvar_item_orcamento: {
         Args: {
           p_descricao: string

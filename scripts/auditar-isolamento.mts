@@ -49,6 +49,8 @@ const MODULOS_NOVOS: Record<string, string[]> = {
     "p3d_config_alertas", "p3d_notificacoes", "p3d_integracoes",
     // Etapa E (parte 2): estoque de peças e filamentos do trabalho.
     "p3d_pecas_estoque", "p3d_movimentos_pecas", "p3d_producao_materiais",
+    // Kits: partes (cores) de um item de estoque.
+    "p3d_material_partes",
   ],
   // Etapa D: preferências de navegação (padrão da empresa e pessoal).
   navegacao: ["menu_preferencias"],
@@ -814,16 +816,19 @@ if (navegacaoForaDoContrato.length) process.exitCode = 1;
 // --- Estoque de material: estoque_atual/custo_medio/ultimo_custo nunca são escritos direto por tela ou action ---
 {
   const caminhoEstoque = "../lib/impressao-3d/auditoria-estoque.ts";
-  const { achadosEstoqueDireto } = (await import(caminhoEstoque)) as typeof import("../lib/impressao-3d/auditoria-estoque");
+  const { achadosEstoqueDireto, achadosTotaisNoCliente } = (await import(caminhoEstoque)) as typeof import("../lib/impressao-3d/auditoria-estoque");
   const ruinsEstoque: string[] = [];
   for (const pasta of ["app", "components", "lib"]) {
     for (const arq of arquivos(join(raiz, pasta))) {
       const rel = relative(raiz, arq).replace(/\\/g, "/");
       if (!/\.(ts|tsx)$/.test(rel) || rel === "lib/impressao-3d/auditoria-estoque.ts" || rel.endsWith("database.types.ts")) continue;
-      for (const a of achadosEstoqueDireto(readFileSync(arq, "utf8"))) ruinsEstoque.push(`${rel}: ${a.regra} (${a.trecho})`);
+      const texto = readFileSync(arq, "utf8");
+      for (const a of achadosEstoqueDireto(texto)) ruinsEstoque.push(`${rel}: ${a.regra} (${a.trecho})`);
+      // Totais em reais (investido, valor em estoque) vêm do banco: nenhuma tela soma ou multiplica.
+      if (/^(components|app)\//.test(rel)) for (const a of achadosTotaisNoCliente(texto)) ruinsEstoque.push(`${rel}: ${a.regra} (${a.trecho})`);
     }
   }
-  console.log(`\nEstoque: escrita direta em estoque_atual/custo_medio/ultimo_custo: ${ruinsEstoque.length}`);
+  console.log(`\nEstoque: escrita direta em estoque_atual/custo_medio/ultimo_custo e total/valor em estoque calculado na tela: ${ruinsEstoque.length}`);
   for (const s of ruinsEstoque) console.log("  ! " + s);
   if (ruinsEstoque.length) process.exitCode = 1;
 }

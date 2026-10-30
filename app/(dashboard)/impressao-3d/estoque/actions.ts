@@ -8,6 +8,7 @@ import { SEM_PERMISSAO, SEM_PERMISSAO_CUSTOS, gramasDeRolos, podeVerCustos } fro
 import { parseNumero } from "@/lib/impressao-3d/numeros";
 import { validarMovimentoPeca } from "@/lib/impressao-3d/pecas";
 import { lerCompra, lerComprador } from "@/lib/impressao-3d/comprador";
+import { AJUSTE_KIT_ACABOU, OBSERVACAO_KIT_ACABOU, validarKit } from "@/lib/impressao-3d/estoque-uso";
 import {
   MOTIVO_PADRAO, ajustesDaConferencia, diferencaContagem, lerContagem, motivoValido, observacaoConferencia,
   observacaoDoAjuste, precisaAjustar,
@@ -52,7 +53,11 @@ export async function criarMaterial(_prev: ActionState, formData: FormData): Pro
   if (!acesso) return { error: SEM_PERMISSAO };
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { preco_compra, peso_liquido_rolo_g: _pesoDoCliente, ...resto } = parsed.data;
+  const { preco_compra, peso_liquido_rolo_g: _pesoDoCliente, ...dados } = parsed.data;
+  // Kit/conjunto: só existe em unidade "un" (o banco recusa outra); o preço pago é o valor do kit.
+  const kit = validarKit({ kit: formData.get("kit"), kitItens: formData.get("kit_itens") });
+  if ("error" in kit) return { error: kit.error };
+  const resto = { ...dados, ...(kit.kit ? { unidade: "un" as const } : {}), kit: kit.kit, kit_itens: kit.kit_itens };
   const porPeso = resto.unidade === "g";
 
   const comprei = parseNumero(formData.get("quanto_comprei"));
@@ -114,7 +119,10 @@ export async function atualizarMaterial(
   if (!acesso) return { error: SEM_PERMISSAO };
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { preco_compra, peso_liquido_rolo_g: _pesoDoCliente, ...resto } = parsed.data;
+  const { preco_compra, peso_liquido_rolo_g: _pesoDoCliente, ...dados } = parsed.data;
+  const kit = validarKit({ kit: formData.get("kit"), kitItens: formData.get("kit_itens") });
+  if ("error" in kit) return { error: kit.error };
+  const resto = { ...dados, ...(kit.kit ? { unidade: "un" as const } : {}), kit: kit.kit, kit_itens: kit.kit_itens };
   const verCustos = podeVerCustos(acesso);
   const supabase = await createClient();
   const { error } = await supabase
@@ -566,7 +574,14 @@ export async function conferirEstoque(_prev: ActionState, formData: FormData): P
     ids.push(id);
     textos.set(id, valor);
   }
-  if (ids.length === 0) return { error: "Nenhum item para conferir." };
+  // Partes de kit que acabaram (ou voltaram) na conferência: parte:<id> = "0" (acabou) ou "1" (tem).
+  const partes: { id: string; disponivel: boolean }[] = [];
+  for (const [chave, valor] of formData.entries()) {
+    if (!chave.startsWith("parte:")) continue;
+    const id = chave.slice(6);
+    if (UUID.test(id) && (valor === "0" || valor === "1")) partes.push({ id, disponivel: valor === "1" });
+  }
+  if (ids.length === 0 && partes.length === 0) return { error: "Nenhum item para conferir." };
   if (ids.length > MAX_ITENS_CONFERENCIA) return { error: `Confira no máximo ${MAX_ITENS_CONFERENCIA} itens por vez.` };
 
   const acesso = await getAcessoEdicao(MODULO);
@@ -585,7 +600,7 @@ export async function conferirEstoque(_prev: ActionState, formData: FormData): P
     ids.filter((id) => porId.has(id)).map((id) => ({ id, saldo: Number(porId.get(id)!.estoque_atual), contagem: textos.get(id) }))
   );
   if ("error" in calculo) return { error: `${porId.get(calculo.id)?.nome ?? "Item"}: ${calculo.error}` };
-  if (calculo.ajustes.length === 0) return { ok: true }; // ninguém mudou: nenhuma chamada
+  if (calculo.ajustes.length === 0 && partes.length === 0) return { ok: true }; // ninguém mudou: nenhuma chamada
 
   const observacao = observacaoConferencia();
   let feitos = 0;
@@ -604,6 +619,116 @@ export async function conferirEstoque(_prev: ActionState, formData: FormData): P
     }
     feitos++;
   }
+
+  // Partes de kit: update direto (edição em Estoque); o banco preenche/limpa acabou_em.
+  for (const parte of partes) {
+    const { error } = await supabase
+      .from("p3d_material_partes")
+      .update({ disponivel: parte.disponivel })
+      .eq("id", parte.id)
+      .eq("workspace_id", acesso.workspaceId);
+    if (error) {
+      revalidatePath(ROTA);
+      return { error: `${feitos} ajuste(s) feito(s); falhou ao marcar parte do kit: ${mensagemEscrita(error, "tente de novo.")}` };
+    }
+  }
+
+  await reavaliarAlertas(acesso.workspaceId);
+  revalidatePath(ROTA);
+  return { ok: true };
+}
+
+// --- Kits: partes (cores) ---------------------------------------------------------------------------
+
+const COR_HEX = /^#[0-9A-Fa-f]{6}$/;
+
+/** Adiciona ou edita uma parte do kit (nome, cor, observação). O banco recusa parte de item que não é kit. */
+export async function salvarParte(
+  materialId: string,
+  parteId: string | null,
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const nome = String(formData.get("nome") ?? "").trim().replace(/\s+/g, " ");
+  if (!nome) return { error: "Nome da cor: campo obrigatório." };
+  if (nome.length > 80) return { error: "Nome da cor: use no máximo 80 caracteres." };
+  const corBruta = String(formData.get("cor_hex") ?? "").trim();
+  if (corBruta && !COR_HEX.test(corBruta)) return { error: "Cor: use o formato #RRGGBB." };
+  const observacao = String(formData.get("observacao") ?? "").trim();
+  if (observacao.length > 300) return { error: "Observação: use no máximo 300 caracteres." };
+
+  const acesso = await getAcessoEdicao(MODULO);
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  const dados = { nome, cor_hex: corBruta || null, observacao: observacao || null };
+  const supabase = await createClient();
+  const { error } = parteId
+    ? await supabase.from("p3d_material_partes").update(dados).eq("id", parteId).eq("workspace_id", acesso.workspaceId)
+    : await supabase.from("p3d_material_partes").insert({ workspace_id: acesso.workspaceId, material_id: materialId, ...dados });
+  if (error) return { error: mensagemEscrita(error, "Não foi possível salvar a cor.") };
+
+  revalidatePath(ROTA);
+  return { ok: true };
+}
+
+/** "Acabou" / "Desfazer": disponivel = false preenche acabou_em (hoje) no banco; true limpa. */
+export async function alternarParteDisponivel(parteId: string, disponivel: boolean): Promise<ActionState> {
+  const acesso = await getAcessoEdicao(MODULO);
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  const { error } = await (await createClient())
+    .from("p3d_material_partes")
+    .update({ disponivel })
+    .eq("id", parteId)
+    .eq("workspace_id", acesso.workspaceId);
+  if (error) return { error: mensagemEscrita(error, "Não foi possível atualizar a cor.") };
+
+  revalidatePath(ROTA);
+  return { ok: true };
+}
+
+export async function excluirParte(parteId: string): Promise<ActionState> {
+  const acesso = await getAcessoEdicao(MODULO);
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  const { error } = await (await createClient())
+    .from("p3d_material_partes")
+    .delete()
+    .eq("id", parteId)
+    .eq("workspace_id", acesso.workspaceId);
+  if (error) return { error: mensagemEscrita(error, "Não foi possível excluir a cor.") };
+
+  revalidatePath(ROTA);
+  return { ok: true };
+}
+
+/**
+ * "Marcar kit como zerado": ajuste de -1 (um kit acabou) com a observação "Kit acabou". É uma sugestão
+ * da tela quando todas as partes acabaram; nunca roda sozinho. Pela RPC, como todo ajuste.
+ */
+export async function marcarKitZerado(materialId: string): Promise<ActionState> {
+  const acesso = await getAcessoEdicao(MODULO);
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  const supabase = await createClient();
+  const { data: material } = await supabase
+    .from("p3d_materiais")
+    .select("estoque_atual, kit")
+    .eq("id", materialId)
+    .eq("workspace_id", acesso.workspaceId)
+    .maybeSingle();
+  if (!material) return { error: "Material não encontrado." };
+  if (!material.kit) return { error: "Este item não é um kit." };
+  if (!(Number(material.estoque_atual) >= 1)) return { error: "O kit já está zerado." };
+
+  const { error } = await supabase.rpc("p3d_movimentar_estoque", {
+    p_ws: acesso.workspaceId,
+    p_material_id: materialId,
+    p_tipo: "ajuste",
+    p_quantidade: AJUSTE_KIT_ACABOU,
+    p_observacao: OBSERVACAO_KIT_ACABOU,
+  });
+  if (error) return { error: mensagemRpc(error, "Não foi possível zerar o kit.") };
 
   await reavaliarAlertas(acesso.workspaceId);
   revalidatePath(ROTA);
