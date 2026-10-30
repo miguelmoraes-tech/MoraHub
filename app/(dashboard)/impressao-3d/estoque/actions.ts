@@ -1,13 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAcessoEdicao } from "@/lib/empresa-ativa";
+import { getAcessoEdicao, getAcessoModulo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { mensagemEscrita, mensagemRpc } from "@/lib/impressao-3d/erros";
 import { SEM_PERMISSAO, SEM_PERMISSAO_CUSTOS, gramasDeRolos, podeVerCustos } from "@/lib/impressao-3d/regras";
 import { parseNumero } from "@/lib/impressao-3d/numeros";
 import { validarMovimentoPeca } from "@/lib/impressao-3d/pecas";
 import { lerCompra, lerComprador } from "@/lib/impressao-3d/comprador";
+import {
+  MOTIVO_PADRAO, ajustesDaConferencia, diferencaContagem, lerContagem, motivoValido, observacaoConferencia,
+  observacaoDoAjuste, precisaAjustar,
+} from "@/lib/impressao-3d/ajuste-estoque";
 import { PESO_KG_G, entradaDeCompraKg, entradaDeCompraUnidade } from "@/lib/impressao-3d/filamentos";
 import {
   MaterialSchema,
@@ -482,6 +486,126 @@ export async function corrigirCompradorMovimento(
   });
   if (error) return { error: mensagemRpc(error, "Não foi possível corrigir o comprador.") };
 
+  revalidatePath(ROTA);
+  return { ok: true };
+}
+
+// --- Atualizar quantidade / Conferir estoque (ajuste com sinal, sempre pela RPC) -----------------------
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_ITENS_CONFERENCIA = 500;
+
+/**
+ * Depois de mexer no saldo, pede ao banco que reavalie os alertas (estoque mínimo). É melhor-esforço:
+ * só quem tem Automações ou Dashboard pode chamar p3d_atualizar_alertas, e uma falha aqui não desfaz o
+ * ajuste (o sino também reavalia sozinho ao abrir).
+ */
+async function reavaliarAlertas(workspaceId: string) {
+  const [automacoes, dashboard] = await Promise.all([getAcessoModulo("p3d_automacoes"), getAcessoModulo("p3d_dashboard")]);
+  if (!automacoes && !dashboard) return;
+  await (await createClient()).rpc("p3d_atualizar_alertas", { p_ws: workspaceId });
+}
+
+/**
+ * "Atualizar quantidade": a pessoa diz quanto tem AGORA; a diferença com o saldo do banco (com sinal)
+ * vira um ajuste em p3d_movimentar_estoque. Diferença zero não chama nada. O motivo vem de uma lista
+ * curta e a observação é opcional. Nunca grava estoque_atual.
+ */
+export async function atualizarQuantidade(
+  materialId: string,
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const lida = lerContagem(formData.get("quantidade_nova"));
+  if ("error" in lida) return { error: lida.error };
+  if (lida.contagem === null) return { error: "Quanto tem agora: campo obrigatório." };
+  const motivoBruto = formData.get("motivo");
+  const motivo = motivoValido(motivoBruto) ? motivoBruto : MOTIVO_PADRAO;
+
+  const acesso = await getAcessoEdicao(MODULO);
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  const supabase = await createClient();
+  const { data: material } = await supabase
+    .from("p3d_materiais")
+    .select("estoque_atual")
+    .eq("id", materialId)
+    .eq("workspace_id", acesso.workspaceId)
+    .maybeSingle();
+  if (!material) return { error: "Material não encontrado." };
+
+  const diferenca = diferencaContagem(Number(material.estoque_atual), lida.contagem);
+  if (!precisaAjustar(diferenca)) return { ok: true }; // nada a ajustar: não chama o banco
+
+  const { error } = await supabase.rpc("p3d_movimentar_estoque", {
+    p_ws: acesso.workspaceId,
+    p_material_id: materialId,
+    p_tipo: "ajuste",
+    p_quantidade: diferenca,
+    p_observacao: observacaoDoAjuste(motivo, formData.get("observacao")),
+  });
+  if (error) return { error: mensagemRpc(error, "Não foi possível atualizar a quantidade.") };
+
+  await reavaliarAlertas(acesso.workspaceId);
+  revalidatePath(ROTA);
+  return { ok: true };
+}
+
+/**
+ * "Conferir estoque": uma linha por material (campos q:<id> = "Quanto tem agora?"). Gera um ajuste só
+ * para as linhas que mudaram, todas com a observação "Conferência de estoque em <data>". Linha vazia ou
+ * igual ao saldo é ignorada. Se um ajuste falhar, os anteriores já valeram: a mensagem diz quantos.
+ */
+export async function conferirEstoque(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const ids: string[] = [];
+  const textos = new Map<string, unknown>();
+  for (const [chave, valor] of formData.entries()) {
+    if (!chave.startsWith("q:")) continue;
+    const id = chave.slice(2);
+    if (!UUID.test(id)) continue;
+    ids.push(id);
+    textos.set(id, valor);
+  }
+  if (ids.length === 0) return { error: "Nenhum item para conferir." };
+  if (ids.length > MAX_ITENS_CONFERENCIA) return { error: `Confira no máximo ${MAX_ITENS_CONFERENCIA} itens por vez.` };
+
+  const acesso = await getAcessoEdicao(MODULO);
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  const supabase = await createClient();
+  const { data: materiais, error: erroLeitura } = await supabase
+    .from("p3d_materiais")
+    .select("id, nome, estoque_atual")
+    .eq("workspace_id", acesso.workspaceId)
+    .in("id", ids);
+  if (erroLeitura) return { error: mensagemEscrita(erroLeitura, "Não foi possível ler o estoque.") };
+  const porId = new Map((materiais ?? []).map((m) => [m.id, m]));
+
+  const calculo = ajustesDaConferencia(
+    ids.filter((id) => porId.has(id)).map((id) => ({ id, saldo: Number(porId.get(id)!.estoque_atual), contagem: textos.get(id) }))
+  );
+  if ("error" in calculo) return { error: `${porId.get(calculo.id)?.nome ?? "Item"}: ${calculo.error}` };
+  if (calculo.ajustes.length === 0) return { ok: true }; // ninguém mudou: nenhuma chamada
+
+  const observacao = observacaoConferencia();
+  let feitos = 0;
+  for (const a of calculo.ajustes) {
+    const { error } = await supabase.rpc("p3d_movimentar_estoque", {
+      p_ws: acesso.workspaceId,
+      p_material_id: a.id,
+      p_tipo: "ajuste",
+      p_quantidade: a.diferenca,
+      p_observacao: observacao,
+    });
+    if (error) {
+      revalidatePath(ROTA);
+      const antes = feitos > 0 ? `${feitos} ajuste(s) feito(s); ` : "";
+      return { error: `${antes}falhou em "${porId.get(a.id)?.nome ?? "item"}": ${mensagemRpc(error, "não foi possível ajustar.")}` };
+    }
+    feitos++;
+  }
+
+  await reavaliarAlertas(acesso.workspaceId);
   revalidatePath(ROTA);
   return { ok: true };
 }

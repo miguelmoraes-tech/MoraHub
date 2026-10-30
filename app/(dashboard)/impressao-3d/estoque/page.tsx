@@ -14,7 +14,7 @@ import type { NumerosReferencia } from "@/lib/impressao-3d/pecas";
 const COLUNAS_MATERIAL =
   "id, workspace_id, tipo, nome, marca, material, cor, cor_hex, diametro_mm, unidade, peso_liquido_rolo_g, estoque_atual, estoque_minimo, localizacao, fornecedor_id, ativo";
 const COLUNAS_MOVIMENTO =
-  "id, material_id, tipo, delta, saldo_apos, observacao, comprador_user_id, comprador_nome, data_compra, created_at";
+  "id, material_id, tipo, delta, saldo_apos, observacao, user_id, comprador_user_id, comprador_nome, data_compra, created_at";
 const COLUNAS_PECA = "id, produto_id, variacao_id, quantidade, estoque_minimo, localizacao";
 const COLUNAS_MOVIMENTO_PECA = "id, peca_id, tipo, delta, saldo_apos, referencia_tipo, referencia_id, observacao, created_at";
 const LIMITE_MOVIMENTOS = 500;
@@ -105,6 +105,7 @@ export default async function EstoquePage() {
   const listaMovimentos = ((movimentos ?? []) as unknown as Partial<MovimentoEstoque>[]).map((m) => ({
     custo_unitario: null,
     custo_total: null,
+    user_id: null,
     comprador_user_id: null,
     comprador_nome: null,
     data_compra: null,

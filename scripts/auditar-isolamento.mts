@@ -810,3 +810,20 @@ if (navegacaoForaDoContrato.length) process.exitCode = 1;
   for (const s of ruins) console.log("  ! " + s);
   if (ruins.length) process.exitCode = 1;
 }
+
+// --- Estoque de material: estoque_atual/custo_medio/ultimo_custo nunca são escritos direto por tela ou action ---
+{
+  const caminhoEstoque = "../lib/impressao-3d/auditoria-estoque.ts";
+  const { achadosEstoqueDireto } = (await import(caminhoEstoque)) as typeof import("../lib/impressao-3d/auditoria-estoque");
+  const ruinsEstoque: string[] = [];
+  for (const pasta of ["app", "components", "lib"]) {
+    for (const arq of arquivos(join(raiz, pasta))) {
+      const rel = relative(raiz, arq).replace(/\\/g, "/");
+      if (!/\.(ts|tsx)$/.test(rel) || rel === "lib/impressao-3d/auditoria-estoque.ts" || rel.endsWith("database.types.ts")) continue;
+      for (const a of achadosEstoqueDireto(readFileSync(arq, "utf8"))) ruinsEstoque.push(`${rel}: ${a.regra} (${a.trecho})`);
+    }
+  }
+  console.log(`\nEstoque: escrita direta em estoque_atual/custo_medio/ultimo_custo: ${ruinsEstoque.length}`);
+  for (const s of ruinsEstoque) console.log("  ! " + s);
+  if (ruinsEstoque.length) process.exitCode = 1;
+}

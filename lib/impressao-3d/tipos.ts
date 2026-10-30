@@ -174,6 +174,8 @@ export interface MovimentoEstoque {
   custo_unitario: number | null;
   custo_total: number | null;
   observacao: string | null;
+  /** Quem fez o movimento (ajuste, perda, entrada...). */
+  user_id: string | null;
   /** Só entradas: quem comprou e a data da compra (somente leitura; mudam por p3d_corrigir_comprador). */
   comprador_user_id: string | null;
   comprador_nome: string | null;

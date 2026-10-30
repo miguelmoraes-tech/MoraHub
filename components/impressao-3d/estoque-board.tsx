@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import Link from "next/link";
-import { Archive, ArchiveRestore, Boxes, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Boxes, ClipboardCheck, Pencil, Plus, Trash2 } from "lucide-react";
 import { StatusChip } from "@/components/status-chip";
 import { SegmentFilter } from "@/components/segment-filter";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
@@ -26,6 +26,8 @@ import {
   formatDataHora, formatMoeda, formatNumero,
 } from "@/lib/impressao-3d/numeros";
 import { abaInicial } from "@/lib/modulos/preferencias";
+import { FormAtualizarQuantidade, ConferirEstoque } from "@/components/impressao-3d/atualizar-quantidade";
+import { saldoParaExibir } from "@/lib/impressao-3d/ajuste-estoque";
 import { PecasEstoque, type DadosPecas } from "@/components/impressao-3d/pecas-estoque";
 import { CamposComprador } from "@/components/impressao-3d/campos-comprador";
 import { CorrigirComprador } from "@/components/impressao-3d/corrigir-comprador";
@@ -160,7 +162,7 @@ function CamposMaterial({
         <p className="text-[11px] text-zinc-500">Sem a permissão de custos, a entrada é registrada sem valor.</p>
       )}
 
-      <details className="rounded-lg border border-zinc-800">
+      <details open={!!item} className="rounded-lg border border-zinc-800">
         <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200">
           Mais opções (unidade, marca, diâmetro, estoque mínimo, fornecedor, localização)
         </summary>
@@ -201,7 +203,7 @@ function CamposMaterial({
       </details>
       {item && (
         <p className="text-[11px] text-zinc-600">
-          O saldo e o custo médio não são editados aqui: use Nova compra, Entrada, Ajuste ou Perda.
+          O saldo e o custo médio não são editados aqui: use Atualizar quantidade, Nova compra, Entrada ou Perda.
         </p>
       )}
     </div>
@@ -310,10 +312,9 @@ function FormMaterial({
   );
 }
 
-type TipoAcao = "entrada" | "ajuste" | "perda";
+type TipoAcao = "entrada" | "perda";
 const TITULO_ACAO: Record<TipoAcao, string> = {
   entrada: "Entrada de estoque",
-  ajuste: "Ajuste de estoque",
   perda: "Registrar perda",
 };
 
@@ -370,12 +371,11 @@ function FormMovimento({
           />
         ) : (
           <Numero
-            rotulo={tipo === "ajuste" ? `Quantidade com sinal (${un}) *` : `Quantidade (${un}) *`}
+            rotulo={`Quantidade (${un}) *`}
             name="quantidade"
             required
-            min={tipo === "ajuste" ? undefined : "0.01"}
+            min="0.01"
             onChange={(e) => setQuantidade(Number(e.target.value) || 0)}
-            ajuda={tipo === "ajuste" ? "Positivo soma, negativo subtrai. Ex.: -120 retira 120." : undefined}
           />
         )}
         {tipo === "entrada" && verCustos && (
@@ -399,9 +399,8 @@ function FormMovimento({
           </div>
         )}
         <Entrada
-          rotulo={tipo === "ajuste" ? "Motivo do ajuste *" : "Observação"}
+          rotulo="Observação"
           name="observacao"
-          required={tipo === "ajuste"}
           className="col-span-2"
         />
       </div>
@@ -433,92 +432,101 @@ function LinhaMaterial({
   fornecedores: Opcoes<OpcaoFornecedor>;
   compradores: DadosCompradores;
 }) {
-  const [modo, setModo] = useState<"nenhum" | "editar" | "compra" | TipoAcao>("nenhum");
+  const [modo, setModo] = useState<"nenhum" | "editar" | "compra" | "quantidade" | TipoAcao>("nenhum");
   const { executar, pendente } = useAcao();
   const baixo = abaixoDoMinimo(item);
   const fechar = () => setModo("nenhum");
 
+  const saldo = saldoParaExibir(item.estoque_atual, item.unidade);
+
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800/80 px-3 py-2.5">
-        <div className="flex min-w-0 items-center gap-3">
-          <span
-            className="h-6 w-6 shrink-0 rounded-full border border-zinc-700"
-            style={item.cor_hex ? { backgroundColor: item.cor_hex } : undefined}
-            title={item.cor ?? "Sem cor"}
-          />
-          <div className="min-w-0">
-            <p className="flex flex-wrap items-center gap-2 text-sm text-zinc-200">
-              {item.nome}
-              {baixo && <StatusChip tone="rose">Abaixo do mínimo</StatusChip>}
-              {!item.ativo && <StatusChip tone="zinc">Arquivado</StatusChip>}
-            </p>
-            <p className="truncate text-xs text-zinc-500">
-              {[item.material, item.cor, item.marca].filter(Boolean).join(" · ") || "Sem detalhes"}
-              {item.localizacao && ` · ${item.localizacao}`}
-              {item.fornecedor_id && fornecedores.acessivel && ` · ${fornecedores.itens.find((f) => f.id === item.fornecedor_id)?.nome ?? "fornecedor"}`}
-            </p>
-            {verCustos && (
-              <p className="truncate text-xs text-zinc-500">
-                {item.unidade === "g" ? (
-                  <>
-                    Custo por kg: cadastro {formatMoeda(custoPorKgDeG(item.custo_cadastro ?? 0))} · médio{" "}
-                    {item.custo_medio > 0 ? formatMoeda(custoPorKgDeG(item.custo_medio)) : "— (sem entradas)"}
-                  </>
-                ) : (
-                  <>
-                    Custo por {item.unidade}: cadastro {formatMoeda(item.custo_cadastro ?? 0, 4)} · médio{" "}
-                    {item.custo_medio > 0 ? formatMoeda(item.custo_medio, 4) : "— (sem entradas)"}
-                  </>
-                )}
+      <div className="space-y-3 rounded-lg border border-zinc-800/80 px-3 py-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span
+              className="mt-0.5 h-6 w-6 shrink-0 rounded-full border border-zinc-700"
+              style={item.cor_hex ? { backgroundColor: item.cor_hex } : undefined}
+              title={item.cor ?? "Sem cor"}
+            />
+            <div className="min-w-0">
+              <p className="flex flex-wrap items-center gap-2 text-sm text-zinc-200">
+                {item.nome}
+                {baixo && <StatusChip tone="rose">Abaixo do mínimo</StatusChip>}
+                {!item.ativo && <StatusChip tone="zinc">Arquivado</StatusChip>}
               </p>
-            )}
+              <p className="text-xs text-zinc-500">
+                {[item.material, item.cor, item.marca].filter(Boolean).join(" · ") || "Sem detalhes"}
+                {item.localizacao && ` · ${item.localizacao}`}
+                {item.fornecedor_id && fornecedores.acessivel && ` · ${fornecedores.itens.find((f) => f.id === item.fornecedor_id)?.nome ?? "fornecedor"}`}
+              </p>
+              {verCustos && (
+                <p className="text-xs text-zinc-500">
+                  {item.unidade === "g" ? (
+                    <>
+                      Custo por kg: cadastro {formatMoeda(custoPorKgDeG(item.custo_cadastro ?? 0))} · médio{" "}
+                      {item.custo_medio > 0 ? formatMoeda(custoPorKgDeG(item.custo_medio)) : "— (sem entradas)"}
+                    </>
+                  ) : (
+                    <>
+                      Custo por {item.unidade}: cadastro {formatMoeda(item.custo_cadastro ?? 0, 4)} · médio{" "}
+                      {item.custo_medio > 0 ? formatMoeda(item.custo_medio, 4) : "— (sem entradas)"}
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <div className="text-right">
-            <p className={`text-sm font-semibold ${baixo ? "text-rose-400" : "text-zinc-100"}`}>
-              {descreverSaldo(item.estoque_atual, item.unidade)}
-            </p>
+          <div className="shrink-0 sm:text-right" aria-label={`Saldo de ${item.nome}`}>
+            <p className="text-xs text-zinc-500">Tem agora</p>
+            <p className={`text-xl font-semibold leading-tight ${baixo ? "text-rose-400" : "text-zinc-50"}`}>{saldo.principal}</p>
+            {saldo.secundario && <p className={`text-sm font-medium ${baixo ? "text-rose-300" : "text-zinc-300"}`}>{saldo.secundario}</p>}
             <p className="text-[11px] text-zinc-500">
               mín. {item.estoque_minimo > 0 ? descreverSaldo(item.estoque_minimo, item.unidade) : "—"}
             </p>
           </div>
-          {podeEditar && (
-            <div className="flex items-center gap-0.5">
-              <BotaoTexto onClick={() => setModo("compra")}>Nova compra</BotaoTexto>
-              <BotaoTexto onClick={() => setModo("entrada")}>Entrada</BotaoTexto>
-              <BotaoTexto onClick={() => setModo("ajuste")}>Ajuste</BotaoTexto>
-              <BotaoTexto onClick={() => setModo("perda")}>Perda</BotaoTexto>
-              <button type="button" aria-label="Editar material" onClick={() => setModo("editar")} className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                disabled={pendente}
-                aria-label={item.ativo ? "Arquivar material" : "Reativar material"}
-                title={item.ativo ? "Arquivar" : "Reativar"}
-                onClick={() => executar(() => alternarMaterialAtivo(item.id, !item.ativo), { sucesso: item.ativo ? "Material arquivado." : "Material reativado." })}
-                className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-60"
-              >
-                {item.ativo ? <Archive className="h-3.5 w-3.5" /> : <ArchiveRestore className="h-3.5 w-3.5" />}
-              </button>
-              <button
-                type="button"
-                disabled={pendente}
-                aria-label="Excluir material"
-                onClick={() => executar(() => excluirMaterial(item.id), { confirmar: `Excluir "${item.nome}"? Materiais com histórico não podem ser excluídos: arquive.`, sucesso: "Material excluído." })}
-                className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400 disabled:opacity-60"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
         </div>
+        {podeEditar && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setModo(modo === "quantidade" ? "nenhum" : "quantidade")}
+              className="rounded-md bg-copper-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-copper-500"
+            >
+              Atualizar quantidade
+            </button>
+            <BotaoTexto onClick={() => setModo(modo === "editar" ? "nenhum" : "editar")}>
+              <span className="flex items-center gap-1"><Pencil className="h-3.5 w-3.5" /> Editar</span>
+            </BotaoTexto>
+            <BotaoTexto onClick={() => setModo("compra")}>Nova compra</BotaoTexto>
+            <BotaoTexto onClick={() => setModo("entrada")}>Entrada</BotaoTexto>
+            <BotaoTexto onClick={() => setModo("perda")}>Perda</BotaoTexto>
+            <button
+              type="button"
+              disabled={pendente}
+              aria-label={item.ativo ? "Arquivar material" : "Reativar material"}
+              title={item.ativo ? "Arquivar" : "Reativar"}
+              onClick={() => executar(() => alternarMaterialAtivo(item.id, !item.ativo), { sucesso: item.ativo ? "Material arquivado." : "Material reativado." })}
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 disabled:opacity-60"
+            >
+              {item.ativo ? <Archive className="h-3.5 w-3.5" /> : <ArchiveRestore className="h-3.5 w-3.5" />}
+            </button>
+            <button
+              type="button"
+              disabled={pendente}
+              aria-label="Excluir material"
+              onClick={() => executar(() => excluirMaterial(item.id), { confirmar: `Excluir "${item.nome}"? Materiais com histórico não podem ser excluídos: arquive.`, sucesso: "Material excluído." })}
+              className="rounded-md p-1.5 text-zinc-500 hover:bg-rose-950/50 hover:text-rose-400 disabled:opacity-60"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
+      {modo === "quantidade" && <FormAtualizarQuantidade material={item} aoFechar={fechar} />}
       {modo === "editar" && <FormMaterial item={item} verCustos={verCustos} fornecedores={fornecedores} compradores={compradores} aoFechar={fechar} />}
       {modo === "compra" && <FormCompra material={item} verCustos={verCustos} compradores={compradores} aoFechar={fechar} />}
-      {(modo === "entrada" || modo === "ajuste" || modo === "perda") && (
+      {(modo === "entrada" || modo === "perda") && (
         <FormMovimento material={item} tipo={modo} verCustos={verCustos} compradores={compradores} aoFechar={fechar} />
       )}
     </div>
@@ -579,6 +587,7 @@ function Historico({
                 <th className="px-3 py-2 text-right font-medium">Saldo após</th>
                 {verCustos && <th className="px-3 py-2 text-right font-medium">Custo unit.</th>}
                 {verCustos && <th className="px-3 py-2 text-right font-medium">Custo total</th>}
+                <th className="px-3 py-2 font-medium">Feito por</th>
                 <th className="px-3 py-2 font-medium">Comprador</th>
                 <th className="px-3 py-2 font-medium">Data da compra</th>
                 <th className="px-3 py-2 font-medium">Observação</th>
@@ -603,6 +612,9 @@ function Historico({
                     {verCustos && (
                       <td className="whitespace-nowrap px-3 py-2 text-right">{m.custo_total != null ? formatMoeda(m.custo_total) : "—"}</td>
                     )}
+                    <td className="whitespace-nowrap px-3 py-2">
+                      {m.user_id ? (compradores.pessoas.find((p) => p.id === m.user_id)?.nome ?? "—") : "—"}
+                    </td>
                     <td className="px-3 py-2">
                       {m.tipo === "entrada" ? (
                         <div className="flex flex-col items-start gap-1">
@@ -658,6 +670,7 @@ export function EstoqueBoard({
 }) {
   const [aba, setAba] = useState<"materiais" | "pecas" | "historico">(abaInicial(abas, "materiais"));
   const [novo, setNovo] = useState(false);
+  const [conferindo, setConferindo] = useState(false);
   const [tipoFiltro, setTipoFiltro] = useState("");
   const [mostrarArquivados, setMostrarArquivados] = useState(false);
 
@@ -682,9 +695,20 @@ export function EstoqueBoard({
           </Link>
         )}
         {podeEditar && aba === "materiais" && !novo && (
-          <BotaoNovo onClick={() => setNovo(true)}>
-            <Plus className="h-4 w-4" /> Novo material
-          </BotaoNovo>
+          <div className="flex flex-wrap items-center gap-2">
+            {!conferindo && visiveis.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setConferindo(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+              >
+                <ClipboardCheck className="h-4 w-4" /> Conferir estoque
+              </button>
+            )}
+            <BotaoNovo onClick={() => setNovo(true)}>
+              <Plus className="h-4 w-4" /> Novo material
+            </BotaoNovo>
+          </div>
         )}
       </div>
       {!podeEditar && (
@@ -737,6 +761,7 @@ export function EstoqueBoard({
         </Cartao>
       ) : (
         <div className="space-y-5">
+          {conferindo && <ConferirEstoque materiais={visiveis} aoFechar={() => setConferindo(false)} />}
           {novo && <FormMaterial verCustos={verCustos} fornecedores={fornecedores} compradores={compradores} aoFechar={() => setNovo(false)} />}
           {visiveis.length === 0 && !novo ? (
             <Cartao titulo="Materiais" icone={<Boxes className="h-4 w-4" />}>

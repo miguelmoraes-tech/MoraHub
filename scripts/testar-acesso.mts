@@ -194,6 +194,11 @@ import {
   montarComprador, rotuloComprador, seletorDeComprador, seletorInicial, totaisGastos, validarDataCompra,
 } from "@/lib/impressao-3d/comprador";
 import { achadosComprador } from "@/lib/impressao-3d/auditoria-comprador";
+import {
+  MOTIVOS_AJUSTE, ajustesDaConferencia, diferencaContagem, lerContagem, motivoValido, observacaoConferencia,
+  observacaoDoAjuste, precisaAjustar, saldoParaExibir, textoDiferenca,
+} from "@/lib/impressao-3d/ajuste-estoque";
+import { achadosEstoqueDireto } from "@/lib/impressao-3d/auditoria-estoque";
 import { ARQUIVOS_CALCULADORA_RAPIDA, precoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
 import { FRASE_MODULO } from "@/lib/impressao-3d/frases-modulos";
 
@@ -4656,6 +4661,99 @@ await teste("telas: campos em coluna única no celular, histórico com Comprador
   assert.ok(imp.includes("Data da compra (aquisição)") && imp.includes("Comprou: "));
   const rel = lerFonte("components/impressao-3d/gastos-por-pessoa.tsx");
   assert.ok(rel.includes("Exportar CSV"));
+});
+
+console.log("\nEstoque — atualizar quantidade e conferir estoque");
+await teste("diferença = contagem − saldo, com sinal; sem ruído de ponto flutuante; zero não chama o banco", () => {
+  assert.equal(diferencaContagem(1000, 750), -250);
+  assert.equal(diferencaContagem(480, 1480), 1000);
+  assert.equal(diferencaContagem(0.1, 0.3), 0.2, "0,3 − 0,1 não vira 0,19999");
+  assert.equal(diferencaContagem(120.5, 120.5), 0);
+  assert.equal(precisaAjustar(0), false);
+  assert.equal(precisaAjustar(-0.001), true);
+  assert.equal(precisaAjustar(250), true);
+  assert.equal(precisaAjustar(Number.NaN), false);
+});
+await teste("'Quanto tem agora?': vazio = não contou; vírgula ou ponto; negativo e texto são erro", () => {
+  assert.deepEqual(lerContagem(""), { contagem: null });
+  assert.deepEqual(lerContagem(undefined), { contagem: null });
+  assert.deepEqual(lerContagem("1250,5"), { contagem: 1250.5 });
+  assert.deepEqual(lerContagem("1250.5"), { contagem: 1250.5 });
+  assert.deepEqual(lerContagem("0"), { contagem: 0 }, "zerar o estoque é uma contagem válida");
+  assert.ok("error" in lerContagem("-3"));
+  assert.ok("error" in lerContagem("abc"));
+});
+await teste("conferência em lote: só as linhas que mudaram, com sinal; vazias e iguais são ignoradas", () => {
+  const r = ajustesDaConferencia([
+    { id: "a", saldo: 1000, contagem: "1000" },
+    { id: "b", saldo: 500, contagem: "320" },
+    { id: "c", saldo: 12, contagem: "" },
+    { id: "d", saldo: 0, contagem: "250,5" },
+    { id: "e", saldo: 80, contagem: "80,0" },
+  ]);
+  assert.ok("ajustes" in r);
+  assert.deepEqual(r.ajustes, [
+    { id: "b", diferenca: -180, contagem: 320 },
+    { id: "d", diferenca: 250.5, contagem: 250.5 },
+  ]);
+  assert.deepEqual(ajustesDaConferencia([{ id: "a", saldo: 1, contagem: "1" }]), { ajustes: [] }, "ninguém mudou: nenhuma chamada");
+});
+await teste("conferência em lote: um valor inválido interrompe tudo (nada é ajustado pela metade)", () => {
+  const r = ajustesDaConferencia([{ id: "a", saldo: 10, contagem: "5" }, { id: "b", saldo: 10, contagem: "x" }]);
+  assert.ok("error" in r && r.id === "b");
+  assert.ok("error" in ajustesDaConferencia([{ id: "a", saldo: 10, contagem: "-1" }]));
+});
+await teste("motivos curtos, observação do ajuste e da conferência (data de São Paulo)", () => {
+  assert.deepEqual(MOTIVOS_AJUSTE.map((m) => m.rotulo), ["Contagem/inventário", "Uso fora do sistema", "Perda", "Outro"]);
+  assert.equal(motivoValido("perda"), true);
+  assert.equal(motivoValido("roubo"), false);
+  assert.equal(observacaoDoAjuste("contagem"), "Contagem/inventário");
+  assert.equal(observacaoDoAjuste("uso_fora", "  teste   de cor "), "Uso fora do sistema — teste de cor");
+  assert.equal(observacaoConferencia("2026-10-30"), "Conferência de estoque em 30/10/2026");
+});
+await teste("saldo visível: filamento em g e em kg; insumo na própria unidade; texto da diferença com sinal", () => {
+  assert.deepEqual(saldoParaExibir(2480, "g"), { principal: "2.480 g", secundario: "2,48 kg" });
+  assert.deepEqual(saldoParaExibir(480, "g"), { principal: "480 g", secundario: "0,48 kg" });
+  assert.deepEqual(saldoParaExibir(12, "un"), { principal: "12 un", secundario: null });
+  assert.equal(textoDiferenca(120, "g"), "+120 g");
+  assert.equal(textoDiferenca(-50.5, "g"), "−50,5 g");
+});
+await teste("auditoria: estoque_atual, custo_medio e ultimo_custo nunca são escritos direto", () => {
+  assert.equal(achadosEstoqueDireto('await s.from("p3d_materiais").update({ estoque_atual: 10 }).eq("id", i);').length, 1);
+  assert.equal(achadosEstoqueDireto('await s.from("p3d_materiais").insert({ nome: "x", custo_medio: 3 });').length, 1);
+  assert.equal(achadosEstoqueDireto('await s.from("p3d_materiais").upsert({ ultimo_custo: 3 });').length, 1);
+  assert.equal(achadosEstoqueDireto('await s.from("p3d_materiais").update({ nome: "x", estoque_minimo: 5 });').length, 0, "mínimo pode");
+  assert.equal(achadosEstoqueDireto('const m = { estoque_atual: 1 };').length, 0, "objeto fora de escrita não conta");
+  assert.equal(achadosEstoqueDireto('// .update({ estoque_atual: 1 })').length, 0, "comentário não conta");
+  const audit = lerFonte("scripts/auditar-isolamento.mts");
+  assert.ok(audit.includes("achadosEstoqueDireto") && audit.includes("if (ruinsEstoque.length) process.exitCode = 1;"));
+});
+await teste("telas: ajuste só por p3d_movimentar_estoque com a diferença; zero não chama; saldo nunca gravado direto", () => {
+  const act = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
+  const aq = act.slice(act.indexOf("export async function atualizarQuantidade"), act.indexOf("export async function conferirEstoque"));
+  assert.ok(aq.includes('p_tipo: "ajuste"') && aq.includes("p_quantidade: diferenca") && aq.includes("p_observacao: observacaoDoAjuste"));
+  assert.ok(aq.includes("if (!precisaAjustar(diferenca)) return { ok: true }"), "diferença 0 não chama o banco");
+  assert.ok(aq.includes('.eq("workspace_id", acesso.workspaceId)'), "saldo lido da empresa ativa");
+  const ce = act.slice(act.indexOf("export async function conferirEstoque"));
+  assert.ok(ce.includes("ajustesDaConferencia") && ce.includes("observacaoConferencia()") && ce.includes('p_tipo: "ajuste"') && ce.includes("p_quantidade: a.diferenca"));
+  assert.ok(ce.includes("calculo.ajustes.length === 0"), "ninguém mudou: nenhuma chamada");
+  assert.ok(!/estoque_atual\s*:|custo_medio\s*:/.test(act), "nenhuma escrita de saldo ou custo médio");
+  assert.ok(act.includes("reavaliarAlertas") && act.includes('"p3d_atualizar_alertas"'), "alertas de mínimo são reavaliados depois do ajuste");
+  assert.ok(act.includes('getAcessoEdicao(MODULO)'));
+});
+await teste("telas: saldo em destaque (g e kg), Atualizar quantidade, Editar em 1 clique, Conferir estoque, histórico com quem fez", () => {
+  const b = lerFonte("components/impressao-3d/estoque-board.tsx");
+  assert.ok(b.includes("Tem agora") && b.includes("saldo.secundario") && b.includes("Atualizar quantidade") && b.includes("Conferir estoque"));
+  assert.ok(b.includes("<Pencil") && b.includes("Editar</span>"), "Editar com texto, 1 clique");
+  assert.ok(b.includes("<details open={!!item}"), "na edição, estoque mínimo e localização já aparecem");
+  assert.ok(b.includes("Feito por") && b.includes("m.user_id"));
+  const f = lerFonte("components/impressao-3d/atualizar-quantidade.tsx");
+  assert.ok(f.includes("Quanto tem agora?") && f.includes("defaultValue={MOTIVO_PADRAO}") && f.includes("saldoComoTexto(material.estoque_atual)"), "campo já preenchido com o saldo");
+  assert.ok(f.includes("grid-cols-1") && f.includes("sm:grid-cols-[1fr_12rem]"), "coluna única no celular");
+  assert.ok(f.includes("precisaAjustar(dif)"), "confirmar desligado sem diferença");
+  const cadastro = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
+  const atual = cadastro.slice(cadastro.indexOf("export async function atualizarMaterial"), cadastro.indexOf("export async function registrarCompraMaterial"));
+  assert.ok(!/estoque_atual|custo_medio|ultimo_custo/.test(atual), "editar o cadastro não mexe em saldo nem custo médio");
 });
 
 console.log(`\n${total} testes`);

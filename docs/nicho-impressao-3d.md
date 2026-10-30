@@ -854,3 +854,24 @@ Cada compra registra **quem pagou** e **quando**. Serve para acertar quem pagou 
 - **Auditoria** (`lib/impressao-3d/auditoria-comprador.ts`): falha se uma tela chamar `p3d_movimentar_estoque` com tipo
   `entrada` ou escrever direto em `p3d_movimentos_estoque` (comprador e data são somente leitura).
 - **Celular**: os campos novos ficam em coluna única, com fonte de 16 px e alvos de 44 px (regras globais de formulário).
+
+## Estoque → Material: atualizar quantidade e conferir estoque
+
+Para ir mantendo o estoque em dia sem precisar entender de entrada, ajuste ou perda:
+
+- **Saldo em destaque** em cada item ("Tem agora"): filamentos em **g e em kg**, demais materiais na própria unidade
+  (`un`, `ml`), com o mínimo logo abaixo. No celular o cartão fica em coluna única.
+- **Atualizar quantidade**: abre "Quanto tem agora?" já preenchido com o saldo atual, um **motivo** (Contagem/inventário,
+  Uso fora do sistema, Perda, Outro) e uma observação opcional. O servidor lê o saldo do banco, calcula a **diferença com sinal**
+  (contagem − saldo) e chama `p3d_movimentar_estoque(p_ws, material, 'ajuste', diferença, observação)`. Diferença zero **não
+  chama o banco**. A tela nunca grava `estoque_atual`, `custo_medio` nem `ultimo_custo`.
+- **Conferir estoque** (botão ao lado de *Novo material*): lista os itens do filtro atual, cada um com "Quanto tem agora?"
+  preenchido. Ao salvar, gera um ajuste **só para as linhas alteradas**, todos com "Conferência de estoque em dd/mm/aaaa".
+  Um valor inválido barra tudo; se um ajuste falhar no meio, a mensagem diz quantos já valeram.
+- **Editar o cadastro** é um clique no botão **Editar** do item (nome, cor e seletor de cor, estoque mínimo, preço de
+  referência, localização, já abertos): não mexe em saldo nem em custo médio, que só mudam por movimentação.
+- **Histórico de material**: o ajuste aparece como "Ajuste", com a variação (+/−), o motivo (na observação) e **Feito por**.
+- **Alertas de mínimo**: depois do ajuste o servidor pede ao banco que reavalie os alertas (`p3d_atualizar_alertas`, para quem
+  tem Automações ou Dashboard); o sino também reavalia sozinho ao abrir.
+- **Código**: contas e textos em `lib/impressao-3d/ajuste-estoque.ts` (puro, testado); auditoria em
+  `lib/impressao-3d/auditoria-estoque.ts`, que falha se qualquer tela ou action escrever esses campos direto.
