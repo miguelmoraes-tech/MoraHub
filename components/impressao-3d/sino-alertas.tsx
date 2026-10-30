@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
+import { usePopoverFixo } from "@/lib/hooks/use-popover-fixo";
 import { useToast } from "@/components/toast";
 import { EVENTO_ALERTAS, atualizarAlertasLimitado } from "@/components/impressao-3d/alertas-cliente";
 import { marcarNotificacao } from "@/app/(dashboard)/impressao-3d/notificacoes/actions";
@@ -40,6 +41,7 @@ export function SinoAlertas({ empresaId, config }: { empresaId: string; config: 
   const [carregando, setCarregando] = useState(true);
   const [pendente, iniciar] = useTransition();
   const caixa = useRef<HTMLDivElement>(null);
+  const pos = usePopoverFixo(caixa, aberto);
 
   const atualizar = useCallback(
     async (forcar = false) => {
@@ -122,6 +124,7 @@ export function SinoAlertas({ empresaId, config }: { empresaId: string; config: 
       <button
         type="button"
         onClick={alternar}
+        title="Alertas do nicho: estoque, prazos, manutenção, pagamentos e falhas"
         aria-label={total > 0 ? `Alertas do nicho: ${total} aberto${total > 1 ? "s" : ""}` : "Alertas do nicho"}
         aria-expanded={aberto}
         className="relative rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
@@ -138,7 +141,8 @@ export function SinoAlertas({ empresaId, config }: { empresaId: string; config: 
         <div
           role="dialog"
           aria-label="Alertas da operação"
-          className="absolute left-3 top-full z-50 w-96 max-w-[calc(100vw-1.5rem)] rounded-xl border border-zinc-800 bg-zinc-950 shadow-xl shadow-black/40"
+          style={{ top: pos.top, left: pos.left }}
+          className="fixed z-50 w-96 max-w-[calc(100vw-1.5rem)] rounded-xl border border-zinc-800 bg-zinc-950 shadow-xl shadow-black/40"
         >
           <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
             <p className="text-sm font-semibold text-zinc-100">Alertas da operação</p>

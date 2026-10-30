@@ -24,6 +24,44 @@
   --color-petrol-600: #0f4c5c;
 }
 
+/* Barra de rolagem da barra lateral: fina e discreta no tema escuro (nada de barra branca nativa).
+   Cores = zinc-700/zinc-500 do design system, translúcidas; o polegar clareia no hover. */
+:root {
+  --scrollbar-trilho: transparent;
+  --scrollbar-polegar: rgb(63 63 70 / 0.55);
+  --scrollbar-polegar-hover: rgb(113 113 122 / 0.8);
+}
+
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-polegar) var(--scrollbar-trilho);
+  /* Reserva o espaço da barra: o menu não "pula" quando ela aparece. */
+  scrollbar-gutter: stable;
+}
+
+.sidebar-scroll:hover {
+  scrollbar-color: var(--scrollbar-polegar-hover) var(--scrollbar-trilho);
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: var(--scrollbar-trilho);
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-polegar);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-polegar-hover);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

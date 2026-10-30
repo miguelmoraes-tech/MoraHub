@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/format";
 import { useToast } from "@/components/toast";
 import Link from "next/link";
 import { useSolicitacoes } from "@/components/vendedor/solicitacoes-provider";
+import { usePopoverFixo } from "@/lib/hooks/use-popover-fixo";
 import { useAprovacoes } from "@/components/aprovacoes/aprovacoes-provider";
 import { ehPedidoCofundador, rotuloDoPedidoAcesso, textoConfirmarCofundador } from "@/lib/socios-shared";
 
@@ -23,6 +24,7 @@ export function SolicitacoesBell() {
   const [respondendoId, setRespondendoId] = useState<string | null>(null);
   const [respondendo, startResponder] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
+  const pos = usePopoverFixo(containerRef, aberto);
 
   useEffect(() => {
     if (!aberto) return;
@@ -73,10 +75,11 @@ export function SolicitacoesBell() {
       <button
         type="button"
         onClick={() => setAberto((v) => !v)}
+        title="Aprovações e pedidos de acesso pendentes"
         aria-label={
           total > 0
-            ? `Notificações: ${total} pendência${total > 1 ? "s" : ""}`
-            : "Notificações"
+            ? `Aprovações e pedidos de acesso pendentes: ${total} pendência${total > 1 ? "s" : ""}`
+            : "Aprovações e pedidos de acesso pendentes"
         }
         aria-expanded={aberto}
         className="relative rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
@@ -93,7 +96,8 @@ export function SolicitacoesBell() {
         <div
           role="dialog"
           aria-label="Pedidos de acesso"
-          className="absolute left-3 top-full z-50 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-zinc-800 bg-zinc-950 shadow-xl shadow-black/40"
+          style={{ top: pos.top, left: pos.left }}
+          className="fixed z-50 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-zinc-800 bg-zinc-950 shadow-xl shadow-black/40"
         >
           <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
             <p className="text-sm font-semibold text-zinc-100">

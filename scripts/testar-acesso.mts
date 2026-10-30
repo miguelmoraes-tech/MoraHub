@@ -183,6 +183,7 @@ import { erroDaRpc, gestorErrorMessage, solicitarAcessoErrorMessage, limparCodig
 import { rotuloDoTipo as rotuloTipoAprovacao } from "@/lib/aprovacoes-shared";
 import { ACESSO_VENDEDOR_AGUARDANDO } from "@/lib/vendedor-access";
 import { GRUPO_EMPRESA } from "@/lib/modulos/preferencias";
+import { CHAVE_ROLAGEM_SIDEBAR, gravarRolagem, lerRolagem } from "@/lib/sidebar-rolagem";
 import { ARQUIVOS_CALCULADORA_RAPIDA, precoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
 import { FRASE_MODULO } from "@/lib/impressao-3d/frases-modulos";
 
@@ -4075,14 +4076,78 @@ await teste("a rota /socios é liberada no proxy para fundador e cofundador, com
   assert.ok(pagina.includes("getEmpresaPainel()") && !pagina.includes("getAcessoModulo"), "página só do painel, sem módulo");
   assert.ok(lerFonte("app/(dashboard)/layout.tsx").includes("painelCompleto={!!painel}"));
 });
-await teste("a barra lateral mantém o bloco Empresa sempre visível (fora da área que rola)", () => {
+await teste("barra lateral: só o rodapé é fixo; cabeçalho, busca, seletores e TODOS os grupos (inclusive Empresa) rolam juntos", () => {
   const side = lerFonte("components/sidebar.tsx");
-  assert.ok(side.includes("GRUPO_EMPRESA") && side.includes('data-menu-fixo="empresa"'));
-  const iNav = side.indexOf('<nav className="flex-1 overflow-y-auto');
-  const iFim = side.indexOf("</nav>");
-  const iFixo = side.indexOf('data-menu-fixo="empresa"');
-  assert.ok(iNav > 0 && iFixo > iFim, "o bloco fixo vem depois do </nav> que rola");
-  assert.ok(!side.slice(iNav, iFim).includes("grupoEmpresa"), "o bloco não está dentro da área rolável");
+  const iAside = side.indexOf("<aside");
+  const iRol = side.indexOf("data-sidebar-scroll");
+  const iNav = side.indexOf("<nav aria-label=\"Menu principal\"");
+  const iFimNav = side.indexOf("</nav>");
+  const iRodape = side.indexOf("{/* Rodapé fixo");
+  assert.ok(iAside > 0 && iRol > iAside && iNav > iRol && iFimNav > iNav && iRodape > iFimNav, "ordem: aside > área rolável > nav > rodapé");
+  assert.ok(/<aside className="flex h-dvh w-64 shrink-0 flex-col/.test(side), "aside: altura da tela (dvh) em coluna");
+  assert.ok(/className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"/.test(side), "área rolável: min-h-0 + flex-1 + overflow-y-auto");
+  assert.equal((side.match(/overflow-y-auto/g) ?? []).length, 1, "uma única área rolável");
+  const rolavel = side.slice(iRol, iRodape);
+  for (const parte of ["data-sidebar-header", "<GlobalSearch", "<EmpresaSwitcher", "<ModeSwitcher", "gruposMenu.map("]) assert.ok(rolavel.includes(parte), `${parte} dentro da área rolável`);
+  assert.ok(!side.includes("data-menu-fixo") && !side.includes("gruposRolaveis") && !side.includes("grupoEmpresa"), "o bloco Empresa não é mais fixo: rola com os demais");
+  const rodape = side.slice(iRodape);
+  assert.ok(/className="shrink-0 border-t border-zinc-900/.test(rodape), "rodapé shrink-0 com borda superior");
+  for (const item of ["{userEmail}", "Personalizar navegação", "Entrar numa empresa com código", "Sair"]) assert.ok(rodape.includes(item), `rodapé tem ${item}`);
+  for (const fora of ["<GlobalSearch", "gruposMenu.map(", "<EmpresaSwitcher"]) assert.ok(!rodape.includes(fora), `${fora} não está no rodapé`);
+  assert.ok(lerFonte("app/(dashboard)/layout.tsx").includes('<div className="flex h-dvh overflow-hidden">'), "layout em dvh");
+});
+await teste("barra de rolagem fina e discreta no tema escuro (tokens do app), sem layout shift", () => {
+  const css = lerFonte("app/globals.css");
+  const bloco = css.slice(css.indexOf(".sidebar-scroll {"));
+  assert.ok(/scrollbar-width:\s*thin/.test(bloco) && /scrollbar-gutter:\s*stable/.test(bloco));
+  assert.ok(/scrollbar-color:\s*var\(--scrollbar-polegar\) var\(--scrollbar-trilho\)/.test(bloco), "polegar translúcido sobre trilho transparente");
+  assert.ok(/\.sidebar-scroll:hover\s*\{\s*scrollbar-color:\s*var\(--scrollbar-polegar-hover\)/.test(bloco), "clareia no hover");
+  for (const pseudo of ["::-webkit-scrollbar {", "::-webkit-scrollbar-track {", "::-webkit-scrollbar-thumb {", "::-webkit-scrollbar-thumb:hover {"]) assert.ok(bloco.includes(`.sidebar-scroll${pseudo}`), pseudo);
+  assert.ok(/--scrollbar-trilho:\s*transparent/.test(css) && /--scrollbar-polegar:\s*rgb\(63 63 70/.test(css), "tokens: trilho transparente, polegar zinc translúcido");
+  assert.ok(!/scrollbar[^;]*(#fff|white)/i.test(bloco), "nada de barra branca");
+});
+await teste("o item ativo fica visível (nearest, sem animar na 1ª carga) e a rolagem não volta ao topo", () => {
+  const side = lerFonte("components/sidebar.tsx");
+  assert.ok(side.includes('aria-current={isActive ? "page" : undefined}'));
+  assert.ok(side.includes('querySelector<HTMLElement>(\'[aria-current="page"]\')') && side.includes('block: "nearest"'));
+  assert.ok(side.includes('behavior: primeiraVez.current || reduzir ? "auto" : "smooth"') && side.includes("prefers-reduced-motion"));
+  assert.ok(side.includes("lerRolagem(window.sessionStorage)") && side.includes("gravarRolagem(window.sessionStorage"), "posição preservada se a barra remontar");
+  // Helpers puros: nunca lançam e ignoram lixo.
+  const memoria = new Map<string, string>();
+  const storage = { getItem: (k: string) => memoria.get(k) ?? null, setItem: (k: string, v: string) => void memoria.set(k, v) };
+  assert.equal(lerRolagem(storage), 0);
+  gravarRolagem(storage, 123.6);
+  assert.equal(lerRolagem(storage), 124);
+  memoria.set(CHAVE_ROLAGEM_SIDEBAR, "lixo");
+  assert.equal(lerRolagem(storage), 0);
+  memoria.set(CHAVE_ROLAGEM_SIDEBAR, "-5");
+  assert.equal(lerRolagem(storage), 0);
+  gravarRolagem(storage, NaN);
+  gravarRolagem(storage, -1);
+  assert.equal(memoria.get(CHAVE_ROLAGEM_SIDEBAR), "-5", "valor inválido não é gravado");
+  const bloqueado = { getItem: () => { throw new Error("bloqueado"); }, setItem: () => { throw new Error("bloqueado"); } };
+  assert.equal(lerRolagem(bloqueado), 0);
+  assert.doesNotThrow(() => gravarRolagem(bloqueado, 10));
+  assert.equal(lerRolagem(null), 0);
+  assert.doesNotThrow(() => gravarRolagem(undefined, 10));
+});
+await teste("foco por teclado visível dentro da área rolável (ring inset) e sem rolagem horizontal", () => {
+  const side = lerFonte("components/sidebar.tsx");
+  assert.ok((side.match(/focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-500/g) ?? []).length >= 4, "itens do menu e 3 itens do rodapé");
+  assert.ok(side.includes("overflow-x-hidden"));
+});
+await teste("os dois sinos: funções diferentes, rótulos e tooltips distintos, popovers fixos (não cortados pela área rolável)", () => {
+  const alertas = lerFonte("components/impressao-3d/sino-alertas.tsx");
+  const pedidos = lerFonte("components/vendedor/solicitacoes-bell.tsx");
+  assert.ok(alertas.includes('title="Alertas do nicho:') && alertas.includes('"Alertas do nicho"') && alertas.includes("Alertas da operação"));
+  assert.ok(pedidos.includes('title="Aprovações e pedidos de acesso pendentes"') && pedidos.includes("Aprovações e pedidos de acesso pendentes: "));
+  assert.notEqual(alertas.match(/aria-label=\{total[^}]*\}/)?.[0], pedidos.match(/aria-label=\{\s*total[\s\S]*?\}/)?.[0]);
+  for (const f of [alertas, pedidos]) {
+    assert.ok(f.includes("usePopoverFixo(") && /className="fixed z-50/.test(f) && f.includes("style={{ top: pos.top, left: pos.left }}"), "popover fixed");
+    assert.ok(!/className="absolute left-3 top-full/.test(f));
+  }
+  const hook = lerFonte("lib/hooks/use-popover-fixo.ts");
+  assert.ok(hook.includes("[data-sidebar-header]") && hook.includes('addEventListener("scroll", calcular, true)'));
 });
 await teste("tela de equipe: fundadores + membros sem repetir, fundador original não sai, erros das RPCs como vieram", () => {
   const membros = [

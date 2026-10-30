@@ -112,7 +112,7 @@ export default async function DashboardLayout({
   const aprovacoesIniciais = workspacePedidosId ? await getAprovacoes(workspacePedidosId) : [];
 
   const conteudo = (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       <Sidebar
         userEmail={user.email ?? ""}
         userId={user.id}

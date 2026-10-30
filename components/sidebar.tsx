@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -38,8 +39,8 @@ import type { EmpresaVinculo } from "@/lib/empresas";
 import { iconeDe } from "@/components/modulos/icones";
 import { CHAT_HABILITADO, rotaPermitida } from "@/lib/modulos/registry";
 import { ACESSO_VENDEDOR_CODIGO } from "@/lib/vendedor-access";
+import { gravarRolagem, lerRolagem } from "@/lib/sidebar-rolagem";
 import {
-  GRUPO_EMPRESA,
   aplicarPreferenciaMenu,
   gruposDoMenu,
   type ItemNavegacao,
@@ -136,7 +137,8 @@ function NavGroup({
             <li key={item.href}>
               <Link
                 href={item.href}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                aria-current={isActive ? "page" : undefined}
+                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-500 ${
                   isActive
                     ? accent === "petrol"
                       ? "bg-petrol-600/15 text-petrol-300"
@@ -209,15 +211,46 @@ export function Sidebar({
   const rotulos = useRotulos();
   const isPessoal = pathname.startsWith("/pessoal");
   const accent: Accent = isPessoal ? "petrol" : "copper";
-  // O bloco "Empresa" (Módulos, Equipe e cofundadores, Aprovações, Configurações) fica fixo, fora da
-  // área que rola: nunca some atrás de uma lista longa de módulos.
   const gruposMenu = aplicarPreferenciaMenu(gruposDoMenu(modulosHabilitados, painelCompleto, restrito), preferencia);
-  const gruposRolaveis = gruposMenu.filter((g) => g.titulo !== GRUPO_EMPRESA);
-  const grupoEmpresa = gruposMenu.find((g) => g.titulo === GRUPO_EMPRESA) ?? null;
+
+  // A barra inteira rola (cabeçalho, busca, seletores e todos os grupos, inclusive "Empresa"); só o rodapé fica fixo.
+  const rolagemRef = useRef<HTMLDivElement>(null);
+  const primeiraVez = useRef(true);
+  const quadro = useRef(0);
+
+  // Restaura a posição se a barra remontou (a barra vive no layout, então navegar não a remonta).
+  useEffect(() => {
+    const el = rolagemRef.current;
+    if (el) el.scrollTop = lerRolagem(window.sessionStorage);
+  }, []);
+
+  // O item ativo fica visível dentro da área rolável; sem animar na primeira carga nem com movimento reduzido.
+  useEffect(() => {
+    const ativo = rolagemRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!ativo) return;
+    const reduzir = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    ativo.scrollIntoView({ block: "nearest", behavior: primeiraVez.current || reduzir ? "auto" : "smooth" });
+    primeiraVez.current = false;
+  }, [pathname]);
+
+  function aoRolar() {
+    if (quadro.current) return;
+    quadro.current = requestAnimationFrame(() => {
+      quadro.current = 0;
+      if (rolagemRef.current) gravarRolagem(window.sessionStorage, rolagemRef.current.scrollTop);
+    });
+  }
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
-      <div className="relative flex items-center gap-2.5 px-5 py-6">
+    <aside className="flex h-dvh w-64 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
+      {/* Única área rolável: min-h-0 deixa o flex encolher e o overflow funcionar de verdade. */}
+      <div
+        ref={rolagemRef}
+        onScroll={aoRolar}
+        data-sidebar-scroll
+        className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
+      >
+      <div data-sidebar-header className="relative flex items-center gap-2.5 px-5 py-6">
         <Image
           src="/logo.png"
           alt="Mora HUB"
@@ -252,7 +285,7 @@ export function Sidebar({
         <ModeSwitcher mode={isPessoal ? "pessoal" : "business"} tiposAtivos={tiposAtivos} />
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav aria-label="Menu principal" className="px-3 py-4">
         <div key={accent} className="hub-mode-fade-in space-y-6">
           {isPessoal ? (
             <>
@@ -267,7 +300,7 @@ export function Sidebar({
             </>
           ) : (
             <>
-              {gruposRolaveis.map((grupo) => (
+              {gruposMenu.map((grupo) => (
                 <NavGroup
                   key={grupo.titulo}
                   title={grupo.titulo}
@@ -281,18 +314,10 @@ export function Sidebar({
         </div>
       </nav>
 
-      {!isPessoal && grupoEmpresa && (
-        <div className="border-t border-zinc-900 px-3 py-3" data-menu-fixo="empresa">
-          <NavGroup
-            title={grupoEmpresa.titulo}
-            items={grupoEmpresa.itens.map((item) => itemDeMenu(item, rotulos))}
-            accent={accent}
-            habilitados={modulosHabilitados}
-          />
-        </div>
-      )}
+      </div>
 
-      <div className="border-t border-zinc-900 p-3">
+      {/* Rodapé fixo: fora da área rolável. */}
+      <div className="shrink-0 border-t border-zinc-900 bg-zinc-950 p-3">
         {CHAT_HABILITADO && (
           <GlobalChatBadge
             href={chatHref}
@@ -306,7 +331,7 @@ export function Sidebar({
         {!isPessoal && (painelCompleto || (restrito && modulosHabilitados.length > 0)) && (
           <Link
             href="/configuracoes/navegacao"
-            className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+            className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-400 outline-none transition-colors hover:bg-zinc-900 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-500"
           >
             <SlidersHorizontal className="h-4 w-4" />
             Personalizar navegação
@@ -315,7 +340,7 @@ export function Sidebar({
         {/* Qualquer conta logada (fundador, cofundador, sócio, funcionário) pode entrar noutra empresa com um código. */}
         <Link
           href={ACESSO_VENDEDOR_CODIGO}
-          className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+          className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-400 outline-none transition-colors hover:bg-zinc-900 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-500"
         >
           <KeyRound className="h-4 w-4" />
           Entrar numa empresa com código
@@ -323,7 +348,7 @@ export function Sidebar({
         <form action={logout}>
           <button
             type="submit"
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-rose-300"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-400 outline-none transition-colors hover:bg-zinc-900 hover:text-rose-300 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-500"
           >
             <LogOut className="h-4 w-4" />
             Sair
