@@ -235,3 +235,25 @@ export const MovimentoSchema = z.object({
   custo_total: numOpc("Custo total", { min: 0 }),
   observacao: textoOpc(300),
 });
+
+/** Linha do estoque de peças: só produto, variação, mínimo e localização (quantidade e custo são das RPCs). */
+export const PecaEstoqueSchema = z.object({
+  produto_id: z.string().uuid({ error: "Escolha o produto." }),
+  variacao_id: uuidOpc(),
+  estoque_minimo: z.preprocess(
+    (v) => parseNumero(v) ?? 0,
+    z.number({ error: "Estoque mínimo: informe um número inteiro." }).int({ error: "Estoque mínimo: use um número inteiro." }).gte(0, { error: "Estoque mínimo: informe zero ou mais." })
+  ),
+  localizacao: textoOpc(120),
+});
+
+/** Movimento de peças lançado na tela (entrada manual, devolução, perda ou ajuste). */
+export const MovimentoPecaSchema = z.object({
+  tipo: z.enum(["entrada_manual", "devolucao", "perda", "ajuste"], { error: "Tipo de movimento inválido." }),
+  quantidade: z.preprocess(
+    (v) => parseNumero(v),
+    z.number({ error: "Quantidade: informe um número inteiro." })
+  ),
+  custo_unitario: numOpc("Custo por peça", { min: 0 }),
+  observacao: textoOpc(300),
+});

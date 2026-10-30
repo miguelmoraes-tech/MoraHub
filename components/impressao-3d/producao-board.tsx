@@ -13,12 +13,12 @@ import {
 } from "@/components/impressao-3d/campos";
 import { TOM_PRIORIDADE } from "@/components/impressao-3d/pedidos-board";
 import {
-  atualizarTrabalho, cancelarProducao, concluirProducao, criarTrabalho, excluirTrabalho, iniciarProducao,
+  atualizarTrabalho, cancelarProducao, concluirProducao, concluirProducaoMulti, criarTrabalho, excluirTrabalho, iniciarProducao,
   registrarFalhaProducao, type ResultadoOperacao,
 } from "@/app/(dashboard)/impressao-3d/producao/actions";
 import {
   PRIORIDADE_ROTULO, QUALIDADE_ROTULO, STATUS_PRODUCAO_ROTULO, TIPO_DEFEITO_ROTULO, TIPOS_DEFEITO,
-  type StatusProducao, type Trabalho,
+  type MaterialDoTrabalho, type StatusProducao, type Trabalho,
 } from "@/lib/impressao-3d/tipos-operacao";
 import { STATUS_IMPRESSORA_ROTULO, type StatusImpressora } from "@/lib/impressao-3d/tipos";
 import type { OpcaoMaterial, OpcaoPedido, OpcaoProduto, Opcoes } from "@/lib/impressao-3d/opcoes";
@@ -28,6 +28,8 @@ import {
 import { formatDataHora, formatGramas, formatHoras, formatNumero } from "@/lib/impressao-3d/numeros";
 import { formatDate } from "@/lib/format";
 import { abaInicial } from "@/lib/modulos/preferencias";
+import { FilamentosLista } from "@/components/impressao-3d/filamentos-lista";
+import { linhasParaTrabalho, novaLinhaFilamento, type LinhaFilamento } from "@/lib/impressao-3d/filamentos";
 
 export interface ImpressoraProducao {
   id: string;
@@ -53,14 +55,22 @@ function CamposTrabalho({
   materiais,
   produtos,
   limitado,
+  linhasDoTrabalho,
 }: {
   item?: Trabalho;
   impressoras: ImpressoraProducao[] | null;
   materiais: Opcoes<OpcaoMaterial>;
   produtos: Opcoes<OpcaoProduto>;
   limitado: boolean;
+  linhasDoTrabalho: MaterialDoTrabalho[];
 }) {
   const [produtoId, setProdutoId] = useState(item?.produto_id ?? "");
+  const [filamentos, setFilamentos] = useState<LinhaFilamento[]>(() =>
+    linhasDoTrabalho.length > 0
+      ? linhasDoTrabalho.map((l) => novaLinhaFilamento({ origem: "estoque", material_id: l.material_id, peso_g: String(l.peso_estimado_g) }))
+      : [novaLinhaFilamento({ origem: "estoque" })]
+  );
+  const montado = linhasParaTrabalho(filamentos);
   const variacoes = produtos.itens.find((p) => p.id === produtoId)?.variacoes ?? [];
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -101,7 +111,13 @@ function CamposTrabalho({
             <input type="hidden" name="impressora_id" value={item?.impressora_id ?? ""} />
           )}
           {materiais.acessivel ? (
-            <Seletor rotulo="Material" name="material_id" defaultValue={item?.material_id ?? ""}>
+            <Seletor
+              rotulo="Material único (alternativa)"
+              name="material_id"
+              defaultValue={item?.material_id ?? ""}
+              disabled={montado.linhas.length > 0}
+              ajuda={montado.linhas.length > 0 ? "A lista de filamentos abaixo vale no lugar deste campo." : undefined}
+            >
               <option value="">Informar ao concluir</option>
               {materiais.itens.map((m) => (
                 <option key={m.id} value={m.id}>{m.nome}</option>
@@ -109,6 +125,29 @@ function CamposTrabalho({
             </Seletor>
           ) : (
             <input type="hidden" name="material_id" value={item?.material_id ?? ""} />
+          )}
+          {!produtoId && !item?.pedido_id && (
+            <p className="col-span-2 text-[11px] text-amber-400 sm:col-span-4">
+              Sem produto, as peças não entram no estoque de peças ao concluir.
+            </p>
+          )}
+          {materiais.acessivel && (
+            <div className="col-span-2 space-y-2 sm:col-span-4">
+              <p className="text-xs font-medium text-zinc-400">Filamentos do trabalho (opcional)</p>
+              <FilamentosLista
+                linhas={filamentos}
+                aoMudar={setFilamentos}
+                opcoes={materiais.itens
+                  .filter((m) => m.unidade === "g")
+                  .map((m) => ({ id: m.id, nome: m.nome, cor: m.cor, cor_hex: m.cor_hex }))}
+                estoqueAcessivel={materiais.acessivel}
+                rotuloPeso="Peso estimado (g)"
+                ajudaPeso="Peso do trabalho inteiro (todas as peças) para este filamento."
+                somenteEstoque
+              />
+              {montado.erros.length > 0 && <p className="text-[11px] text-rose-400">{montado.erros[0]}</p>}
+              <input type="hidden" name="filamentos" value={JSON.stringify(montado.linhas)} />
+            </div>
           )}
         </>
       )}
@@ -139,12 +178,14 @@ function FormTrabalho({
   impressoras,
   materiais,
   produtos,
+  linhasDoTrabalho,
   aoFechar,
 }: {
   item?: Trabalho;
   impressoras: ImpressoraProducao[] | null;
   materiais: Opcoes<OpcaoMaterial>;
   produtos: Opcoes<OpcaoProduto>;
+  linhasDoTrabalho: MaterialDoTrabalho[];
   aoFechar: () => void;
 }) {
   const acao = item ? atualizarTrabalho.bind(null, item.id) : criarTrabalho;
@@ -155,10 +196,11 @@ function FormTrabalho({
     <form action={formAction} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
       {!item && (
         <p className="text-[11px] text-zinc-500">
-          Trabalho avulso (produção para estoque). Trabalhos de pedido são criados por &quot;Gerar produção&quot; no pedido.
+          <strong>Produzir para o estoque de peças</strong>: ao concluir um trabalho avulso com produto, as peças entram sozinhas no
+          estoque de peças. Trabalhos de pedido são criados por &quot;Gerar produção&quot; no pedido e não mexem no estoque de peças.
         </p>
       )}
-      <CamposTrabalho item={item} impressoras={impressoras} materiais={materiais} produtos={produtos} limitado={limitado} />
+      <CamposTrabalho item={item} impressoras={impressoras} materiais={materiais} produtos={produtos} limitado={limitado} linhasDoTrabalho={linhasDoTrabalho} />
       <ErroForm state={state} />
       <div className="flex justify-end gap-2">
         <BotaoTexto onClick={aoFechar}>Cancelar</BotaoTexto>
@@ -219,16 +261,22 @@ function FormIniciar({
 function FormConcluir({
   trabalho,
   materiais,
+  linhas,
   executar,
   pendente,
   aoFechar,
 }: {
   trabalho: Trabalho;
   materiais: Opcoes<OpcaoMaterial>;
+  /** Filamentos do trabalho (p3d_producao_materiais); vazio = trabalho antigo, conclusão simples. */
+  linhas: MaterialDoTrabalho[];
   executar: Executor;
   pendente: boolean;
   aoFechar: () => void;
 }) {
+  if (linhas.length > 0) {
+    return <FormConcluirMulti trabalho={trabalho} materiais={materiais} linhas={linhas} executar={executar} pendente={pendente} aoFechar={aoFechar} />;
+  }
   return (
     <form
       action={(fd) => executar(() => concluirProducao(trabalho.id, fd), aoFechar)}
@@ -261,13 +309,79 @@ function FormConcluir({
   );
 }
 
-function FormFalha({
+/** Conclusão de trabalho com vários filamentos: uma linha por filamento (estimado pré-preenchido, real editável). */
+function FormConcluirMulti({
   trabalho,
+  materiais,
+  linhas,
   executar,
   pendente,
   aoFechar,
 }: {
   trabalho: Trabalho;
+  materiais: Opcoes<OpcaoMaterial>;
+  linhas: MaterialDoTrabalho[];
+  executar: Executor;
+  pendente: boolean;
+  aoFechar: () => void;
+}) {
+  const [reais, setReais] = useState<Record<string, string>>(() =>
+    Object.fromEntries(linhas.map((l) => [l.material_id, String(l.peso_estimado_g)]))
+  );
+  const consumos = JSON.stringify(linhas.map((l) => ({ material_id: l.material_id, peso_real_g: reais[l.material_id] ?? "" })));
+  return (
+    <form
+      action={(fd) => executar(() => concluirProducaoMulti(trabalho.id, fd), aoFechar)}
+      className="space-y-3 rounded-lg border border-copper-500/30 bg-zinc-950/60 p-3"
+    >
+      <p className="text-sm font-medium text-zinc-100">Concluir trabalho #{trabalho.numero}</p>
+      <input type="hidden" name="consumos" value={consumos} />
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-zinc-400">Peso real consumido por filamento (g) *</p>
+        {linhas.map((l) => {
+          const m = materiais.itens.find((x) => x.id === l.material_id);
+          return (
+            <div key={l.material_id} className="grid grid-cols-[1fr_9rem] items-end gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm text-zinc-200">{[m?.nome ?? "Filamento", m?.cor].filter(Boolean).join(" · ")}</p>
+                <p className="text-[11px] text-zinc-600">Estimado: {formatGramas(l.peso_estimado_g)}</p>
+              </div>
+              <Numero
+                rotulo="Real (g)"
+                required
+                value={reais[l.material_id] ?? ""}
+                onChange={(e) => setReais((r) => ({ ...r, [l.material_id]: e.target.value }))}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Numero rotulo="Horas reais *" name="horas_reais" required />
+        <Entrada rotulo="Observação" name="observacao" className="col-span-2 sm:col-span-3" />
+      </div>
+      <p className="text-[11px] text-zinc-600">
+        Cada filamento é baixado do estoque com o peso real informado, as horas são somadas à impressora e ela é liberada. Isto não pode ser feito duas vezes.
+        {!trabalho.pedido_id && trabalho.produto_id && " Como é um trabalho avulso com produto, as peças entram no estoque de peças."}
+      </p>
+      <div className="flex justify-end gap-2">
+        <BotaoTexto onClick={aoFechar}>Cancelar</BotaoTexto>
+        <BotaoPrimario pendente={pendente}>{pendente ? "Concluindo..." : "Concluir e baixar estoque"}</BotaoPrimario>
+      </div>
+    </form>
+  );
+}
+
+function FormFalha({
+  trabalho,
+  multi,
+  executar,
+  pendente,
+  aoFechar,
+}: {
+  trabalho: Trabalho;
+  /** Trabalho com vários filamentos. */
+  multi: boolean;
   executar: Executor;
   pendente: boolean;
   aoFechar: () => void;
@@ -284,6 +398,12 @@ function FormFalha({
           ? "Trabalho já concluído: o estoque NÃO é baixado de novo (o consumo já saiu na conclusão). Informar quantidade afetada menor que a do trabalho mantém o trabalho concluído (falha parcial)."
           : "Trabalho imprimindo: o material perdido é baixado do estoque e o trabalho passa a \"Falhou\"."}
       </Aviso>
+      {multi && (
+        <Aviso>
+          Este trabalho tem vários filamentos: o peso perdido que você informar é dividido proporcionalmente aos pesos estimados de cada
+          filamento, e a reimpressão copia a lista.
+        </Aviso>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Seletor rotulo="Tipo de defeito *" name="tipo_defeito" required defaultValue="" className="col-span-2">
           <option value="" disabled>Selecione...</option>
@@ -351,6 +471,7 @@ function CartaoTrabalho({
   materiais,
   produtos,
   pedidos,
+  linhas,
   hoje,
   executar,
   pendente,
@@ -361,6 +482,8 @@ function CartaoTrabalho({
   materiais: Opcoes<OpcaoMaterial>;
   produtos: Opcoes<OpcaoProduto>;
   pedidos: Opcoes<OpcaoPedido>;
+  /** Filamentos deste trabalho. */
+  linhas: MaterialDoTrabalho[];
   hoje: string;
   executar: Executor;
   pendente: boolean;
@@ -416,6 +539,18 @@ function CartaoTrabalho({
               {trabalho.iniciado_em && ` · iniciado ${formatDataHora(trabalho.iniciado_em)}`}
               {trabalho.concluido_em && ` · concluído ${formatDataHora(trabalho.concluido_em)}`}
             </p>
+            {linhas.length > 0 && (
+              <p className="text-xs text-zinc-500">
+                Filamentos:{" "}
+                {linhas
+                  .map((l) => {
+                    const m = materiais.itens.find((x) => x.id === l.material_id);
+                    const nome = [m?.nome ?? "filamento", m?.cor].filter(Boolean).join(" · ");
+                    return `${nome} ${formatGramas(l.peso_estimado_g)}${l.peso_real_g !== null ? ` (real ${formatGramas(l.peso_real_g)})` : ""}`;
+                  })
+                  .join("; ")}
+              </p>
+            )}
             {trabalho.observacoes && <p className="text-xs text-zinc-600">{trabalho.observacoes}</p>}
           </div>
           {podeEditar && (
@@ -447,11 +582,11 @@ function CartaoTrabalho({
         </div>
       </div>
       {modo === "editar" && (
-        <FormTrabalho item={trabalho} impressoras={impressoras} materiais={materiais} produtos={produtos} aoFechar={fechar} />
+        <FormTrabalho item={trabalho} impressoras={impressoras} materiais={materiais} produtos={produtos} linhasDoTrabalho={linhas} aoFechar={fechar} />
       )}
       {modo === "iniciar" && <FormIniciar trabalho={trabalho} impressoras={impressoras} executar={executar} pendente={pendente} aoFechar={fechar} />}
-      {modo === "concluir" && <FormConcluir trabalho={trabalho} materiais={materiais} executar={executar} pendente={pendente} aoFechar={fechar} />}
-      {modo === "falha" && <FormFalha trabalho={trabalho} executar={executar} pendente={pendente} aoFechar={fechar} />}
+      {modo === "concluir" && <FormConcluir trabalho={trabalho} materiais={materiais} linhas={linhas} executar={executar} pendente={pendente} aoFechar={fechar} />}
+      {modo === "falha" && <FormFalha trabalho={trabalho} multi={linhas.length > 0} executar={executar} pendente={pendente} aoFechar={fechar} />}
       {modo === "cancelar" && <FormCancelar trabalho={trabalho} aoFechar={fechar} />}
     </div>
   );
@@ -525,12 +660,14 @@ export function ProducaoBoard({
   truncado,
   impressoras,
   materiais,
+  linhasMaterial,
   produtos,
   pedidos,
   podeEditar,
   hoje,
   abas,
 }: {
+  linhasMaterial: MaterialDoTrabalho[];
   trabalhos: Trabalho[];
   truncado: boolean;
   /** null = sem acesso ao módulo Impressoras. */
@@ -573,6 +710,11 @@ export function ProducaoBoard({
     return m;
   }, [trabalhos]);
   const lista = aba === "produtividade" ? [] : (porStatus.get(aba) ?? []);
+  const linhasPorTrabalho = useMemo(() => {
+    const m = new Map<string, MaterialDoTrabalho[]>();
+    for (const l of linhasMaterial) m.set(l.producao_id, [...(m.get(l.producao_id) ?? []), l]);
+    return m;
+  }, [linhasMaterial]);
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
@@ -585,7 +727,7 @@ export function ProducaoBoard({
         </div>
         {podeEditar && !novo && (
           <BotaoNovo onClick={() => setNovo(true)}>
-            <Plus className="h-4 w-4" /> Novo trabalho avulso
+            <Plus className="h-4 w-4" /> Produzir para o estoque de peças
           </BotaoNovo>
         )}
       </div>
@@ -609,7 +751,7 @@ export function ProducaoBoard({
       )}
       {novo && (
         <div className="mb-5">
-          <FormTrabalho impressoras={impressoras} materiais={materiais} produtos={produtos} aoFechar={() => setNovo(false)} />
+          <FormTrabalho impressoras={impressoras} materiais={materiais} produtos={produtos} linhasDoTrabalho={[]} aoFechar={() => setNovo(false)} />
         </div>
       )}
 
@@ -652,6 +794,7 @@ export function ProducaoBoard({
                   materiais={materiais}
                   produtos={produtos}
                   pedidos={pedidos}
+                  linhas={linhasPorTrabalho.get(t.id) ?? []}
                   hoje={hoje}
                   executar={executar}
                   pendente={pendente}

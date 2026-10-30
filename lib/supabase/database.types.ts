@@ -3424,6 +3424,59 @@ export type Database = {
           },
         ]
       }
+      p3d_movimentos_pecas: {
+        Row: {
+          created_at: string
+          custo_unitario: number | null
+          delta: number
+          id: string
+          observacao: string | null
+          peca_id: string
+          referencia_id: string | null
+          referencia_tipo: string | null
+          saldo_apos: number
+          tipo: string
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          custo_unitario?: number | null
+          delta: number
+          id?: string
+          observacao?: string | null
+          peca_id: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          saldo_apos: number
+          tipo: string
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          custo_unitario?: number | null
+          delta?: number
+          id?: string
+          observacao?: string | null
+          peca_id?: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          saldo_apos?: number
+          tipo?: string
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_movimentos_pecas_peca_id_workspace_id_fkey"
+            columns: ["peca_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_pecas_estoque"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
       p3d_notificacoes: {
         Row: {
           chave: string
@@ -3681,6 +3734,70 @@ export type Database = {
           },
         ]
       }
+      p3d_pecas_estoque: {
+        Row: {
+          created_at: string
+          custo_medio: number
+          estoque_minimo: number
+          id: string
+          localizacao: string | null
+          produto_id: string
+          quantidade: number
+          updated_at: string
+          user_id: string
+          variacao_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          custo_medio?: number
+          estoque_minimo?: number
+          id?: string
+          localizacao?: string | null
+          produto_id: string
+          quantidade?: number
+          updated_at?: string
+          user_id?: string
+          variacao_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          custo_medio?: number
+          estoque_minimo?: number
+          id?: string
+          localizacao?: string | null
+          produto_id?: string
+          quantidade?: number
+          updated_at?: string
+          user_id?: string
+          variacao_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_pecas_estoque_produto_id_workspace_id_fkey"
+            columns: ["produto_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produtos"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_pecas_estoque_variacao_id_workspace_id_fkey"
+            columns: ["variacao_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_produto_variacoes"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_pecas_estoque_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       p3d_pedido_historico: {
         Row: {
           created_at: string
@@ -3735,6 +3852,7 @@ export type Database = {
           orcamento_item_id: string | null
           ordem: number
           origem: string
+          pecas_baixadas_em: string | null
           pedido_id: string
           preco_total: number
           preco_unitario: number
@@ -3755,6 +3873,7 @@ export type Database = {
           orcamento_item_id?: string | null
           ordem?: number
           origem?: string
+          pecas_baixadas_em?: string | null
           pedido_id: string
           preco_total?: number
           preco_unitario: number
@@ -3775,6 +3894,7 @@ export type Database = {
           orcamento_item_id?: string | null
           ordem?: number
           origem?: string
+          pecas_baixadas_em?: string | null
           pedido_id?: string
           preco_total?: number
           preco_unitario?: number
@@ -4117,6 +4237,51 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "perfis_tipos_ativos"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      p3d_producao_materiais: {
+        Row: {
+          created_at: string
+          id: string
+          material_id: string
+          peso_estimado_g: number
+          peso_real_g: number | null
+          producao_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          material_id: string
+          peso_estimado_g?: number
+          peso_real_g?: number | null
+          producao_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          material_id?: string
+          peso_estimado_g?: number
+          peso_real_g?: number | null
+          producao_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p3d_producao_materiais_material_id_workspace_id_fkey"
+            columns: ["material_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_materiais"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "p3d_producao_materiais_producao_id_workspace_id_fkey"
+            columns: ["producao_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "p3d_producao"
+            referencedColumns: ["id", "workspace_id"]
           },
         ]
       }
@@ -6318,6 +6483,7 @@ export type Database = {
         }[]
       }
       p3d_atualizar_alertas: { Args: { p_ws: string }; Returns: number }
+      p3d_baixar_pecas_pedido: { Args: { p_pedido_id: string }; Returns: Json }
       p3d_calcular_preco: { Args: { p: Json }; Returns: Json }
       p3d_cancelar_producao: {
         Args: { p_motivo: string; p_producao_id: string }
@@ -6333,6 +6499,15 @@ export type Database = {
         }
         Returns: Json
       }
+      p3d_concluir_producao_multi: {
+        Args: {
+          p_consumos: Json
+          p_horas_reais: number
+          p_observacao?: string
+          p_producao_id: string
+        }
+        Returns: Json
+      }
       p3d_criar_pedido_de_orcamento: {
         Args: {
           p_orcamento_id: string
@@ -6340,6 +6515,10 @@ export type Database = {
           p_prioridade?: string
         }
         Returns: string
+      }
+      p3d_devolver_pecas_pedido: {
+        Args: { p_motivo?: string; p_pedido_id: string }
+        Returns: Json
       }
       p3d_estoque_aplicar: {
         Args: {
@@ -6385,6 +6564,19 @@ export type Database = {
         }
         Returns: Json
       }
+      p3d_movimentar_pecas: {
+        Args: {
+          p_custo_unitario?: number
+          p_observacao?: string
+          p_permitir_negativo?: boolean
+          p_produto_id: string
+          p_quantidade: number
+          p_tipo: string
+          p_variacao_id: string
+          p_ws: string
+        }
+        Returns: Json
+      }
       p3d_mudar_status_compra: {
         Args: { p_compra_id: string; p_status: string }
         Returns: string
@@ -6409,6 +6601,21 @@ export type Database = {
       p3d_num: { Args: { d?: number; k: string; p: Json }; Returns: number }
       p3d_painel: {
         Args: { p_ate?: string; p_de?: string; p_ws: string }
+        Returns: Json
+      }
+      p3d_pecas_aplicar: {
+        Args: {
+          p_custo_unitario: number
+          p_observacao: string
+          p_permitir_negativo: boolean
+          p_produto_id: string
+          p_quantidade: number
+          p_ref_id: string
+          p_ref_tipo: string
+          p_tipo: string
+          p_variacao_id: string
+          p_ws: string
+        }
         Returns: Json
       }
       p3d_pedido_set_status: {

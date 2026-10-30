@@ -47,6 +47,8 @@ const MODULOS_NOVOS: Record<string, string[]> = {
     "p3d_envios",
     // Etapa C-1: alertas, notificacoes e integracoes.
     "p3d_config_alertas", "p3d_notificacoes", "p3d_integracoes",
+    // Etapa E (parte 2): estoque de peças e filamentos do trabalho.
+    "p3d_pecas_estoque", "p3d_movimentos_pecas", "p3d_producao_materiais",
   ],
   // Etapa D: preferências de navegação (padrão da empresa e pessoal).
   navegacao: ["menu_preferencias"],
@@ -359,7 +361,10 @@ const PROTEGIDOS: Record<string, string[]> = {
     "status", "status_pagamento", "numero", "origem", "orcamento_id", "subtotal", "total",
     "custo_total", "lucro_total", "pago_valor", "cancelado_em", "cancelado_motivo",
   ],
-  p3d_pedido_itens: ["preco_total", "custo_total", "lucro"],
+  p3d_pedido_itens: ["preco_total", "custo_total", "lucro", "pecas_baixadas_em"],
+  // Quantidade e custo médio das peças só mudam por p3d_movimentar_pecas (e Produção/Pedidos); o peso real, por p3d_concluir_producao_multi.
+  p3d_pecas_estoque: ["quantidade", "custo_medio"],
+  p3d_producao_materiais: ["peso_real_g"],
   p3d_producao: [
     "status", "numero", "horas_reais", "peso_real_g", "qualidade", "iniciado_em", "concluido_em",
     "consumo_registrado_em", "reimpressao_de",
@@ -370,7 +375,7 @@ const PROTEGIDOS: Record<string, string[]> = {
   p3d_config_alertas: ["updated_by"],
 };
 const SOMENTE_LEITURA = [
-  "p3d_orcamento_itens", "p3d_movimentos_estoque",
+  "p3d_orcamento_itens", "p3d_movimentos_estoque", "p3d_movimentos_pecas",
   // Etapa B: somente leitura (escrita so por RPC).
   "p3d_pedido_pagamentos", "p3d_pedido_historico", "p3d_inspecoes", "p3d_falhas",
   // Etapa C-1: notificacoes sao geradas pelo banco (p3d_atualizar_alertas); so lida_em muda, por RPC.
@@ -426,6 +431,7 @@ const SCHEMA_DA_TABELA: Record<string, string[]> = {
   p3d_compra_itens: ["CompraItemSchema"],
   p3d_pedidos: ["PedidoSchema", "PedidoLimitadoSchema"],
   p3d_pedido_itens: ["PedidoItemSchema"],
+  p3d_pecas_estoque: ["PecaEstoqueSchema"],
   p3d_producao: ["TrabalhoSchema", "TrabalhoLimitadoSchema"],
   p3d_envios: ["EnvioSchema"],
   p3d_integracoes: ["IntegracaoSchema"],
@@ -725,4 +731,42 @@ if (navegacaoForaDoContrato.length) process.exitCode = 1;
   console.log(`\nEtapa E: preço calculado no cliente (Calculadora de preço): ${precoNoCliente.length}`);
   for (const s of precoNoCliente) console.log("  ! " + s);
   if (precoNoCliente.length) process.exitCode = 1;
+}
+
+// --- Etapa E (parte 2): conclusão de trabalho com materiais, saldo e preço no cliente ----------------
+{
+  const problemas: string[] = [];
+  const ler = (rel: string) => readFileSync(join(raiz, rel), "utf8").replace(/\r\n/g, "\n");
+
+  // 1. p3d_concluir_producao (conclusão simples) nunca em trabalho com materiais: a action confere
+  //    p3d_producao_materiais ANTES da RPC simples, e só ela chama a RPC simples.
+  const acoesProd = ler("app/(dashboard)/impressao-3d/producao/actions.ts");
+  const iSimples = acoesProd.indexOf('rpc("p3d_concluir_producao"');
+  const iLinhas = acoesProd.indexOf('.from("p3d_producao_materiais")');
+  if (iSimples === -1) problemas.push("producao/actions.ts não chama p3d_concluir_producao (trabalhos antigos)");
+  else if (iLinhas === -1 || iLinhas > iSimples) problemas.push("producao/actions.ts chama p3d_concluir_producao sem conferir p3d_producao_materiais antes");
+  if (!/Este trabalho tem vários filamentos/.test(acoesProd)) problemas.push("producao/actions.ts não recusa a conclusão simples de trabalho com materiais");
+  if (!acoesProd.includes('rpc("p3d_concluir_producao_multi"')) problemas.push("producao/actions.ts não usa p3d_concluir_producao_multi");
+  for (const pasta of ["app", "components", "lib"]) {
+    for (const arq of arquivos(join(raiz, pasta))) {
+      const rel = relative(raiz, arq).replace(/\\/g, "/");
+      if (rel === "app/(dashboard)/impressao-3d/producao/actions.ts") continue;
+      if (/\.rpc\(\s*["'`]p3d_concluir_producao["'`]/.test(readFileSync(arq, "utf8"))) {
+        problemas.push(`${rel} chama p3d_concluir_producao fora da action que confere os materiais`);
+      }
+    }
+  }
+  const quadro = ler("components/impressao-3d/producao-board.tsx");
+  if (!/linhas\.length > 0\) \{\s*return <FormConcluirMulti/.test(quadro)) problemas.push("producao-board.tsx não roteia trabalho com materiais para FormConcluirMulti");
+
+  // 2. Preço e saldo nunca recalculados no cliente.
+  const caminhoModulo = "../lib/impressao-3d/auditoria-preco.ts";
+  const { ARQUIVOS_CALCULADORA_RAPIDA: arqPreco, precoCalculadoNoCliente: achaPreco, ARQUIVOS_SEM_SALDO_NO_CLIENTE: arqSaldo, saldoCalculadoNoCliente: achaSaldo } =
+    (await import(caminhoModulo)) as typeof import("../lib/impressao-3d/auditoria-preco");
+  for (const rel of arqPreco) for (const n of achaPreco(ler(rel))) problemas.push(`${rel}: preço no cliente (${n})`);
+  for (const rel of arqSaldo) for (const n of achaSaldo(ler(rel))) problemas.push(`${rel}: saldo no cliente (${n})`);
+
+  console.log(`\nEtapa E (parte 2): conclusão multi, preço e saldo no cliente: ${problemas.length}`);
+  for (const s of problemas) console.log("  ! " + s);
+  if (problemas.length) process.exitCode = 1;
 }

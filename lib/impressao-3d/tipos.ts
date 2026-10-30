@@ -273,3 +273,43 @@ export interface ItemOrcamento {
 /** Colunas de cada select (nunca `*`: quem não tem o extra "custos" não recebe custo). */
 export const COLUNAS_IMPRESSORA =
   "id, workspace_id, nome, marca, modelo, tecnologia, volume_x_mm, volume_y_mm, volume_z_mm, bico_mm, status, potencia_media_kw, valor_aquisicao, valor_residual, vida_util_horas, data_aquisicao, horas_uso, manutencao_hora, manutencao_ciclo, intervalo_manutencao_horas, horas_ultima_manutencao, integracao_tipo, integracao_url, observacoes, ativo";
+
+// --- Estoque de peças (peças impressas prontas) -------------------------------------------------
+
+export type TipoMovimentoPeca = "producao" | "entrada_manual" | "devolucao" | "venda" | "perda" | "ajuste";
+export const TIPO_MOVIMENTO_PECA_ROTULO: Record<TipoMovimentoPeca, string> = {
+  producao: "Produção",
+  entrada_manual: "Entrada manual",
+  devolucao: "Devolução",
+  venda: "Venda",
+  perda: "Perda",
+  ajuste: "Ajuste",
+};
+
+/** Tipos que a tela do estoque de peças pode lançar. Produção e venda são das telas de Produção e de Pedidos. */
+export const TIPOS_PECA_NA_TELA = ["entrada_manual", "devolucao", "perda", "ajuste"] as const;
+export type TipoPecaNaTela = (typeof TIPOS_PECA_NA_TELA)[number];
+
+export interface PecaEstoque {
+  id: string;
+  produto_id: string;
+  variacao_id: string | null;
+  quantidade: number;
+  /** Custo: só com o extra "custos" do Estoque. */
+  custo_medio: number | null;
+  estoque_minimo: number;
+  localizacao: string | null;
+}
+
+export interface MovimentoPeca {
+  id: string;
+  peca_id: string;
+  tipo: TipoMovimentoPeca;
+  delta: number;
+  saldo_apos: number;
+  custo_unitario: number | null;
+  referencia_tipo: string | null;
+  referencia_id: string | null;
+  observacao: string | null;
+  created_at: string;
+}

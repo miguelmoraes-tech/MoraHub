@@ -703,3 +703,81 @@ pela aprovação de todos em Aprovações (com 1 fundador, valem na hora).
 margem, W → kW, entrada por rolos, resumo de WhatsApp, Equipe e cofundadores, começo enxuto. `auditar-isolamento.mts`
 **falha se a Calculadora de preço calcular preço no cliente** (`lib/impressao-3d/auditoria-preco.ts`: custo ×
 multiplicador, custo ÷ (1 − margem), preço atribuído por multiplicação...) ou se deixar de chamar a RPC.
+
+
+## Etapa E (parte 2): filamentos marcados, estoque de peças e produção com vários materiais
+
+### Filamentos marcados (calculadora, simulador avançado e orçamento)
+
+A Calculadora rápida troca o campo único de material por **"Filamentos usados neste projeto"**: uma lista (mínimo 1
+linha, adicionar/remover) em que cada linha escolhe um filamento do estoque (mostrando cor, custo por kg e saldo) ou
+**informa na hora** (nome, cor opcional, valor do kg) e o peso **por peça** daquele filamento.
+
+`p_entrada.materiais` (peso do **lote** = peso por peça × quantidade):
+
+- do estoque: `{material_id, peso_g}`;
+- informado na hora: `{nome, cor?, peso_g, preco_por_g}` com `preco_por_g = valor do kg ÷ 1000`.
+
+Com a lista, **não** se envia `material_id`, `preco_por_g`, `preco_rolo`, `peso_rolo_g` nem `peso_peca_g` no topo
+(a lista é a fonte; as demais regras da calculadora rápida não mudam). O resultado mostra **uma linha por filamento**
+(`calculo.detalhes.material.itens[{material_id, nome, cor, peso_g, preco_por_g, custo}]`) e, para filamento do estoque
+cujo peso total passa do saldo, "Faltam X g" (comparação informativa, sem bloquear). "Criar orçamento com este
+cálculo" leva a lista ao item. O simulador avançado ganhou "Vários filamentos no mesmo trabalho (opcional)" (pesos do
+lote; o material único continua como alternativa) e `materiais` é um campo **do item** do orçamento (sobrevive ao
+"Recalcular com valores atuais").
+
+### Cadastro de filamento por kg
+
+Visíveis: nome/descrição, tipo, material, cor (seletor + `cor_hex`), **Valor pago por kg** e **Quanto comprei** (kg ou g;
+0 = só cadastra). Grava `preco_compra = valor do kg` e `peso_liquido_rolo_g = 1000` (assim `custo_cadastro` = valor do
+kg ÷ 1000 por g); o peso do rolo enviado pelo cliente é ignorado. "Quanto comprei" vira `p3d_movimentar_estoque`
+(`entrada`, gramas, `p_custo_total = kg × valor do kg`, só com o extra `custos`). **Nova compra** por filamento é uma
+nova entrada com o valor pago (atualiza o custo médio). Unidade, marca, diâmetro, estoque mínimo, fornecedor e
+localização ficam em **Mais opções**. A lista mostra cor, saldo em kg/g, custo por kg (cadastro e médio) e alerta de
+mínimo. Nunca se envia `estoque_atual`, `custo_medio` nem `ultimo_custo`.
+
+### Estoque de peças (aba "Peças" do módulo `p3d_estoque`)
+
+O Estoque tem as abas **Material** (`materiais`), **Peças** (`pecas`) e **Histórico de material** (`historico`), com
+chaves estáveis no registro (respeitam as abas ocultas e o mínimo de 1 visível). Peças usam as **mesmas permissões** do
+estoque de material (sem módulo novo; o extra `custos` esconde o custo médio).
+
+- `p3d_pecas_estoque` (produto, variação, `quantidade` inteira, `custo_medio`, `estoque_minimo`, `localizacao`):
+  insert/update direto **só** de produto, variação, mínimo e localização; quantidade e custo médio **só por
+  movimentação**. Excluir só linha sem saldo e sem histórico.
+- `p3d_movimentos_pecas`: somente leitura (a tela mostra a **origem**: "Produção #n", "Pedido #n" ou "Manual").
+- `p3d_movimentar_pecas`: a tela lança **entrada manual, perda e ajuste** (devolução também é aceita na action;
+  ajuste com sinal e motivo obrigatório). `producao` e `venda` são das telas de Produção e de Pedidos, nunca daqui.
+  Saldo negativo é recusado pelo banco (mensagem como veio).
+- "Nova peça no estoque": escolhe produto/variação, com quantidade inicial opcional e **criar produto rápido** (só o
+  nome) para quem edita Produtos. Sem o módulo Produtos ligado a aba convida a adicioná-lo em Módulos.
+
+### Produção com vários materiais
+
+- **Produzir para o estoque de peças** (trabalho avulso): produto (+variação), quantidade, impressora, **lista de
+  filamentos com peso estimado** (grava `p3d_producao` e `p3d_producao_materiais`; com a lista, `material_id` fica
+  nulo e o peso estimado é a soma). Linhas só mudam com o trabalho na fila.
+- **Concluir**: trabalho com linhas de material abre um diálogo com **uma linha por filamento** (estimado
+  pré-preenchido, real editável) + horas reais → `p3d_concluir_producao_multi` (exige o consumo de TODOS os materiais;
+  os materiais vêm do banco, não do formulário). A conclusão simples (`p3d_concluir_producao`) só roda depois de a
+  action conferir que o trabalho **não** tem linhas de material. Avisos: estoque negativo, abaixo do mínimo,
+  manutenção devida e **"N peças entraram no estoque de peças"** (trabalho concluído **sem pedido e com produto**;
+  produção de pedido não mexe no estoque de peças).
+- **Falha** em trabalho multi mantém a assinatura de `p3d_registrar_falha`: a perda total é dividida
+  proporcionalmente aos pesos estimados dos filamentos e a reimpressão copia a lista (a tela avisa).
+
+### Pedidos
+
+Cada item com produto mostra **"Em estoque: N peças"**; o chip **"Baixado do estoque"** aparece no item já baixado
+(`pecas_baixadas_em`, somente leitura), que não pode mais mudar produto/quantidade nem ser removido (devolva antes).
+Botões **Baixar do estoque de peças** (`p3d_baixar_pecas_pedido`) e **Devolver peças ao estoque**
+(`p3d_devolver_pecas_pedido`) só aparecem com edição em Pedidos **e** em Estoque; erros do banco aparecem como vieram
+(ex.: faltou peça).
+
+### Primeiros passos e auditoria
+
+Primeiros passos: filamento com valor do kg, 1ª entrada de estoque, 1ª impressora, tarifa de energia, 1º produto
+(só de módulos ligados). A auditoria (`auditar-isolamento.mts`) falha em escrita direta em
+`p3d_pecas_estoque.quantidade/custo_medio`, em `p3d_movimentos_pecas`, em `p3d_producao_materiais.peso_real_g`, em
+`p3d_pedido_itens.pecas_baixadas_em`, em uso de `p3d_concluir_producao` fora da action que confere os materiais e em
+preço ou saldo recalculados no cliente (`lib/impressao-3d/auditoria-preco.ts`).

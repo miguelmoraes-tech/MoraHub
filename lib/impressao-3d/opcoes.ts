@@ -52,7 +52,11 @@ export async function getOpcoesMateriais(): Promise<Opcoes<OpcaoMaterial>> {
   return { itens: (data ?? []) as unknown as OpcaoMaterial[], acessivel: true };
 }
 
-export type OpcaoMaterialCusto = OpcaoMaterial & { custo_por_g: number | null };
+export type OpcaoMaterialCusto = OpcaoMaterial & {
+  custo_por_g: number | null;
+  /** Saldo do estoque na unidade do material (g para filamento). */
+  estoque_atual: number;
+};
 
 /**
  * Materiais da Calculadora de preço, com o custo por g que o cadastro já guarda (não é cálculo de
@@ -68,19 +72,19 @@ export async function getOpcoesMateriaisComCusto(
     .from("p3d_materiais")
     .select(
       ver
-        ? "id, nome, tipo, unidade, cor, cor_hex, peso_liquido_rolo_g, custo_cadastro, custo_medio"
-        : "id, nome, tipo, unidade, cor, cor_hex, peso_liquido_rolo_g"
+        ? "id, nome, tipo, unidade, cor, cor_hex, peso_liquido_rolo_g, estoque_atual, custo_cadastro, custo_medio"
+        : "id, nome, tipo, unidade, cor, cor_hex, peso_liquido_rolo_g, estoque_atual"
     )
     .eq("workspace_id", acesso.workspaceId)
     .eq("ativo", true)
     .order("nome", { ascending: true });
-  const linhas = (data ?? []) as unknown as (OpcaoMaterial & { custo_cadastro?: number | null; custo_medio?: number | null })[];
+  const linhas = (data ?? []) as unknown as (OpcaoMaterial & { estoque_atual?: number | null; custo_cadastro?: number | null; custo_medio?: number | null })[];
   return {
     itens: linhas.map(({ custo_cadastro, custo_medio, ...m }) => {
       const medio = Number(custo_medio) || 0;
       const cadastro = Number(custo_cadastro) || 0;
       const custo = base === "medio" && medio > 0 ? medio : cadastro;
-      return { ...m, custo_por_g: ver && custo > 0 ? custo : null };
+      return { ...m, estoque_atual: Number(m.estoque_atual) || 0, custo_por_g: ver && custo > 0 ? custo : null };
     }),
     acessivel: true,
   };

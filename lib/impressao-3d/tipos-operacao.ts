@@ -153,6 +153,8 @@ export interface PedidoItem {
   lucro: number;
   entrada: unknown;
   calculo: unknown;
+  /** Quando as peças deste item saíram do estoque de peças (somente leitura; null = não baixado). */
+  pecas_baixadas_em: string | null;
 }
 
 export interface PedidoPagamento {
@@ -229,6 +231,14 @@ export interface Trabalho {
   reimpressao_de: string | null;
   observacoes: string | null;
   created_at: string;
+}
+
+/** Linha de p3d_producao_materiais: um filamento do trabalho (peso real só preenchido ao concluir, pelo banco). */
+export interface MaterialDoTrabalho {
+  producao_id: string;
+  material_id: string;
+  peso_estimado_g: number;
+  peso_real_g: number | null;
 }
 
 /** Retorno de p3d_iniciar_producao. */
@@ -355,7 +365,7 @@ export const COLUNAS_HISTORICO_PRECOS =
 export const COLUNAS_PEDIDO =
   "id, numero, cliente_id, cliente_avulso, status, status_pagamento, prioridade, origem, orcamento_id, data_pedido, prazo_entrega, desconto_valor, frete_valor, subtotal, total, pago_valor, observacoes, cancelado_em, cancelado_motivo, created_at";
 export const COLUNAS_PEDIDO_ITEM =
-  "id, pedido_id, ordem, origem, descricao, produto_id, variacao_id, quantidade, preco_unitario, preco_total, entrada, calculo";
+  "id, pedido_id, ordem, origem, descricao, produto_id, variacao_id, quantidade, preco_unitario, preco_total, entrada, calculo, pecas_baixadas_em";
 export const COLUNAS_PEDIDO_PAGAMENTO = "id, pedido_id, tipo, forma, valor, data, observacao, conta_receber_id, created_at";
 export const COLUNAS_PEDIDO_HISTORICO = "id, pedido_id, de, para, motivo, created_at";
 export const COLUNAS_TRABALHO =

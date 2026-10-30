@@ -5,10 +5,14 @@ import { getAcessoEdicao, getAcessoModulo } from "@/lib/empresa-ativa";
 import { createClient } from "@/lib/supabase/server";
 import { mensagemEscrita, mensagemRpc } from "@/lib/impressao-3d/erros";
 import { SEM_PERMISSAO, podeVerCustos } from "@/lib/impressao-3d/regras";
-import { avisosConclusao, lerConclusao, lerFalha, lerInicio } from "@/lib/impressao-3d/regras-operacao";
+import {
+  avisosConclusao, avisosConclusaoMulti, lerConclusao, lerConclusaoMulti, lerFalha, lerInicio, lerPecasEstoque,
+} from "@/lib/impressao-3d/regras-operacao";
+import { lerLinhasTrabalho, montarConsumos, pesoTotalLinhas } from "@/lib/impressao-3d/filamentos";
+import { textoPecasEntraram } from "@/lib/impressao-3d/pecas";
 import { formParaObjeto, primeiroErro, textoReq } from "@/lib/impressao-3d/validacao";
 import {
-  ConclusaoSchema, FalhaSchema, TrabalhoLimitadoSchema, TrabalhoSchema,
+  ConclusaoMultiSchema, ConclusaoSchema, FalhaSchema, TrabalhoLimitadoSchema, TrabalhoSchema,
 } from "@/lib/impressao-3d/validacao-operacao";
 import { formatMoeda, formatNumero } from "@/lib/impressao-3d/numeros";
 import type { ActionState } from "@/lib/actions/types";
@@ -37,14 +41,35 @@ function revalidarTudo() {
 export async function criarTrabalho(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = TrabalhoSchema.safeParse(formParaObjeto(formData));
   if (!parsed.success) return { error: primeiroErro(parsed.error) };
+  const lista = lerLinhasTrabalho(formData.get("filamentos"));
+  if (lista.erro) return { error: lista.erro };
 
   const acesso = await getAcessoEdicao(MODULO);
   if (!acesso) return { error: SEM_PERMISSAO };
 
-  const { error } = await (await createClient())
+  // Com filamentos, a lista é a fonte do material e do peso: o material único fica nulo.
+  const dados = lista.linhas.length > 0
+    ? { ...parsed.data, material_id: null, peso_estimado_g: pesoTotalLinhas(lista.linhas) }
+    : parsed.data;
+
+  const supabase = await createClient();
+  const { data: criado, error } = await supabase
     .from("p3d_producao")
-    .insert({ workspace_id: acesso.workspaceId, ...parsed.data });
-  if (error) return { error: mensagemEscrita(error, "Não foi possível criar o trabalho.") };
+    .insert({ workspace_id: acesso.workspaceId, ...dados })
+    .select("id")
+    .single();
+  if (error || !criado) return { error: mensagemEscrita(error, "Não foi possível criar o trabalho.") };
+
+  if (lista.linhas.length > 0) {
+    const { error: erroLinhas } = await supabase.from("p3d_producao_materiais").insert(
+      lista.linhas.map((l) => ({ workspace_id: acesso.workspaceId, producao_id: criado.id, ...l }))
+    );
+    if (erroLinhas) {
+      // Não deixa um trabalho pela metade na fila.
+      await supabase.from("p3d_producao").delete().eq("id", criado.id).eq("workspace_id", acesso.workspaceId).eq("status", "fila");
+      return { error: mensagemEscrita(erroLinhas, "Não foi possível salvar os filamentos do trabalho.") };
+    }
+  }
 
   revalidatePath(ROTA);
   return { ok: true };
@@ -69,14 +94,38 @@ export async function atualizarTrabalho(trabalhoId: string, _prev: ActionState, 
   const parsed = esquema.safeParse(objeto);
   if (!parsed.success) return { error: primeiroErro(parsed.error) };
 
+  // Filamentos só mudam com o trabalho na fila (o banco também recusa depois).
+  const editaLinhas = atual.status === "fila" && formData.has("filamentos");
+  const lista = editaLinhas ? lerLinhasTrabalho(formData.get("filamentos")) : { linhas: [], erro: null };
+  if (lista.erro) return { error: lista.erro };
+  const dados =
+    editaLinhas && lista.linhas.length > 0
+      ? { ...parsed.data, material_id: null, peso_estimado_g: pesoTotalLinhas(lista.linhas) }
+      : parsed.data;
+
   const { data, error } = await supabase
     .from("p3d_producao")
-    .update(parsed.data)
+    .update(dados)
     .eq("id", trabalhoId)
     .eq("workspace_id", acesso.workspaceId)
     .select("id");
   if (error) return { error: mensagemEscrita(error, "Não foi possível atualizar o trabalho.") };
   if (!data || data.length === 0) return { error: "Trabalho não encontrado." };
+
+  if (editaLinhas) {
+    const { error: erroApagar } = await supabase
+      .from("p3d_producao_materiais")
+      .delete()
+      .eq("producao_id", trabalhoId)
+      .eq("workspace_id", acesso.workspaceId);
+    if (erroApagar) return { error: mensagemEscrita(erroApagar, "Não foi possível atualizar os filamentos do trabalho.") };
+    if (lista.linhas.length > 0) {
+      const { error: erroLinhas } = await supabase.from("p3d_producao_materiais").insert(
+        lista.linhas.map((l) => ({ workspace_id: acesso.workspaceId, producao_id: trabalhoId, ...l }))
+      );
+      if (erroLinhas) return { error: mensagemEscrita(erroLinhas, "Não foi possível salvar os filamentos do trabalho.") };
+    }
+  }
 
   revalidatePath(ROTA);
   return { ok: true };
@@ -133,7 +182,19 @@ export async function concluirProducao(trabalhoId: string, formData: FormData): 
   if (!acesso) return { error: SEM_PERMISSAO };
   const { peso_real_g, horas_reais, material_id, observacao } = parsed.data;
 
-  const { data, error } = await (await createClient()).rpc("p3d_concluir_producao", {
+  // Trabalho COM linhas de material só conclui por p3d_concluir_producao_multi (a conclusão simples é recusada).
+  const supabase = await createClient();
+  const { data: linhas, error: erroLinhas } = await supabase
+    .from("p3d_producao_materiais")
+    .select("material_id")
+    .eq("producao_id", trabalhoId)
+    .eq("workspace_id", acesso.workspaceId);
+  if (erroLinhas) return { error: mensagemEscrita(erroLinhas, "Não foi possível ler os filamentos do trabalho.") };
+  if ((linhas ?? []).length > 0) {
+    return { error: "Este trabalho tem vários filamentos: conclua informando o consumo real de cada um." };
+  }
+
+  const { data, error } = await supabase.rpc("p3d_concluir_producao", {
     p_producao_id: trabalhoId,
     p_peso_real_g: peso_real_g,
     p_horas_reais: horas_reais,
@@ -143,11 +204,86 @@ export async function concluirProducao(trabalhoId: string, formData: FormData): 
   if (error) return { error: mensagemRpc(error, "Não foi possível concluir o trabalho.") };
 
   const r = lerConclusao(data);
+  const avisos = avisosConclusao(r, (n) => formatNumero(n, 1));
+  // Trabalho avulso com produto: as peças entram sozinhas no estoque de peças.
+  if (lerPecasEstoque(data)) {
+    const { data: t } = await supabase
+      .from("p3d_producao")
+      .select("quantidade")
+      .eq("id", trabalhoId)
+      .eq("workspace_id", acesso.workspaceId)
+      .maybeSingle();
+    if (t) avisos.push(textoPecasEntraram(t.quantidade));
+  }
   revalidarTudo();
   return {
     ok: true,
     mensagem: "Trabalho concluído. O consumo de material foi baixado do estoque.",
-    avisos: avisosConclusao(r, (n) => formatNumero(n, 1)),
+    avisos,
+  };
+}
+
+/**
+ * Conclui um trabalho com VÁRIOS filamentos (p3d_concluir_producao_multi): exige o consumo real de TODOS
+ * os materiais do trabalho. Baixa cada filamento do estoque, soma as horas na impressora e, em trabalho
+ * avulso com produto, dá entrada das peças no estoque de peças.
+ */
+export async function concluirProducaoMulti(trabalhoId: string, formData: FormData): Promise<ResultadoOperacao> {
+  const horas = ConclusaoMultiSchema.safeParse(formParaObjeto(formData));
+  if (!horas.success) return { error: primeiroErro(horas.error) };
+
+  const acesso = await getAcessoEdicao(MODULO);
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  let bruto: unknown;
+  try {
+    bruto = JSON.parse(String(formData.get("consumos") ?? "[]"));
+  } catch {
+    return { error: "Consumos: lista inválida." };
+  }
+  const linhasForm = (Array.isArray(bruto) ? bruto : []).map((x) => {
+    const o = x && typeof x === "object" ? (x as Record<string, unknown>) : {};
+    return { material_id: String(o.material_id ?? ""), peso_real_g: String(o.peso_real_g ?? "") };
+  });
+
+  // Os materiais do trabalho vêm do banco, nunca do formulário.
+  const supabase = await createClient();
+  const { data: doTrabalho, error: erroLeitura } = await supabase
+    .from("p3d_producao_materiais")
+    .select("material_id")
+    .eq("producao_id", trabalhoId)
+    .eq("workspace_id", acesso.workspaceId);
+  if (erroLeitura) return { error: mensagemEscrita(erroLeitura, "Não foi possível ler os filamentos do trabalho.") };
+  const ids = (doTrabalho ?? []).map((l) => l.material_id);
+  if (ids.length === 0) return { error: "Este trabalho não tem filamentos: use a conclusão simples." };
+
+  const montado = montarConsumos(linhasForm, ids);
+  if (montado.erros.length > 0) return { error: montado.erros[0] };
+
+  const { data, error } = await supabase.rpc("p3d_concluir_producao_multi", {
+    p_producao_id: trabalhoId,
+    p_horas_reais: horas.data.horas_reais,
+    p_consumos: montado.consumos as never,
+    ...(horas.data.observacao ? { p_observacao: horas.data.observacao } : {}),
+  });
+  if (error) return { error: mensagemRpc(error, "Não foi possível concluir o trabalho.") };
+
+  const r = lerConclusaoMulti(data);
+  let quantidade = 0;
+  if (r.pecas_estoque) {
+    const { data: t } = await supabase
+      .from("p3d_producao")
+      .select("quantidade")
+      .eq("id", trabalhoId)
+      .eq("workspace_id", acesso.workspaceId)
+      .maybeSingle();
+    quantidade = t?.quantidade ?? 0;
+  }
+  revalidarTudo();
+  return {
+    ok: true,
+    mensagem: "Trabalho concluído. O consumo de cada filamento foi baixado do estoque.",
+    avisos: avisosConclusaoMulti(r, quantidade, (n) => formatNumero(n, 1)),
   };
 }
 

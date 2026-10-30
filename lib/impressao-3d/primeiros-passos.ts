@@ -17,10 +17,10 @@ export interface PassoDef {
 }
 
 export const PASSOS: readonly PassoDef[] = [
-  { chave: "precificacao", titulo: "Informar a tarifa de energia na calculadora de preço", modulo: "p3d_precificacao", href: "/impressao-3d/precificacao" },
+  { chave: "material", titulo: "Cadastrar o primeiro filamento com o valor do kg", modulo: "p3d_estoque", href: "/impressao-3d/estoque" },
+  { chave: "entrada_estoque", titulo: "Registrar a primeira entrada de estoque (quanto você comprou)", modulo: "p3d_estoque", href: "/impressao-3d/estoque" },
   { chave: "impressora", titulo: "Cadastrar a primeira impressora", modulo: "p3d_impressoras", href: "/impressao-3d/impressoras" },
-  { chave: "material", titulo: "Cadastrar o primeiro material com preço", modulo: "p3d_estoque", href: "/impressao-3d/estoque" },
-  { chave: "entrada_estoque", titulo: "Registrar a primeira entrada de estoque", modulo: "p3d_estoque", href: "/impressao-3d/estoque" },
+  { chave: "precificacao", titulo: "Informar a tarifa de energia na calculadora de preço", modulo: "p3d_precificacao", href: "/impressao-3d/precificacao" },
   { chave: "produto", titulo: "Cadastrar o primeiro produto", modulo: "p3d_produtos", href: "/impressao-3d/produtos" },
   { chave: "orcamento", titulo: "Criar o primeiro orçamento", modulo: "p3d_orcamentos", href: "/impressao-3d/orcamentos" },
   { chave: "pedido", titulo: "Criar o primeiro pedido", modulo: "p3d_pedidos", href: "/impressao-3d/pedidos" },

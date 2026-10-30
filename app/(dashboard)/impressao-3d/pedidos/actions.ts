@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { mensagemEscrita, mensagemRpc } from "@/lib/impressao-3d/erros";
 import { SEM_PERMISSAO, SEM_PERMISSAO_CUSTOS, podeVerCustos } from "@/lib/impressao-3d/regras";
 import { lerPagamento, pedidoEditavel } from "@/lib/impressao-3d/regras-operacao";
+import { lerBaixaPecas, lerDevolucaoPecas, textoBaixa } from "@/lib/impressao-3d/pecas";
 import { formParaObjeto, primeiroErro } from "@/lib/impressao-3d/validacao";
 import {
   PagamentoSchema, PedidoItemSchema, PedidoLimitadoSchema, PedidoSchema,
@@ -274,4 +275,42 @@ export async function gerarProducaoDoPedido(pedidoId: string): Promise<Resultado
   revalidatePath(`${ROTA}/${pedidoId}`);
   revalidatePath("/impressao-3d/producao");
   return { ok: true, criados: typeof data === "number" ? data : Number(data) || 0 };
+}
+
+export type ResultadoPecasPedido = { error: string } | { ok: true; mensagem: string };
+
+/**
+ * Baixa do estoque de peças os itens do pedido que têm produto (p3d_baixar_pecas_pedido): não baixa
+ * duas vezes e recusa se faltar peça (mensagem do banco, como veio). Exige edição em Pedidos E em Estoque.
+ */
+export async function baixarPecasPedido(pedidoId: string): Promise<ResultadoPecasPedido> {
+  const acesso = await getAcessoEdicao(MODULO);
+  const acessoEstoque = await getAcessoEdicao("p3d_estoque");
+  if (!acesso || !acessoEstoque) return { error: "Baixar peças exige edição em Pedidos e em Estoque." };
+
+  const { data, error } = await (await createClient()).rpc("p3d_baixar_pecas_pedido", { p_pedido_id: pedidoId });
+  if (error) return { error: mensagemRpc(error, "Não foi possível baixar as peças do estoque.") };
+
+  revalidatePath(`${ROTA}/${pedidoId}`);
+  revalidatePath("/impressao-3d/estoque");
+  return { ok: true, mensagem: textoBaixa(lerBaixaPecas(data)) };
+}
+
+/** Devolve ao estoque de peças os itens já baixados do pedido (motivo opcional). */
+export async function devolverPecasPedido(pedidoId: string, motivo?: string): Promise<ResultadoPecasPedido> {
+  const acesso = await getAcessoEdicao(MODULO);
+  const acessoEstoque = await getAcessoEdicao("p3d_estoque");
+  if (!acesso || !acessoEstoque) return { error: "Devolver peças exige edição em Pedidos e em Estoque." };
+
+  const limpo = typeof motivo === "string" ? motivo.trim().slice(0, 300) : "";
+  const { data, error } = await (await createClient()).rpc("p3d_devolver_pecas_pedido", {
+    p_pedido_id: pedidoId,
+    ...(limpo ? { p_motivo: limpo } : {}),
+  });
+  if (error) return { error: mensagemRpc(error, "Não foi possível devolver as peças ao estoque.") };
+
+  const n = lerDevolucaoPecas(data).itens_devolvidos;
+  revalidatePath(`${ROTA}/${pedidoId}`);
+  revalidatePath("/impressao-3d/estoque");
+  return { ok: true, mensagem: `${n} ${n === 1 ? "item devolvido" : "itens devolvidos"} ao estoque de peças.` };
 }

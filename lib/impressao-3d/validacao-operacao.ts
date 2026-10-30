@@ -161,6 +161,12 @@ export const ConclusaoSchema = z.object({
   observacao: textoOpc(300),
 });
 
+/** Conclusão com vários filamentos: horas e observação (o consumo de cada filamento vai à parte, como lista). */
+export const ConclusaoMultiSchema = z.object({
+  horas_reais: numReq("Horas reais", { min: 0 }),
+  observacao: textoOpc(300),
+});
+
 export const FalhaSchema = z.object({
   tipo_defeito: z.enum(TIPOS_DEFEITO, { error: "Selecione o tipo de defeito." }),
   peso_perdido_g: numReq("Peso perdido", { min: 0 }),

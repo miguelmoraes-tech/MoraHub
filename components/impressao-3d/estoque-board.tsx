@@ -10,19 +10,22 @@ import {
   ErroForm, Numero, Seletor, SomenteLeitura, Vazio, useAcao,
 } from "@/components/impressao-3d/campos";
 import {
-  alternarMaterialAtivo, atualizarMaterial, criarMaterial, excluirMaterial, movimentarEstoque,
+  alternarMaterialAtivo, atualizarMaterial, criarMaterial, excluirMaterial, movimentarEstoque, registrarCompraMaterial,
 } from "@/app/(dashboard)/impressao-3d/estoque/actions";
 import {
   TIPO_MATERIAL_ROTULO, TIPO_MOVIMENTO_ROTULO, UNIDADE_ROTULO,
   type Material, type MovimentoEstoque, type TipoMaterial, type TipoMovimento,
 } from "@/lib/impressao-3d/tipos";
-import { abaixoDoMinimo, custoPorGrama, gramasDeRolos } from "@/lib/impressao-3d/regras";
-import { entradaDeRolosComprados, saldoEmRolos } from "@/lib/impressao-3d/cadastro-simples";
+import { abaixoDoMinimo, gramasDeRolos } from "@/lib/impressao-3d/regras";
+import {
+  custoPorKgDeG, entradaDeCompraKg, entradaDeCompraUnidade, formatarSaldoPeso, precoPorGDeValorKg,
+} from "@/lib/impressao-3d/filamentos";
 import type { OpcaoFornecedor, Opcoes } from "@/lib/impressao-3d/opcoes";
 import {
   formatDataHora, formatMoeda, formatNumero,
 } from "@/lib/impressao-3d/numeros";
 import { abaInicial } from "@/lib/modulos/preferencias";
+import { PecasEstoque, type DadosPecas } from "@/components/impressao-3d/pecas-estoque";
 
 function CamposMaterial({
   item,
@@ -34,11 +37,23 @@ function CamposMaterial({
   fornecedores: Opcoes<OpcaoFornecedor>;
 }) {
   const [unidade, setUnidade] = useState(item?.unidade ?? "g");
-  const [preco, setPreco] = useState(item?.preco_compra ?? 0);
-  const [peso, setPeso] = useState(item?.peso_liquido_rolo_g ?? 0);
-  const [rolos, setRolos] = useState(0);
+  const porPeso = unidade === "g";
+  // Valor do kg: no filamento o custo_cadastro já é por g (valor do kg ÷ 1000), mesmo em cadastros antigos por rolo.
+  const valorInicial =
+    item == null
+      ? ""
+      : porPeso && item.custo_cadastro != null
+        ? custoPorKgDeG(item.custo_cadastro)
+        : (item.preco_compra ?? "");
+  const [valor, setValor] = useState<string>(String(valorInicial));
+  const [comprei, setComprei] = useState("");
+  const [unidadeCompra, setUnidadeCompra] = useState<"kg" | "g">("kg");
   const [corHex, setCorHex] = useState(item?.cor_hex ?? "");
-  const entrada = entradaDeRolosComprados({ rolos, pesoRoloG: peso, precoPago: verCustos ? preco : null });
+  const valorNum = Number(valor.replace(",", ".")) || 0;
+  const compreiNum = Number(comprei.replace(",", ".")) || 0;
+  const entrada = porPeso
+    ? entradaDeCompraKg({ quantidade: compreiNum, unidade: unidadeCompra, valorKg: verCustos ? valorNum : null })
+    : entradaDeCompraUnidade({ quantidade: compreiNum, precoUnitario: verCustos ? valorNum : null });
 
   return (
     <div className="space-y-3">
@@ -56,12 +71,7 @@ function CamposMaterial({
             <option key={v} value={v}>{l}</option>
           ))}
         </Seletor>
-        <Entrada
-          rotulo="Material"
-          name="material"
-          defaultValue={item?.material ?? ""}
-          placeholder="PLA, PETG, ABS..."
-        />
+        <Entrada rotulo="Material" name="material" defaultValue={item?.material ?? ""} placeholder="PLA, PETG, ABS..." />
         <Entrada rotulo="Cor" name="cor" defaultValue={item?.cor ?? ""} placeholder="Preto" />
         <Campo rotulo="Seletor de cor" ajuda="Só para identificar na lista.">
           <div className="flex items-center gap-2">
@@ -84,40 +94,43 @@ function CamposMaterial({
         </Campo>
         {verCustos && (
           <Numero
-            rotulo="Preço pago (R$)"
+            rotulo={porPeso ? "Valor pago por kg (R$)" : "Valor pago por unidade (R$)"}
             name="preco_compra"
-            defaultValue={item?.preco_compra ?? ""}
-            onChange={(e) => setPreco(Number(e.target.value) || 0)}
-            ajuda="Quanto você pagou em UM rolo (está na nota de compra)."
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            ajuda={porPeso ? "Quanto você paga em 1 kg do filamento (está na nota de compra)." : "Quanto você paga em uma unidade."}
           />
         )}
-        <Numero
-          rotulo="Peso do rolo (g)"
-          name="peso_liquido_rolo_g"
-          defaultValue={item?.peso_liquido_rolo_g ?? ""}
-          onChange={(e) => setPeso(Number(e.target.value) || 0)}
-          ajuda="Só o filamento, sem o carretel. Na etiqueta: normalmente 1000 g."
-        />
         {!item && (
-          <Numero
-            rotulo="Quantos rolos comprei"
-            name="rolos_comprados"
-            step="1"
-            onChange={(e) => setRolos(Number(e.target.value) || 0)}
-            ajuda={
-              entrada
-                ? `Entrada de ${formatNumero(entrada.gramas, 1)} g no estoque${
-                    entrada.custoTotal != null ? ` por ${formatMoeda(entrada.custoTotal)}` : ""
-                  }.`
-                : "0 = só cadastra, sem dar entrada no estoque."
-            }
-          />
+          <>
+            <Numero
+              rotulo="Quanto comprei"
+              name="quanto_comprei"
+              value={comprei}
+              onChange={(e) => setComprei(e.target.value)}
+              ajuda={
+                entrada
+                  ? `Entrada de ${formatNumero(entrada.quantidade, 1)} ${porPeso ? "g" : unidade} no estoque${
+                      entrada.custoTotal != null ? ` por ${formatMoeda(entrada.custoTotal)}` : ""
+                    }.`
+                  : "0 = só cadastra, sem dar entrada no estoque."
+              }
+            />
+            {porPeso ? (
+              <Seletor rotulo="Em" name="unidade_compra" value={unidadeCompra} onChange={(e) => setUnidadeCompra(e.target.value as "kg" | "g")}>
+                <option value="kg">kg</option>
+                <option value="g">g</option>
+              </Seletor>
+            ) : (
+              <div className="flex flex-col justify-end text-xs text-zinc-500">na unidade do material ({unidade})</div>
+            )}
+          </>
         )}
-        {verCustos && (
+        {verCustos && porPeso && valorNum > 0 && (
           <div className="flex flex-col justify-end">
             <p className="text-xs font-medium text-zinc-400">Custo por g</p>
-            <p className="text-sm text-zinc-200">{formatMoeda(custoPorGrama(preco, peso), 4)}/{unidade}</p>
-            <p className="text-[11px] text-zinc-600">preço pago ÷ peso do rolo</p>
+            <p className="text-sm text-zinc-200">{formatMoeda(precoPorGDeValorKg(valorNum), 4)}/g</p>
+            <p className="text-[11px] text-zinc-600">valor do kg ÷ 1000</p>
           </div>
         )}
       </div>
@@ -127,7 +140,7 @@ function CamposMaterial({
 
       <details className="rounded-lg border border-zinc-800">
         <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200">
-          Mais opções (marca, diâmetro, estoque mínimo, fornecedor, localização)
+          Mais opções (unidade, marca, diâmetro, estoque mínimo, fornecedor, localização)
         </summary>
         <div className="grid grid-cols-2 gap-3 border-t border-zinc-800 p-3 sm:grid-cols-4">
           <Seletor
@@ -166,11 +179,82 @@ function CamposMaterial({
       </details>
       {item && (
         <p className="text-[11px] text-zinc-600">
-          O saldo e o custo médio não são editados aqui: use Entrada, Ajuste ou Perda.
+          O saldo e o custo médio não são editados aqui: use Nova compra, Entrada, Ajuste ou Perda.
         </p>
       )}
     </div>
   );
+}
+
+/** Nova compra de um filamento já cadastrado: nova entrada com o valor pago (atualiza o custo médio). */
+function FormCompra({ material, verCustos, aoFechar }: { material: Material; verCustos: boolean; aoFechar: () => void }) {
+  const [state, formAction, pendente] = useActionState(registrarCompraMaterial.bind(null, material.id), undefined);
+  useActionSuccess(state, aoFechar);
+  const porPeso = material.unidade === "g";
+  const [quantidade, setQuantidade] = useState("");
+  const [unidadeCompra, setUnidadeCompra] = useState<"kg" | "g">("kg");
+  const [valorKg, setValorKg] = useState(
+    material.custo_cadastro != null && porPeso ? String(custoPorKgDeG(material.custo_cadastro)) : String(material.preco_compra ?? "")
+  );
+  const q = Number(quantidade.replace(",", ".")) || 0;
+  const v = Number(valorKg.replace(",", ".")) || 0;
+  const previa = porPeso
+    ? entradaDeCompraKg({ quantidade: q, unidade: unidadeCompra, valorKg: verCustos ? v : null })
+    : entradaDeCompraUnidade({ quantidade: q, precoUnitario: verCustos ? v : null });
+
+  return (
+    <form action={formAction} className="space-y-3 rounded-lg border border-copper-500/30 bg-zinc-950/60 p-3">
+      <input type="hidden" name="unidade_compra" value={unidadeCompra} />
+      <p className="text-sm font-medium text-zinc-100">
+        Nova compra · {material.nome}{" "}
+        <span className="text-xs font-normal text-zinc-500">
+          (saldo atual {descreverSaldo(material.estoque_atual, material.unidade)})
+        </span>
+      </p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Numero
+          rotulo="Quanto comprei *"
+          name="quantidade"
+          required
+          min="0.001"
+          value={quantidade}
+          onChange={(e) => setQuantidade(e.target.value)}
+        />
+        {porPeso && (
+          <Seletor rotulo="Em" value={unidadeCompra} onChange={(e) => setUnidadeCompra(e.target.value as "kg" | "g")}>
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+          </Seletor>
+        )}
+        {verCustos && (
+          <Numero
+            rotulo={porPeso ? "Valor pago por kg (R$)" : "Valor pago por unidade (R$)"}
+            name="valor_pago"
+            value={valorKg}
+            onChange={(e) => setValorKg(e.target.value)}
+            ajuda={
+              previa?.custoTotal != null
+                ? `Total desta compra: ${formatMoeda(previa.custoTotal)}. Atualiza o custo médio.`
+                : "Vazio = entrada sem custo informado."
+            }
+          />
+        )}
+      </div>
+      {!verCustos && <p className="text-[11px] text-zinc-500">Sem a permissão de custos, a entrada é registrada sem valor.</p>}
+      <ErroForm state={state} />
+      <div className="flex justify-end gap-2">
+        <BotaoTexto onClick={aoFechar}>Cancelar</BotaoTexto>
+        <BotaoPrimario pendente={pendente}>{pendente ? "Salvando..." : "Registrar compra"}</BotaoPrimario>
+      </div>
+    </form>
+  );
+}
+
+/** "2,5 kg" para filamento em gramas; as demais unidades ficam como estão. */
+function descreverSaldo(saldo: number, unidade: string): string {
+  if (unidade !== "g") return `${formatNumero(saldo, 1)} ${unidade}`;
+  const s = formatarSaldoPeso(saldo);
+  return `${formatNumero(s.valor, 2)} ${s.unidade}`;
 }
 
 function FormMaterial({
@@ -315,7 +399,7 @@ function LinhaMaterial({
   verCustos: boolean;
   fornecedores: Opcoes<OpcaoFornecedor>;
 }) {
-  const [modo, setModo] = useState<"nenhum" | "editar" | TipoAcao>("nenhum");
+  const [modo, setModo] = useState<"nenhum" | "editar" | "compra" | TipoAcao>("nenhum");
   const { executar, pendente } = useAcao();
   const baixo = abaixoDoMinimo(item);
   const fechar = () => setModo("nenhum");
@@ -342,8 +426,17 @@ function LinhaMaterial({
             </p>
             {verCustos && (
               <p className="truncate text-xs text-zinc-500">
-                Custo por {item.unidade}: cadastro {formatMoeda(item.custo_cadastro ?? 0, 4)} · médio{" "}
-                {item.custo_medio > 0 ? formatMoeda(item.custo_medio, 4) : "— (sem entradas)"}
+                {item.unidade === "g" ? (
+                  <>
+                    Custo por kg: cadastro {formatMoeda(custoPorKgDeG(item.custo_cadastro ?? 0))} · médio{" "}
+                    {item.custo_medio > 0 ? formatMoeda(custoPorKgDeG(item.custo_medio)) : "— (sem entradas)"}
+                  </>
+                ) : (
+                  <>
+                    Custo por {item.unidade}: cadastro {formatMoeda(item.custo_cadastro ?? 0, 4)} · médio{" "}
+                    {item.custo_medio > 0 ? formatMoeda(item.custo_medio, 4) : "— (sem entradas)"}
+                  </>
+                )}
               </p>
             )}
           </div>
@@ -351,19 +444,15 @@ function LinhaMaterial({
         <div className="flex shrink-0 items-center gap-3">
           <div className="text-right">
             <p className={`text-sm font-semibold ${baixo ? "text-rose-400" : "text-zinc-100"}`}>
-              {formatNumero(item.estoque_atual, 1)} {item.unidade}
+              {descreverSaldo(item.estoque_atual, item.unidade)}
             </p>
-            {saldoEmRolos(item.estoque_atual, item.unidade, item.peso_liquido_rolo_g) != null && (
-              <p className="text-[11px] text-zinc-500">
-                ≈ {formatNumero(saldoEmRolos(item.estoque_atual, item.unidade, item.peso_liquido_rolo_g) ?? 0, 1)} rolo(s)
-              </p>
-            )}
             <p className="text-[11px] text-zinc-500">
-              mín. {item.estoque_minimo > 0 ? `${formatNumero(item.estoque_minimo, 1)} ${item.unidade}` : "—"}
+              mín. {item.estoque_minimo > 0 ? descreverSaldo(item.estoque_minimo, item.unidade) : "—"}
             </p>
           </div>
           {podeEditar && (
             <div className="flex items-center gap-0.5">
+              <BotaoTexto onClick={() => setModo("compra")}>Nova compra</BotaoTexto>
               <BotaoTexto onClick={() => setModo("entrada")}>Entrada</BotaoTexto>
               <BotaoTexto onClick={() => setModo("ajuste")}>Ajuste</BotaoTexto>
               <BotaoTexto onClick={() => setModo("perda")}>Perda</BotaoTexto>
@@ -394,6 +483,7 @@ function LinhaMaterial({
         </div>
       </div>
       {modo === "editar" && <FormMaterial item={item} verCustos={verCustos} fornecedores={fornecedores} aoFechar={fechar} />}
+      {modo === "compra" && <FormCompra material={item} verCustos={verCustos} aoFechar={fechar} />}
       {(modo === "entrada" || modo === "ajuste" || modo === "perda") && (
         <FormMovimento material={item} tipo={modo} verCustos={verCustos} aoFechar={fechar} />
       )}
@@ -495,8 +585,10 @@ export function EstoqueBoard({
   verCustos,
   limiteMovimentos,
   fornecedores,
+  pecas,
   abas,
 }: {
+  pecas: DadosPecas;
   materiais: Material[];
   movimentos: MovimentoEstoque[];
   podeEditar: boolean;
@@ -506,7 +598,7 @@ export function EstoqueBoard({
   /** Abas visíveis pela preferência de navegação (nunca vazia; ordem do registro). */
   abas: string[];
 }) {
-  const [aba, setAba] = useState<"materiais" | "historico">(abaInicial(abas, "materiais"));
+  const [aba, setAba] = useState<"materiais" | "pecas" | "historico">(abaInicial(abas, "materiais"));
   const [novo, setNovo] = useState(false);
   const [tipoFiltro, setTipoFiltro] = useState("");
   const [mostrarArquivados, setMostrarArquivados] = useState(false);
@@ -537,7 +629,7 @@ export function EstoqueBoard({
           <SomenteLeitura />
         </div>
       )}
-      {baixos.length > 0 && (
+      {baixos.length > 0 && aba !== "pecas" && (
         <div className="mb-4">
           <Aviso tom="alerta">
             Abaixo do mínimo: {baixos.map((m) => `${m.nome} (${formatNumero(m.estoque_atual, 1)} ${m.unidade})`).join(", ")}.
@@ -547,7 +639,7 @@ export function EstoqueBoard({
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
-          {([["materiais", "Materiais"], ["historico", "Histórico de movimentos"]] as const).filter(([k]) => abas.includes(k)).map(([k, l]) => (
+          {([["materiais", "Material"], ["pecas", "Peças"], ["historico", "Histórico de material"]] as const).filter(([k]) => abas.includes(k)).map(([k, l]) => (
             <button
               key={k}
               type="button"
@@ -574,7 +666,9 @@ export function EstoqueBoard({
         )}
       </div>
 
-      {aba === "historico" ? (
+      {aba === "pecas" ? (
+        <PecasEstoque dados={pecas} podeEditar={podeEditar} verCustos={verCustos} limiteMovimentos={limiteMovimentos} />
+      ) : aba === "historico" ? (
         <Cartao titulo="Histórico de movimentos" icone={<Boxes className="h-4 w-4" />}>
           <Historico materiais={materiais} movimentos={movimentos} verCustos={verCustos} limite={limiteMovimentos} />
         </Cartao>

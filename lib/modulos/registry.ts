@@ -298,7 +298,11 @@ export const MODULOS: ModuloRegistro[] = [
     rotas: ["/impressao-3d/estoque"],
     icone: "boxes",
     tabelas: ["p3d_materiais", "p3d_movimentos_estoque"],
-    abas: [{ chave: "materiais", rotulo: "Materiais" }, { chave: "historico", rotulo: "Histórico de movimentos" }],
+    abas: [
+      { chave: "materiais", rotulo: "Material" },
+      { chave: "pecas", rotulo: "Peças" },
+      { chave: "historico", rotulo: "Histórico de material" },
+    ],
     menu: [{ label: "Estoque", href: "/impressao-3d/estoque", icone: "boxes", grupo: "Impressão 3D" }],
   },
   {

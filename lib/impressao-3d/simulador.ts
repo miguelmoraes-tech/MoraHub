@@ -7,6 +7,7 @@
 import { parseNumero } from "@/lib/impressao-3d/numeros";
 import { entradaParaRecalculo, limparOutrosCustos, type OutroCusto } from "@/lib/impressao-3d/regras";
 import { ROTULO_PARAMETRO } from "@/lib/impressao-3d/calculo";
+import { linhasDeEntrada, montarMateriais, type LinhaFilamento } from "@/lib/impressao-3d/filamentos";
 import type { ConfigPrecificacao } from "@/lib/impressao-3d/tipos";
 
 export type PesoModo = "detalhado" | "total";
@@ -14,6 +15,8 @@ export type PesoModo = "detalhado" | "total";
 export interface EstadoSimulador {
   impressora_id: string;
   material_id: string;
+  /** Vários filamentos (p_entrada.materiais), pesos do LOTE. Com alguma linha preenchida, a lista vale no lugar do material único. */
+  filamentos: LinhaFilamento[];
   quantidade: string;
   pesoModo: PesoModo;
   /** Campos numéricos por chave de p_entrada (texto do formulário). */
@@ -25,6 +28,7 @@ export interface EstadoSimulador {
 export const ESTADO_VAZIO: EstadoSimulador = {
   impressora_id: "",
   material_id: "",
+  filamentos: [],
   quantidade: "1",
   pesoModo: "detalhado",
   campos: {},
@@ -91,8 +95,15 @@ export function montarEntrada(e: EstadoSimulador, config: ConfigPrecificacao | n
     entrada[chave] = n;
   }
 
+  // Lista de filamentos: quando há linha com peso, ela é a fonte do material e do peso (nada de
+  // material_id, preço do material nem pesos no topo).
+  const lista = montarMateriais(e.filamentos, 1);
+  erros.push(...lista.erros);
+  const usaLista = lista.materiais.length > 0;
+  if (usaLista) entrada.materiais = lista.materiais;
+
   if (e.impressora_id) entrada.impressora_id = e.impressora_id;
-  if (e.material_id) entrada.material_id = e.material_id;
+  if (e.material_id && !usaLista) entrada.material_id = e.material_id;
 
   const q = parseNumero(e.quantidade);
   if (q === null || Number.isNaN(q) || !Number.isInteger(q) || q <= 0) {
@@ -101,7 +112,9 @@ export function montarEntrada(e: EstadoSimulador, config: ConfigPrecificacao | n
     entrada.quantidade = q;
   }
 
-  if (e.pesoModo === "total") {
+  if (usaLista) {
+    // O peso vem das linhas de filamento.
+  } else if (e.pesoModo === "total") {
     numero("peso_total_g", e.campos.peso_total_g);
     // A purga é um subconjunto do total do fatiador: informada só para não receber margem de desperdício.
     numero("peso_purga_g", e.campos.peso_purga_g);
@@ -115,7 +128,11 @@ export function montarEntrada(e: EstadoSimulador, config: ConfigPrecificacao | n
   if (outros.length !== preenchidos) erros.push("Outros custos: informe um valor maior que zero em cada linha.");
   if (outros.length > 0) entrada.outros_custos = outros;
 
-  for (const { chave } of PARAMETROS_AVANCADOS) numero(chave, e.campos[chave]);
+  const DO_MATERIAL_UNICO = ["preco_por_g", "preco_rolo", "peso_rolo_g"];
+  for (const { chave } of PARAMETROS_AVANCADOS) {
+    if (usaLista && DO_MATERIAL_UNICO.includes(chave)) continue;
+    numero(chave, e.campos[chave]);
+  }
 
   // Modo de preço: só é enviado o que difere da configuração (ou o que foi digitado).
   if (!config || e.modo_preco !== config.modo_preco) entrada.modo_preco = e.modo_preco;
@@ -150,6 +167,7 @@ export function estadoDeEntrada(entrada: Record<string, unknown>): EstadoSimulad
   return {
     impressora_id: typeof entrada.impressora_id === "string" ? entrada.impressora_id : "",
     material_id: typeof entrada.material_id === "string" ? entrada.material_id : "",
+    filamentos: linhasDeEntrada(entrada.materiais),
     quantidade: txt(entrada.quantidade) || "1",
     pesoModo: typeof entrada.peso_total_g === "number" && entrada.peso_total_g > 0 ? "total" : "detalhado",
     campos,

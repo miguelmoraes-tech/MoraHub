@@ -96,7 +96,7 @@ export const CHAVES_ENTRADA_NUMERICAS = [
 
 /** O que é DO ITEM (peças, horas, mão de obra, preço manual); o resto vem da config/impressora/material. */
 export const CHAVES_DO_ITEM = [
-  "impressora_id", "material_id", "quantidade",
+  "impressora_id", "material_id", "materiais", "quantidade",
   "peso_peca_g", "peso_suporte_g", "peso_brim_g", "peso_purga_g", "peso_total_g",
   "horas_impressao", "mao_obra_horas", "acabamento_horas", "montagem_horas",
   "embalagem_custo", "outros_custos", "preco_manual",

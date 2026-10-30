@@ -214,6 +214,52 @@ export function lerConclusao(json: unknown): ResultadoConclusao {
   };
 }
 
+/** Peças que entraram no estoque de peças ao concluir um trabalho avulso com produto (null = não entrou). */
+export interface PecasEstoqueRetorno {
+  saldo: number;
+  custo_medio: number;
+}
+
+export function lerPecasEstoque(json: unknown): PecasEstoqueRetorno | null {
+  const r = registro(registro(json).pecas_estoque);
+  if (Object.keys(r).length === 0) return null;
+  return { saldo: num(r.saldo), custo_medio: num(r.custo_medio) };
+}
+
+/** Retorno de p3d_concluir_producao_multi. */
+export interface ResultadoConclusaoMulti extends ResultadoConclusao {
+  peso_total_g: number | null;
+  pecas_estoque: PecasEstoqueRetorno | null;
+}
+
+export function lerConclusaoMulti(json: unknown): ResultadoConclusaoMulti {
+  const r = registro(json);
+  return {
+    ...lerConclusao(json),
+    peso_total_g: r.peso_total_g === null || r.peso_total_g === undefined ? null : num(r.peso_total_g),
+    pecas_estoque: lerPecasEstoque(json),
+  };
+}
+
+/**
+ * Avisos da conclusão de um trabalho com vários filamentos (estoque negativo, abaixo do mínimo, manutenção
+ * devida) e, se as peças entraram no estoque de peças, "N peças entraram no estoque de peças" (N = a
+ * quantidade do trabalho).
+ */
+export function avisosConclusaoMulti(
+  r: ResultadoConclusaoMulti,
+  quantidadeTrabalho: number,
+  saldoFmt: (n: number) => string
+): string[] {
+  const out = avisosConclusao(r, saldoFmt);
+  if (r.pecas_estoque) {
+    out.push(
+      `${quantidadeTrabalho} ${quantidadeTrabalho === 1 ? "peça entrou" : "peças entraram"} no estoque de peças (saldo: ${r.pecas_estoque.saldo}).`
+    );
+  }
+  return out;
+}
+
 export function lerFalha(json: unknown): ResultadoFalha {
   const r = registro(json);
   return {

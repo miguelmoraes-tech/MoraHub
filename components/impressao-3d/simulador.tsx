@@ -16,7 +16,10 @@ import { lerSimulacao, ROTULO_PARAMETRO, type ResultadoSimulacao } from "@/lib/i
 import {
   ESTADO_VAZIO, PARAMETROS_AVANCADOS, estadoParaEdicao, montarEntrada, type EstadoSimulador,
 } from "@/lib/impressao-3d/simulador";
+import { novaLinhaFilamento } from "@/lib/impressao-3d/filamentos";
 import { formatNumero } from "@/lib/impressao-3d/numeros";
+import { FilamentosLista } from "@/components/impressao-3d/filamentos-lista";
+import { montarMateriais } from "@/lib/impressao-3d/filamentos";
 import type { OpcaoImpressora, OpcaoMaterial, Opcoes } from "@/lib/impressao-3d/opcoes";
 import type { ConfigPrecificacao, ItemOrcamento } from "@/lib/impressao-3d/tipos";
 
@@ -290,6 +293,29 @@ export function Simulador({ impressoras, materiais, config, verCustos, contexto,
             />
           </div>
 
+          <details className="rounded-lg border border-zinc-800" open={estado.filamentos.length > 0}>
+            <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200">
+              Vários filamentos no mesmo trabalho (opcional)
+            </summary>
+            <div className="space-y-3 border-t border-zinc-800 p-3">
+              <FilamentosLista
+                linhas={estado.filamentos.length > 0 ? estado.filamentos : [novaLinhaFilamento({ origem: materiais.itens.length > 0 ? "estoque" : "manual" })]}
+                aoMudar={(filamentos) => alterar({ filamentos })}
+                opcoes={materiais.itens
+                  .filter((m) => m.unidade === "g")
+                  .map((m) => ({ id: m.id, nome: m.nome, cor: m.cor, cor_hex: m.cor_hex }))}
+                estoqueAcessivel={materiais.acessivel}
+                rotuloPeso="Peso no lote (g)"
+                ajudaPeso="Peso do lote inteiro (todas as unidades)."
+              />
+              {montarMateriais(estado.filamentos, 1).materiais.length > 0 && (
+                <Aviso tom="info">
+                  Com a lista de filamentos, o peso e o preço do material vêm das linhas: o material único e os pesos abaixo são ignorados.
+                </Aviso>
+              )}
+            </div>
+          </details>
+
           <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
             {([["detalhado", "Peso por componente"], ["total", "Total do fatiador"]] as const).map(([k, l]) => (
               <button
@@ -540,6 +566,13 @@ export function ParametrosUsados({ entrada }: { entrada: Record<string, unknown>
           <dd className="text-right text-zinc-300">
             {typeof v === "number"
               ? formatNumero(v, 4)
+              : k === "materiais" && Array.isArray(v)
+                ? v
+                    .map((o) => {
+                      const m = o as { nome?: string; material_id?: string; peso_g?: number };
+                      return `${m.nome ?? (m.material_id ? "filamento do estoque" : "filamento")}: ${formatNumero(Number(m.peso_g) || 0, 1)} g`;
+                    })
+                    .join("; ")
               : Array.isArray(v)
                 ? v.map((o) => `${(o as { nome?: string }).nome ?? ""}: ${formatNumero(Number((o as { valor?: number }).valor) || 0)}`).join("; ")
                 : String(v)}

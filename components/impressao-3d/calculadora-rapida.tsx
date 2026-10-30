@@ -12,11 +12,13 @@ import { simularPreco } from "@/app/(dashboard)/impressao-3d/precificacao/simula
 import { salvarTarifaPadrao } from "@/app/(dashboard)/impressao-3d/precificacao/actions";
 import { usarSimulacaoEmOrcamento } from "@/app/(dashboard)/impressao-3d/orcamentos/actions";
 import { COMPOSICAO_ROTULO, lerSimulacao, type ResultadoSimulacao } from "@/lib/impressao-3d/calculo";
+import { FilamentosLista } from "@/components/impressao-3d/filamentos-lista";
+import { faltaDeEstoque, type MaterialEntrada } from "@/lib/impressao-3d/filamentos";
 import {
   EXTRAS_RAPIDOS, estadoInicialRapido, explicarMargem, explicarMultiplicador, montarEntradaRapida,
   resumoWhatsapp, valoresIniciaisExtras, type EstadoRapido,
 } from "@/lib/impressao-3d/calculadora-rapida";
-import { formatMoeda, formatPercentualFracao, parseNumero } from "@/lib/impressao-3d/numeros";
+import { formatMoeda, formatNumero, formatPercentualFracao, parseNumero } from "@/lib/impressao-3d/numeros";
 import type { OpcaoImpressora, OpcaoMaterialCusto, Opcoes } from "@/lib/impressao-3d/opcoes";
 import type { ConfigPrecificacao } from "@/lib/impressao-3d/tipos";
 import type { RascunhoOpcao } from "@/components/impressao-3d/simulador";
@@ -72,10 +74,11 @@ function Linha({ rotulo, valor, destaque, sub }: { rotulo: string; valor: string
 export function CalculadoraRapida({ impressoras, materiais, config, podeEditar, usarEmOrcamento }: Props) {
   const router = useRouter();
   const toast = useToast();
-  const [estado, setEstado] = useState<EstadoRapido>(() => ({
-    ...estadoInicialRapido(config),
-    materialModo: materiais.acessivel && materiais.itens.length > 0 ? "estoque" : "manual",
-  }));
+  const [estado, setEstado] = useState<EstadoRapido>(() => {
+    const inicial = estadoInicialRapido(config);
+    const podeEstoque = materiais.acessivel && materiais.itens.length > 0;
+    return { ...inicial, filamentos: inicial.filamentos.map((f) => ({ ...f, origem: podeEstoque ? "estoque" : "manual" })) };
+  });
   const [resultado, setResultado] = useState<Guardado<ResultadoSimulacao | null> | null>(null);
   const [erroRpc, setErroRpc] = useState<Guardado<string> | null>(null);
   const [tarifaSalva, setTarifaSalva] = useState(config.tarifa_kwh);
@@ -218,68 +221,30 @@ export function CalculadoraRapida({ impressoras, materiais, config, podeEditar, 
       : margemDigitada !== null && !Number.isNaN(margemDigitada)
         ? explicarMargem(margemDigitada)
         : null;
-  const materialEscolhido = materiais.itens.find((m) => m.id === estado.material_id) ?? null;
+  // Só filamentos em gramas entram na lista (resina em ml e insumos em un seguem no Estoque).
+  const opcoesFilamento = materiais.itens
+    .filter((m) => m.unidade === "g")
+    .map((m) => ({ id: m.id, nome: m.nome, cor: m.cor, cor_hex: m.cor_hex, custo_por_g: m.custo_por_g, saldo: m.estoque_atual }));
+  const saldos = Object.fromEntries(materiais.itens.map((m) => [m.id, m.estoque_atual]));
+  const faltas = faltaDeEstoque(
+    Array.isArray(montada.entrada.materiais) ? (montada.entrada.materiais as MaterialEntrada[]) : [],
+    saldos
+  );
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
       <div className="space-y-5">
         <fieldset className="space-y-3">
-          <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Material</legend>
-          {materiais.acessivel && materiais.itens.length > 0 && (
-            <Alternador
-              valor={estado.materialModo}
-              opcoes={[["estoque", "Do estoque"], ["manual", "Informar na hora"]] as const}
-              aoMudar={(v) => alterar({ materialModo: v })}
-            />
-          )}
-          {estado.materialModo === "estoque" && materiais.acessivel && materiais.itens.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Seletor
-                rotulo="Material"
-                value={estado.material_id}
-                onChange={(e) => alterar({ material_id: e.target.value })}
-                ajuda={
-                  materialEscolhido?.custo_por_g != null
-                    ? `Custo: ${formatMoeda(materialEscolhido.custo_por_g, 4)} por g (do cadastro do estoque).`
-                    : undefined
-                }
-              >
-                <option value="">Escolha um material</option>
-                {materiais.itens.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nome}
-                    {m.custo_por_g != null ? ` — ${formatMoeda(m.custo_por_g, 4)}/g` : ""}
-                  </option>
-                ))}
-              </Seletor>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <Numero
-                  rotulo="Preço do rolo (R$)"
-                  value={estado.preco_rolo}
-                  onChange={(e) => alterar({ preco_rolo: e.target.value })}
-                  ajuda="Quanto você pagou no rolo (nota de compra)."
-                />
-                <Numero
-                  rotulo="Peso do rolo (g)"
-                  value={estado.peso_rolo_g}
-                  onChange={(e) => alterar({ peso_rolo_g: e.target.value })}
-                  ajuda="Normalmente 1000 g (1 kg). Está na etiqueta."
-                />
-              </div>
-              {materiais.acessivel && materiais.itens.length === 0 && (
-                <p className="text-[11px] text-zinc-600">
-                  Quer escolher da lista?{" "}
-                  <Link href="/impressao-3d/estoque" className="text-copper-400 hover:underline">Cadastre o material no estoque</Link>.
-                </p>
-              )}
-              {!materiais.acessivel && (
-                <p className="text-[11px] text-zinc-600">Sem acesso ao Estoque: informe o preço e o peso do rolo.</p>
-              )}
-            </div>
-          )}
+          <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Filamentos usados neste projeto</legend>
+          <FilamentosLista
+            linhas={estado.filamentos}
+            aoMudar={(filamentos) => alterar({ filamentos })}
+            opcoes={opcoesFilamento}
+            estoqueAcessivel={materiais.acessivel}
+            rotuloPeso="Peso por peça (g)"
+            ajudaPeso="O fatiador (Bambu Studio, Cura, PrusaSlicer) mostra o peso de cada filamento."
+            faltas={faltas}
+          />
         </fieldset>
 
         <fieldset className="space-y-3">
@@ -328,12 +293,6 @@ export function CalculadoraRapida({ impressoras, materiais, config, podeEditar, 
             />
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Numero
-              rotulo="Peso por peça (g)"
-              value={estado.peso_g}
-              onChange={(e) => alterar({ peso_g: e.target.value })}
-              ajuda="O fatiador (Bambu Studio, Cura, PrusaSlicer) mostra o peso da peça."
-            />
             <Numero
               rotulo="Tempo — horas"
               step="1"
@@ -486,6 +445,22 @@ export function CalculadoraRapida({ impressoras, materiais, config, podeEditar, 
                 {quantidade > 1 && <Linha rotulo="Custo do lote" valor={formatMoeda(exibido.calculo.custo_total)} />}
               </div>
             </div>
+
+            {exibido.calculo.detalhes.material.itens.length > 0 && (
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2">
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+                  Filamentos{quantidade > 1 ? ` (lote de ${quantidade} peças)` : ""}
+                </p>
+                {exibido.calculo.detalhes.material.itens.map((it, i) => (
+                  <Linha
+                    key={`${it.material_id ?? it.nome}-${i}`}
+                    rotulo={[it.nome, it.cor].filter(Boolean).join(" · ") || `Filamento ${i + 1}`}
+                    sub={`${formatNumero(it.peso_g, 1)} g`}
+                    valor={formatMoeda(it.custo)}
+                  />
+                ))}
+              </div>
+            )}
 
             <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2">
               <Linha rotulo="Lucro do lote" valor={formatMoeda(exibido.calculo.lucro)} />

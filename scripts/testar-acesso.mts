@@ -164,6 +164,17 @@ import {
   resumoWhatsapp, valoresIniciaisExtras, wattsParaKw, type EstadoRapido,
 } from "@/lib/impressao-3d/calculadora-rapida";
 import { entradaDeRolosComprados, saldoEmRolos } from "@/lib/impressao-3d/cadastro-simples";
+import {
+  cadastroDeValorKg, custoPorKgDeG, entradaDeCompraKg, entradaDeCompraUnidade, faltaDeEstoque, formatarSaldoPeso,
+  lerLinhasTrabalho, linhasDeEntrada, linhasParaTrabalho, montarConsumos, montarMateriais, novaLinhaFilamento,
+  paraGramas, pesoTotalLinhas, precoPorGDeValorKg,
+} from "@/lib/impressao-3d/filamentos";
+import {
+  chaveEstoquePeca, itensBaixados, itensBaixaveis, lerBaixaPecas, lerDevolucaoPecas, origemMovimentoPeca,
+  pecaAbaixoDoMinimo, textoBaixa, textoPecasEntraram, validarMovimentoPeca,
+} from "@/lib/impressao-3d/pecas";
+import { avisosConclusaoMulti, lerConclusaoMulti } from "@/lib/impressao-3d/regras-operacao";
+import { ARQUIVOS_SEM_SALDO_NO_CLIENTE, saldoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
 import { ARQUIVOS_CALCULADORA_RAPIDA, precoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
 import { FRASE_MODULO } from "@/lib/impressao-3d/frases-modulos";
 
@@ -3516,7 +3527,7 @@ await teste("Primeiros passos: só por dado real, só de módulos ligados, link 
   assert.equal(semPedidos.find((p) => p.chave === "pedido"), undefined, "módulo desligado não gera passo");
   assert.equal(semPedidos.length, PASSOS.length - 1);
   const enxuta = montarPassos(todosFalsos, ["p3d_estoque", "p3d_impressoras", "p3d_precificacao"]);
-  assert.deepEqual(enxuta.map((p) => p.chave), ["precificacao", "impressora", "material", "entrada_estoque"], "empresa enxuta: só os passos dos 3 módulos");
+  assert.deepEqual(enxuta.map((p) => p.chave), ["material", "entrada_estoque", "impressora", "precificacao"], "empresa enxuta: só os passos dos 3 módulos, filamento primeiro");
   assert.ok(enxuta.every((p) => p.destino !== "/modulos"));
   assert.equal(todosConcluidos(montarPassos(todosFalsos, [])), true, "sem módulos do nicho não há o que cobrar");
   const tudo = Object.fromEntries(Object.keys(todosFalsos).map((k) => [k, true])) as typeof todosFalsos;
@@ -3578,7 +3589,12 @@ await teste("documentação da Etapa D", () => {
 console.log("\nEtapa E — Calculadora rápida, cadastros simples, equipe e começo enxuto");
 const CFG = { ...CONFIG_PADRAO, tarifa_kwh: 0.9, valor_hora_mao_obra: 30, desperdicio_pct: 8, falha_pct: 7, impostos_pct: 6, taxa_pagamento_pct: 2, comissao_pct: 3, taxa_fixa_pagamento: 1 };
 function rapido(parcial: Partial<EstadoRapido> = {}): EstadoRapido {
-  return { ...estadoInicialRapido(CFG), peso_g: "25", horas: "1", minutos: "30", quantidade: "1", material_id: "mat-1", impressora_id: "imp-1", ...parcial };
+  return {
+    ...estadoInicialRapido(CFG),
+    filamentos: [novaLinhaFilamento({ origem: "estoque", material_id: "mat-1", peso_g: "25" })],
+    horas: "1", minutos: "30", quantidade: "1", impressora_id: "imp-1",
+    ...parcial,
+  };
 }
 await teste("multiplicador ↔ markup_pct: ×5 = 400 (e de volta); padrão ×5", () => {
   assert.equal(multiplicadorParaMarkupPct(5), 400);
@@ -3598,13 +3614,14 @@ await teste("multiplicador ↔ markup_pct: ×5 = 400 (e de volta); padrão ×5",
   assert.match(explicarMultiplicador(5) ?? "", /×5 = lucro de 4× o custo \(margem de 80%\)/);
   assert.equal(explicarMultiplicador(0.5), null);
 });
-await teste("x peças multiplica peso e tempo; tempo em horas + minutos; quantidade vai junto", () => {
-  const r = montarEntradaRapida(rapido({ peso_g: "25", horas: "1", minutos: "30", quantidade: "4" }));
-  assert.equal(r.entrada.peso_peca_g, 100);
+await teste("x peças multiplica peso (de cada filamento) e tempo; tempo em horas + minutos; quantidade vai junto", () => {
+  const r = montarEntradaRapida(rapido({ quantidade: "4" }));
+  assert.deepEqual(r.entrada.materiais, [{ material_id: "mat-1", peso_g: 100 }]);
   assert.equal(r.entrada.horas_impressao, 6);
   assert.equal(r.entrada.quantidade, 4);
   assert.equal(montarEntradaRapida(rapido({ horas: "", minutos: "20", quantidade: "3" })).entrada.horas_impressao, 1, "20 min × 3 = 1 h sem erro de ponto flutuante");
-  assert.equal(montarEntradaRapida(rapido({ peso_g: "12,5", quantidade: "2" })).entrada.peso_peca_g, 25, "vírgula pt-BR");
+  const virgula = montarEntradaRapida(rapido({ quantidade: "2", filamentos: [novaLinhaFilamento({ material_id: "mat-1", peso_g: "12,5" })] }));
+  assert.deepEqual(virgula.entrada.materiais, [{ material_id: "mat-1", peso_g: 25 }], "vírgula pt-BR");
   assert.ok(montarEntradaRapida(rapido({ quantidade: "0" })).erros.length > 0);
   assert.ok(montarEntradaRapida(rapido({ quantidade: "1,5" })).erros.length > 0);
 });
@@ -3615,7 +3632,9 @@ await teste("modo rápido força 0 em tudo que não é material + depreciação 
   for (const k of ["desperdicio_pct", "falha_pct", "manutencao_hora", "manutencao_ciclo", "mao_obra_horas", "acabamento_horas", "montagem_horas", "embalagem_custo", "despesas_fixas_pct", "impostos_pct", "taxa_pagamento_pct", "comissao_pct", "taxa_fixa_pagamento", "preco_minimo", "arredondar_para"]) {
     assert.ok((ZEROS_MODO_RAPIDO as readonly string[]).includes(k), k);
   }
-  assert.equal(entrada.material_id, "mat-1");
+  // Com a lista de filamentos, nada de material_id/preço do material/peso no topo.
+  for (const k of ["material_id", "preco_por_g", "preco_rolo", "peso_rolo_g", "peso_peca_g"]) assert.ok(!(k in entrada), `${k} fora do topo`);
+  assert.deepEqual(entrada.materiais, [{ material_id: "mat-1", peso_g: 25 }]);
   assert.equal(entrada.impressora_id, "imp-1");
   assert.equal(entrada.tarifa_kwh, 0.9);
   assert.ok(!("preco_manual" in entrada) && !("outros_custos" in entrada));
@@ -3667,7 +3686,7 @@ await teste("W → kW: 120 W = 0,12 kW (e de volta); custo/hora ao vivo da impre
   assert.equal(c.total, 0.52);
   assert.equal(custoHoraImpressora({ aquisicao: 100, residual: 0, vidaUtilHoras: 0, watts: 100, tarifaKwh: 1 }).depreciacao, 0, "sem vida útil: 0");
 });
-await teste("sem impressora: energia e depreciação 0 explícitos com aviso; sem tempo e sem material avisam", () => {
+await teste("sem impressora: energia e depreciação 0 explícitos com aviso; sem tempo e sem filamento avisam", () => {
   const sem = montarEntradaRapida(rapido({ impressora_id: "" }));
   assert.ok(!("impressora_id" in sem.entrada));
   assert.deepEqual([sem.entrada.potencia_media_kw, sem.entrada.valor_aquisicao, sem.entrada.valor_residual], [0, 0, 0]);
@@ -3679,16 +3698,46 @@ await teste("sem impressora: energia e depreciação 0 explícitos com aviso; se
   assert.equal(soPeso.entrada.horas_impressao, 0);
   assert.equal(soPeso.pronta, true, "só o peso já calcula");
   assert.ok(soPeso.avisos.some((a) => /tempo/.test(a)));
-  assert.equal(montarEntradaRapida(rapido({ peso_g: "", horas: "", minutos: "" })).pronta, false);
-  assert.equal(montarEntradaRapida(rapido({ peso_g: "", horas: "2" })).pronta, true, "só o tempo também");
+  const semFilamento = rapido({ filamentos: [novaLinhaFilamento()], horas: "", minutos: "" });
+  assert.equal(montarEntradaRapida(semFilamento).pronta, false);
+  assert.equal(montarEntradaRapida({ ...semFilamento, horas: "2" }).pronta, true, "só o tempo também");
+  assert.equal(montarEntradaRapida({ ...semFilamento, horas: "2" }).entrada.peso_peca_g, 0);
+  assert.ok(!("materiais" in montarEntradaRapida({ ...semFilamento, horas: "2" }).entrada));
 });
-await teste("material: do estoque (material_id) ou informado na hora (preço + peso do rolo)", () => {
-  const manual = montarEntradaRapida(rapido({ materialModo: "manual", preco_rolo: "89,90", peso_rolo_g: "1000" }));
-  assert.equal(manual.entrada.preco_rolo, 89.9);
-  assert.equal(manual.entrada.peso_rolo_g, 1000);
-  assert.ok(!("material_id" in manual.entrada));
-  assert.ok(montarEntradaRapida(rapido({ materialModo: "manual", preco_rolo: "0", peso_rolo_g: "1000" })).erros.length > 0);
-  assert.ok(montarEntradaRapida(rapido({ material_id: "" })).avisos.some((a) => /material/.test(a)));
+await teste("filamentos marcados: vários, do estoque ou informados na hora (valor do kg ÷ 1000), peso por peça × quantidade", () => {
+  const dois = montarEntradaRapida(rapido({
+    quantidade: "3",
+    filamentos: [
+      novaLinhaFilamento({ material_id: "mat-1", peso_g: "20" }),
+      novaLinhaFilamento({ origem: "manual", nome: "PLA branco", cor: "Branco", valor_kg: "89,90", peso_g: "5" }),
+    ],
+  }));
+  assert.deepEqual(dois.erros, []);
+  assert.deepEqual(dois.entrada.materiais, [
+    { material_id: "mat-1", peso_g: 60 },
+    { nome: "PLA branco", cor: "Branco", peso_g: 15, preco_por_g: 0.0899 },
+  ]);
+  assert.equal(precoPorGDeValorKg(89.9), 0.0899);
+  assert.equal(precoPorGDeValorKg(120), 0.12);
+  // Linha manual sem valor do kg é erro; sem peso é ignorada; sem escolher o filamento avisa.
+  assert.ok(montarMateriais([novaLinhaFilamento({ origem: "manual", nome: "x", valor_kg: "", peso_g: "10" })]).erros.length > 0);
+  assert.deepEqual(montarMateriais([novaLinhaFilamento({ material_id: "mat-1", peso_g: "" })]).materiais, []);
+  assert.ok(montarMateriais([novaLinhaFilamento({ peso_g: "10" })]).avisos.length > 0);
+  assert.equal(montarMateriais([novaLinhaFilamento({ origem: "manual", valor_kg: "100", peso_g: "10" })]).materiais[0] && (montarMateriais([novaLinhaFilamento({ origem: "manual", valor_kg: "100", peso_g: "10" })]).materiais[0] as { nome: string }).nome, "Filamento 1");
+  assert.ok(montarEntradaRapida(rapido({ filamentos: [novaLinhaFilamento({ material_id: "mat-1", peso_g: "-1" })] })).erros.length > 0);
+});
+await teste("\"faltam X g\": comparação informativa com o saldo; soma linhas do mesmo filamento", () => {
+  const mats = montarMateriais([
+    novaLinhaFilamento({ material_id: "a", peso_g: "60" }),
+    novaLinhaFilamento({ material_id: "a", peso_g: "40" }),
+    novaLinhaFilamento({ material_id: "b", peso_g: "10" }),
+    novaLinhaFilamento({ origem: "manual", valor_kg: "100", peso_g: "500" }),
+  ], 2).materiais;
+  assert.deepEqual(faltaDeEstoque(mats, { a: 150, b: 100 }), [{ material_id: "a", precisa: 200, tem: 150, falta: 50 }]);
+  assert.deepEqual(faltaDeEstoque(mats, { a: 200, b: 20 }), [], "saldo igual ao necessário não falta; manual não entra");
+  assert.deepEqual(faltaDeEstoque(mats, {}), [], "sem saldo conhecido não afirma nada");
+  assert.deepEqual(linhasDeEntrada(mats).map((l) => [l.origem, l.peso_g]), [["estoque", "120"], ["estoque", "80"], ["estoque", "20"], ["manual", "1000"]], "volta para a tela ao editar o item");
+  assert.equal(linhasDeEntrada(mats)[3].valor_kg, "100");
 });
 await teste("resumo para WhatsApp: peça, quantidade, preço por peça e total; nunca custo ou lucro", () => {
   const t = resumoWhatsapp({ nomePeca: "Suporte de headset", quantidade: 4, precoUnidade: "R$ 12,50", precoTotal: "R$ 50,00" });
@@ -3723,22 +3772,33 @@ await teste("Calculadora de preço: item de menu, rótulo e modo avançado (nada
   const op = lerFonte("lib/impressao-3d/opcoes.ts");
   assert.ok(op.includes("getOpcoesMateriaisComCusto") && op.includes("ver && custo > 0 ? custo : null"), "custo/g só com o extra custos");
 });
-await teste("cadastro de material: rolos comprados dão entrada (custo_total = rolos × preço); zero rolos só cadastra", () => {
+await teste("cadastro de filamento: valor do kg → preco_compra + rolo de 1000 g; quanto comprei (kg ou g) dá a entrada", () => {
+  assert.deepEqual(cadastroDeValorKg(89.9), { preco_compra: 89.9, peso_liquido_rolo_g: 1000 });
+  assert.equal(custoPorKgDeG(0.0899), 89.9);
+  assert.equal(paraGramas(2.5, "kg"), 2500);
+  assert.equal(paraGramas(750, "g"), 750);
+  assert.deepEqual(entradaDeCompraKg({ quantidade: 3, unidade: "kg", valorKg: 79.9 }), { quantidade: 3000, custoTotal: 239.7 });
+  assert.deepEqual(entradaDeCompraKg({ quantidade: 500, unidade: "g", valorKg: 80 }), { quantidade: 500, custoTotal: 40 });
+  assert.deepEqual(entradaDeCompraKg({ quantidade: 2, unidade: "kg", valorKg: null }), { quantidade: 2000, custoTotal: null });
+  assert.equal(entradaDeCompraKg({ quantidade: 0, unidade: "kg", valorKg: 80 }), null, "zero = só cadastra");
+  assert.deepEqual(entradaDeCompraUnidade({ quantidade: 4, precoUnitario: 12.5 }), { quantidade: 4, custoTotal: 50 });
+  assert.deepEqual(formatarSaldoPeso(2500), { valor: 2.5, unidade: "kg" });
+  assert.deepEqual(formatarSaldoPeso(480), { valor: 480, unidade: "g" });
+  // Os cadastros antigos por rolo continuam funcionando.
   assert.deepEqual(entradaDeRolosComprados({ rolos: 3, pesoRoloG: 1000, precoPago: 79.9 }), { gramas: 3000, custoTotal: 239.7 });
-  assert.deepEqual(entradaDeRolosComprados({ rolos: 2, pesoRoloG: 750, precoPago: null }), { gramas: 1500, custoTotal: null });
-  assert.equal(entradaDeRolosComprados({ rolos: 0, pesoRoloG: 1000, precoPago: 80 }), null);
   assert.equal(saldoEmRolos(2500, "g", 1000), 2.5);
-  assert.equal(saldoEmRolos(2500, "ml", 1000), null);
-  assert.equal(saldoEmRolos(2500, "g", null), null);
   const acao = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
-  assert.ok(acao.includes('formData.get("rolos_comprados")') && acao.includes('"p3d_movimentar_estoque"') && acao.includes("p_custo_total: entrada.custoTotal"));
-  assert.ok(acao.includes("verCustos ? preco_compra : null"), "custo da entrada só com o extra custos");
-  assert.ok(!/estoque_atual|custo_medio/.test(acao.slice(acao.indexOf("export async function criarMaterial"), acao.indexOf("export async function atualizarMaterial"))), "saldo só pela RPC");
+  const criar = acao.slice(acao.indexOf("export async function criarMaterial"), acao.indexOf("export async function atualizarMaterial"));
+  assert.ok(criar.includes('formData.get("quanto_comprei")') && criar.includes('"p3d_movimentar_estoque"') && criar.includes("p_custo_total: entrada.custoTotal"));
+  assert.ok(criar.includes("peso_liquido_rolo_g: PESO_KG_G") && criar.includes("verCustos ? preco_compra : null"), "kg: rolo de 1000 g; custo só com o extra");
+  assert.ok(!/estoque_atual|custo_medio|ultimo_custo/.test(acao.slice(acao.indexOf("export async function criarMaterial"), acao.indexOf("export async function alternarMaterialAtivo"))), "saldo e custo médio só pela RPC");
+  assert.ok(/registrarCompraMaterial[\s\S]*p3d_movimentar_estoque[\s\S]*Nova compra/.test(acao), "nova compra = nova entrada com o valor pago");
   const tela = lerFonte("components/impressao-3d/estoque-board.tsx");
-  assert.ok(tela.includes('name="rolos_comprados"') && tela.includes("Mais opções") && tela.includes("<details"));
-  for (const campo of ["marca", "diametro_mm", "estoque_minimo", "fornecedor_id", "localizacao"]) {
+  assert.ok(tela.includes('name="quanto_comprei"') && tela.includes("Valor pago por kg") && tela.includes("Nova compra") && tela.includes("<details"));
+  for (const campo of ["marca", "diametro_mm", "estoque_minimo", "fornecedor_id", "localizacao", "unidade"]) {
     assert.ok(tela.indexOf(`name="${campo}"`) > tela.indexOf("Mais opções"), `${campo} em "Mais opções"`);
   }
+  assert.ok(tela.includes("Custo por kg") && tela.includes("descreverSaldo("), "lista: saldo em kg/g e custo por kg");
 });
 await teste("cadastro de impressora: watts na tela, kW no banco; custo/hora ao vivo; resto em Mais opções", () => {
   const tela = lerFonte("components/impressao-3d/impressoras-board.tsx");
@@ -3785,6 +3845,170 @@ await teste("começo enxuto: cartão \"Precisa de mais?\" e frase de 1 linha por
 await teste("documentação da Etapa E", () => {
   const doc = lerFonte("docs/nicho-impressao-3d.md");
   for (const t of ["Etapa E", "Calculadora de preço", "Modo avançado", "Incluir também", "markup_pct", "Equipe e cofundadores", "enxuta"]) {
+    assert.ok(doc.includes(t), `doc sem "${t}"`);
+  }
+});
+
+console.log("\nEtapa E (parte 2) — filamentos marcados, estoque de peças, produção com vários materiais, pedidos");
+await teste("simulador avançado e orçamento aceitam a lista de materiais (e mantêm o material único)", () => {
+  const base = { ...ESTADO_VAZIO, material_id: "mat-unico", campos: { peso_peca_g: "50", preco_por_g: "0.1" }, quantidade: "2" };
+  const unico = montarEntrada(base, null);
+  assert.equal(unico.entrada.material_id, "mat-unico");
+  assert.equal(unico.entrada.peso_peca_g, 50);
+  assert.ok(!("materiais" in unico.entrada));
+  const lista = montarEntrada({ ...base, filamentos: [novaLinhaFilamento({ material_id: "a", peso_g: "30" }), novaLinhaFilamento({ origem: "manual", nome: "Azul", valor_kg: "100", peso_g: "20" })] }, null);
+  assert.deepEqual(lista.entrada.materiais, [{ material_id: "a", peso_g: 30 }, { nome: "Azul", peso_g: 20, preco_por_g: 0.1 }]);
+  for (const k of ["material_id", "peso_peca_g", "preco_por_g"]) assert.ok(!(k in lista.entrada), `${k} fora do topo com a lista`);
+  // Editar um item de orçamento devolve as linhas para a tela, e a lista é "do item" (não some no recalcular).
+  const volta = estadoParaEdicao({ quantidade: 2, materiais: lista.entrada.materiais, peso_peca_g: 0 }, null);
+  assert.equal(volta.filamentos.length, 2);
+  assert.ok(entradaParaRecalculo({ materiais: [{ material_id: "a", peso_g: 1 }], tarifa_kwh: 1 }).materiais, "materiais é do item");
+  const tela = lerFonte("components/impressao-3d/simulador.tsx");
+  assert.ok(tela.includes("Vários filamentos no mesmo trabalho") && tela.includes("<FilamentosLista"));
+});
+await teste("resultado por filamento (detalhes.material.itens) e linhas da calculadora vêm da RPC", () => {
+  const calc = lerCalculo({
+    custos: { material: 3.5 },
+    detalhes: { material: { itens: [{ material_id: "a", nome: "PLA", cor: "Preto", peso_g: 100, preco_por_g: 0.08, custo: 8.64 }, { nome: "Azul", peso_g: 10, preco_por_g: 0.1, custo: 1.08 }] } },
+    por_unidade: { preco: 5 },
+  });
+  assert.equal(calc?.detalhes.material.itens.length, 2);
+  assert.deepEqual(calc?.detalhes.material.itens[0], { material_id: "a", nome: "PLA", cor: "Preto", peso_g: 100, preco_por_g: 0.08, custo: 8.64 });
+  assert.equal(calc?.detalhes.material.itens[1].material_id, null);
+  assert.deepEqual(lerCalculo({ custos: {} })?.detalhes.material.itens, []);
+  const tela = lerFonte("components/impressao-3d/calculadora-rapida.tsx");
+  assert.ok(tela.includes("detalhes.material.itens.map") && tela.includes("<FilamentosLista") && tela.includes("faltaDeEstoque("));
+  assert.ok(!tela.includes("estado.material_id") && !tela.includes("peso_rolo_g"), "campo único de material saiu da calculadora rápida");
+});
+await teste("Estoque com duas abas (Material e Peças), chaves estáveis, mesma permissão do módulo", () => {
+  const estoque = MODULOS.find((m) => m.chave === "p3d_estoque")!;
+  assert.deepEqual(estoque.abas?.map((a) => a.chave), ["materiais", "pecas", "historico"]);
+  assert.equal(estoque.abas?.[0].rotulo, "Material");
+  assert.equal(estoque.abas?.[1].rotulo, "Peças");
+  assert.equal(abasVisiveis("p3d_estoque", { itens: [], abasOcultas: { p3d_estoque: ["materiais", "historico"] } }).join(), "pecas");
+  assert.equal(abasVisiveis("p3d_estoque", { itens: [], abasOcultas: { p3d_estoque: ["materiais", "pecas", "historico"] } }).length, 1, "mínimo de 1 visível");
+  const tela = lerFonte("components/impressao-3d/estoque-board.tsx");
+  assert.ok(tela.includes('["materiais", "Material"], ["pecas", "Peças"]') && tela.includes("<PecasEstoque"));
+  const matriz = lerFonte("lib/socios-shared.ts");
+  assert.ok(!matriz.includes("p3d_pecas"), "peças usam o mesmo módulo p3d_estoque (sem módulo novo)");
+});
+await teste("estoque de peças: movimentos só por RPC; tipos da tela; ajuste exige sinal e motivo; saldo negativo é do banco", () => {
+  assert.deepEqual(validarMovimentoPeca("entrada_manual", 5, null), { quantidade: 5 });
+  assert.ok("error" in validarMovimentoPeca("entrada_manual", 0, null));
+  assert.ok("error" in validarMovimentoPeca("perda", -2, null));
+  assert.ok("error" in validarMovimentoPeca("perda", 1.5, null));
+  assert.ok("error" in validarMovimentoPeca("ajuste", 3, null), "ajuste sem motivo");
+  assert.ok("error" in validarMovimentoPeca("ajuste", 0, "contagem"));
+  assert.deepEqual(validarMovimentoPeca("ajuste", -2, "contagem"), { quantidade: -2 });
+  assert.equal(pecaAbaixoDoMinimo({ quantidade: 3, estoque_minimo: 3 }), true);
+  assert.equal(pecaAbaixoDoMinimo({ quantidade: 0, estoque_minimo: 0 }), false, "mínimo 0 = sem alerta");
+  const numeros = { producao: { p1: 7 }, pedido: { o1: 12 } };
+  assert.equal(origemMovimentoPeca({ tipo: "producao", referencia_tipo: "producao", referencia_id: "p1" }, numeros), "Produção #7");
+  assert.equal(origemMovimentoPeca({ tipo: "venda", referencia_tipo: "pedido", referencia_id: "o1" }, numeros), "Pedido #12");
+  assert.equal(origemMovimentoPeca({ tipo: "venda", referencia_tipo: "pedido", referencia_id: "x" }, numeros), "Pedido");
+  assert.equal(origemMovimentoPeca({ tipo: "entrada_manual", referencia_tipo: null, referencia_id: null }, numeros), "Manual");
+  assert.equal(textoPecasEntraram(1), "1 peça entrou no estoque de peças.");
+  assert.equal(textoPecasEntraram(4), "4 peças entraram no estoque de peças.");
+  const acao = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
+  const pecas = acao.slice(acao.indexOf("// --- Estoque de peças"));
+  assert.ok(pecas.includes('"p3d_movimentar_pecas"') && pecas.includes('getAcessoEdicao(MODULO)') && pecas.includes('getAcessoEdicao("p3d_produtos")'));
+  assert.ok(!/\bquantidade:|custo_medio:/.test(pecas.slice(pecas.indexOf("export async function criarPecaEstoque"), pecas.indexOf("export async function atualizarPecaEstoque"))), "insert direto sem quantidade/custo");
+  assert.ok(/\.update\(\{ estoque_minimo: parsed\.data\.estoque_minimo, localizacao: parsed\.data\.localizacao \}\)/.test(pecas), "update direto só de mínimo e localização");
+  assert.ok(!pecas.includes("producao") || !/p_tipo: "(producao|venda)"/.test(pecas), "produção e venda nunca daqui");
+  assert.ok(pecas.includes("custo_unitario !== null && custo_unitario > 0 && !podeVerCustos(acesso)"), "custo por peça só com o extra custos");
+  const tela = lerFonte("components/impressao-3d/pecas-estoque.tsx");
+  assert.ok(tela.includes("Nova peça no estoque") && tela.includes("Entrada manual") && tela.includes("Perda") && tela.includes("Ajuste") && tela.includes("criarProdutoRapido") && tela.includes("/modulos"), "ações, produto rápido e convite a Produtos");
+  assert.ok(tela.includes("origemMovimentoPeca("), "histórico com origem");
+  const pagina = lerFonte("app/(dashboard)/impressao-3d/estoque/page.tsx");
+  assert.ok(pagina.includes("custo_medio`") && pagina.includes("verCustos ?"), "custo médio das peças só com o extra");
+});
+await teste("produção com vários materiais: linhas do trabalho, consumo de todos, conclusão multi", () => {
+  const id1 = "11111111-1111-4111-8111-111111111111";
+  const id2 = "22222222-2222-4222-8222-222222222222";
+  const ok = lerLinhasTrabalho(JSON.stringify([{ material_id: id1, peso_estimado_g: 100 }, { material_id: id2, peso_estimado_g: 20.5 }]));
+  assert.equal(ok.erro, null);
+  assert.equal(pesoTotalLinhas(ok.linhas), 120.5);
+  assert.ok(lerLinhasTrabalho(JSON.stringify([{ material_id: id1, peso_estimado_g: 1 }, { material_id: id1, peso_estimado_g: 2 }])).erro, "filamento repetido");
+  assert.ok(lerLinhasTrabalho(JSON.stringify([{ material_id: "x", peso_estimado_g: 1 }])).erro, "id inválido");
+  assert.ok(lerLinhasTrabalho(JSON.stringify([{ material_id: id1, peso_estimado_g: 0 }])).erro, "peso zero");
+  assert.ok(lerLinhasTrabalho("{").erro, "JSON torto");
+  assert.deepEqual(lerLinhasTrabalho("").linhas, []);
+  assert.deepEqual(linhasParaTrabalho([novaLinhaFilamento({ material_id: id1, peso_g: "10" }), novaLinhaFilamento({ peso_g: "" })]).linhas, [{ material_id: id1, peso_estimado_g: 10 }]);
+  assert.ok(linhasParaTrabalho([novaLinhaFilamento({ peso_g: "10" })]).erros.length > 0, "peso sem filamento");
+  // Consumo da conclusão: TODOS os materiais, cada um com peso real (zero vale), sem repetir.
+  const consumos = montarConsumos([{ material_id: id1, peso_real_g: "98,5" }, { material_id: id2, peso_real_g: "0" }], [id1, id2]);
+  assert.deepEqual(consumos, { consumos: [{ material_id: id1, peso_real_g: 98.5 }, { material_id: id2, peso_real_g: 0 }], erros: [] });
+  assert.ok(montarConsumos([{ material_id: id1, peso_real_g: "98" }], [id1, id2]).erros.length > 0, "falta um filamento");
+  assert.ok(montarConsumos([{ material_id: id1, peso_real_g: "" }], [id1]).erros.length > 0, "peso vazio");
+  assert.ok(montarConsumos([{ material_id: id1, peso_real_g: "-1" }], [id1]).erros.length > 0);
+  assert.ok(montarConsumos([{ material_id: id1, peso_real_g: "1" }, { material_id: id1, peso_real_g: "2" }], [id1]).erros.length > 0, "repetido");
+  // Retorno de p3d_concluir_producao_multi e avisos.
+  const r = lerConclusaoMulti({ peso_total_g: 118.5, estoque_negativo: false, abaixo_do_minimo: true, manutencao_devida: true, pecas_estoque: { saldo: 6, custo_medio: 3.2 } });
+  assert.equal(r.peso_total_g, 118.5);
+  assert.deepEqual(r.pecas_estoque, { saldo: 6, custo_medio: 3.2 });
+  const avisos = avisosConclusaoMulti(r, 4, (n) => String(n));
+  assert.ok(avisos.some((a) => /abaixo do estoque mínimo/.test(a)) && avisos.some((a) => /manutenção/.test(a)));
+  assert.ok(avisos.includes("4 peças entraram no estoque de peças (saldo: 6)."));
+  assert.equal(avisosConclusaoMulti(lerConclusaoMulti({ estoque_negativo: true }), 1, String).some((a) => /NEGATIVO/.test(a)), true);
+  assert.equal(lerConclusaoMulti(null).pecas_estoque, null);
+  // Código: a action confere os materiais, usa a RPC multi e divide a falha só no banco.
+  const acao = lerFonte("app/(dashboard)/impressao-3d/producao/actions.ts");
+  assert.ok(acao.includes('rpc("p3d_concluir_producao_multi"') && acao.includes("p_consumos: montado.consumos"));
+  assert.ok(acao.indexOf('.from("p3d_producao_materiais")') < acao.indexOf('rpc("p3d_concluir_producao"'), "conclusão simples só depois de conferir os materiais");
+  assert.ok(acao.includes("Este trabalho tem vários filamentos"), "conclusão simples recusada com materiais");
+  assert.ok(acao.includes("material_id: null") && acao.includes("pesoTotalLinhas("), "com a lista, material único nulo");
+  assert.ok(!/peso_real_g/.test(acao.slice(acao.indexOf("export async function criarTrabalho"), acao.indexOf("/** Só trabalho na fila */") > 0 ? acao.indexOf("/** Só trabalho na fila */") : acao.indexOf("export async function excluirTrabalho"))), "peso real nunca vai em insert/update direto");
+  const quadro = lerFonte("components/impressao-3d/producao-board.tsx");
+  assert.ok(quadro.includes("FormConcluirMulti") && quadro.includes("Produzir para o estoque de peças") && quadro.includes("dividido proporcionalmente"));
+  assert.ok(quadro.includes("name=\"filamentos\"") && quadro.includes("somenteEstoque"));
+  const pagina = lerFonte("app/(dashboard)/impressao-3d/producao/page.tsx");
+  assert.ok(pagina.includes('.from("p3d_producao_materiais")') && pagina.includes('.eq("workspace_id", ws)'));
+});
+await teste("pedidos: Em estoque, baixar e devolver peças (pedido E estoque), chip por item, sem botões sem permissão", () => {
+  assert.equal(chaveEstoquePeca("p", null), "p|");
+  assert.equal(chaveEstoquePeca("p", "v"), "p|v");
+  const itens = [
+    { produto_id: "p", pecas_baixadas_em: null },
+    { produto_id: "q", pecas_baixadas_em: "2026-01-01" },
+    { produto_id: null, pecas_baixadas_em: null },
+  ];
+  assert.equal(itensBaixaveis(itens), 1);
+  assert.equal(itensBaixados(itens), 1);
+  assert.deepEqual(lerBaixaPecas({ itens_baixados: 2, itens_sem_produto_ignorados: 1 }), { itens_baixados: 2, itens_sem_produto_ignorados: 1 });
+  assert.deepEqual(lerBaixaPecas(null), { itens_baixados: 0, itens_sem_produto_ignorados: 0 });
+  assert.deepEqual(lerDevolucaoPecas({ itens_devolvidos: 3 }), { itens_devolvidos: 3 });
+  assert.equal(textoBaixa({ itens_baixados: 1, itens_sem_produto_ignorados: 0 }), "1 item baixado do estoque de peças.");
+  assert.match(textoBaixa({ itens_baixados: 2, itens_sem_produto_ignorados: 1 }), /2 itens baixados.*1 item sem produto foi ignorado/);
+  const acoes = lerFonte("app/(dashboard)/impressao-3d/pedidos/actions.ts");
+  assert.ok(/baixarPecasPedido[\s\S]*getAcessoEdicao\(MODULO\)[\s\S]*getAcessoEdicao\("p3d_estoque"\)[\s\S]*p3d_baixar_pecas_pedido/.test(acoes), "baixa: edição em Pedidos E em Estoque");
+  assert.ok(/devolverPecasPedido[\s\S]*getAcessoEdicao\("p3d_estoque"\)[\s\S]*p3d_devolver_pecas_pedido/.test(acoes));
+  assert.ok(acoes.includes("mensagemRpc(error, \"Não foi possível baixar as peças do estoque.\")"), "erro do banco como veio");
+  const tela = lerFonte("components/impressao-3d/pedido-detalhe.tsx");
+  assert.ok(tela.includes("Baixar do estoque de peças") && tela.includes("Devolver peças ao estoque") && tela.includes("Baixado do estoque") && tela.includes("Em estoque:"));
+  assert.ok(tela.includes("podeBaixarPecas && pedido.status") && tela.includes("!item.pecas_baixadas_em"), "botões só com permissão; item baixado não edita");
+  const pagina = lerFonte("app/(dashboard)/impressao-3d/pedidos/[id]/page.tsx");
+  assert.ok(pagina.includes('getAcessoEdicao("p3d_estoque")') && pagina.includes("podeBaixarPecas={podeEditar && !!acessoEstoqueEdicao}") && pagina.includes('.from("p3d_pecas_estoque")'));
+  assert.ok(lerFonte("lib/impressao-3d/tipos-operacao.ts").includes("pecas_baixadas_em"));
+});
+await teste("a tela nunca recalcula saldo nem preço (detector da auditoria)", () => {
+  for (const arq of ARQUIVOS_SEM_SALDO_NO_CLIENTE) assert.deepEqual(saldoCalculadoNoCliente(lerFonte(arq)), [], `${arq} recalcula saldo`);
+  assert.ok(saldoCalculadoNoCliente("const saldoApos = saldo + delta;").length > 0);
+  assert.ok(saldoCalculadoNoCliente("peca.quantidade -= 1;").length > 0);
+  assert.ok(saldoCalculadoNoCliente("const emEstoque = peca.quantidade - vendidas;").length > 0);
+  assert.deepEqual(saldoCalculadoNoCliente("// saldoApos = saldo + delta\nconst a = 1;"), []);
+  const audit = lerFonte("scripts/auditar-isolamento.mts");
+  for (const t of ["p3d_pecas_estoque", "p3d_movimentos_pecas", "p3d_producao_materiais", "pecas_baixadas_em", "p3d_concluir_producao_multi"]) assert.ok(audit.includes(t), `auditoria cobre ${t}`);
+  assert.ok(audit.includes('["quantidade", "custo_medio"]') && audit.includes('["peso_real_g"]'));
+});
+await teste("Primeiros passos: filamento com valor do kg, entrada de estoque, impressora e produto", () => {
+  const passos = montarPassos({ precificacao: false, impressora: false, material: false, entrada_estoque: false, produto: false, orcamento: false, pedido: false }, ["p3d_estoque", "p3d_impressoras", "p3d_precificacao", "p3d_produtos"]);
+  assert.deepEqual(passos.map((p) => p.chave), ["material", "entrada_estoque", "impressora", "precificacao", "produto"]);
+  assert.match(passos[0].titulo, /filamento.*valor do kg/i);
+  assert.ok(lerFonte("lib/impressao-3d/primeiros-passos.ts").includes('.gt("preco_compra", 0)'), "filamento com valor do kg = preco_compra > 0");
+});
+await teste("documentação da Etapa E (parte 2)", () => {
+  const doc = lerFonte("docs/nicho-impressao-3d.md");
+  for (const t of ["Filamentos marcados", "p_entrada.materiais", "Estoque de peças", "p3d_movimentar_pecas", "p3d_concluir_producao_multi", "p3d_baixar_pecas_pedido", "Valor pago por kg"]) {
     assert.ok(doc.includes(t), `doc sem "${t}"`);
   }
 });

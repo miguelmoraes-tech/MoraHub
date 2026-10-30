@@ -18,6 +18,16 @@ export interface CustosCalculo {
   rateio_despesas_fixas: number;
 }
 
+export interface ItemMaterialCalculo {
+  material_id: string | null;
+  nome: string;
+  cor: string;
+  /** Peso do LOTE. */
+  peso_g: number;
+  preco_por_g: number;
+  custo: number;
+}
+
 export interface CalculoPreco {
   custos: CustosCalculo;
   custo_total: number;
@@ -31,7 +41,14 @@ export interface CalculoPreco {
   markup_real: number;
   por_unidade: { custo: number; preco: number; lucro: number };
   detalhes: {
-    material: { peso_total_g: number; desperdicio_g: number; peso_consumo_g: number; preco_por_g: number };
+    material: {
+      peso_total_g: number;
+      desperdicio_g: number;
+      peso_consumo_g: number;
+      preco_por_g: number;
+      /** Um por filamento da lista p_entrada.materiais (custo já inclui a parte do desperdício). */
+      itens: ItemMaterialCalculo[];
+    };
     energia: { kwh: number; potencia_kw: number; tarifa_kwh: number };
     depreciacao_por_hora: number;
     falha: { tentativas_esperadas: number; custo_de_uma_tentativa: number };
@@ -79,6 +96,20 @@ export function normalizarFracao(valor: number, lucro: number, base: number): nu
   return Math.abs(valor) > 1.5 ? valor / 100 : valor;
 }
 
+function lerItensMaterial(bruto: unknown): ItemMaterialCalculo[] {
+  if (!Array.isArray(bruto)) return [];
+  return bruto
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x))
+    .map((o) => ({
+      material_id: typeof o.material_id === "string" ? o.material_id : null,
+      nome: typeof o.nome === "string" ? o.nome : "",
+      cor: typeof o.cor === "string" ? o.cor : "",
+      peso_g: num(o.peso_g),
+      preco_por_g: num(o.preco_por_g),
+      custo: num(o.custo),
+    }));
+}
+
 export function lerCalculo(bruto: unknown): CalculoPreco | null {
   const c = obj(bruto);
   if (Object.keys(c).length === 0) return null;
@@ -112,6 +143,7 @@ export function lerCalculo(bruto: unknown): CalculoPreco | null {
         desperdicio_g: num(mat.desperdicio_g),
         peso_consumo_g: num(mat.peso_consumo_g),
         preco_por_g: num(mat.preco_por_g),
+        itens: lerItensMaterial(mat.itens),
       },
       energia: { kwh: num(en.kwh), potencia_kw: num(en.potencia_kw), tarifa_kwh: num(en.tarifa_kwh) },
       depreciacao_por_hora: num(dep.por_hora),
@@ -146,6 +178,7 @@ export const ROTULO_PARAMETRO: Record<string, string> = {
   peso_brim_g: "Peso do brim (g)",
   peso_purga_g: "Peso da purga (g)",
   peso_total_g: "Peso total do fatiador (g)",
+  materiais: "Filamentos",
   horas_impressao: "Horas de impressão",
   quantidade: "Quantidade",
   preco_por_g: "Preço do material (R$/g)",

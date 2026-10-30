@@ -23,4 +23,34 @@ export function precoCalculadoNoCliente(texto: string): string[] {
 export const ARQUIVOS_CALCULADORA_RAPIDA = [
   "components/impressao-3d/calculadora-rapida.tsx",
   "lib/impressao-3d/calculadora-rapida.ts",
+  // Montam as linhas de filamento da entrada; só convertem unidade (valor do kg ÷ 1000), nunca preço.
+  "components/impressao-3d/filamentos-lista.tsx",
+  "lib/impressao-3d/filamentos.ts",
+];
+
+/**
+ * Padrões que denunciam SALDO de estoque calculado no cliente. Saldo e custo médio (material e peças)
+ * só mudam pelas RPCs e a tela mostra o que o banco devolveu.
+ */
+export const PADROES_SALDO_NO_CLIENTE: { nome: string; re: RegExp }[] = [
+  { nome: "saldo atribuído por conta", re: /\b(saldoApos|saldo_apos|estoque_atual|estoqueAtual|emEstoque|saldoPecas|saldoMaterial)\w*\s*(\+=|-=|=)\s*[^;=]*[+\-*]\s*\w/ },
+  { nome: "quantidade da peça somada/subtraída", re: /\b(peca|p|item)\.(quantidade|estoque_atual)\s*(\+=|-=)/ },
+  { nome: "saldo após = saldo ± delta", re: /saldo\w*\s*[+-]\s*[\w.]*delta/i },
+];
+
+/** Nomes dos padrões de saldo encontrados (sem comentários). */
+export function saldoCalculadoNoCliente(texto: string): string[] {
+  const semComentarios = texto.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return PADROES_SALDO_NO_CLIENTE.filter(({ re }) => re.test(semComentarios)).map(({ nome }) => nome);
+}
+
+/** Telas do estoque de material/peças, produção e pedidos: não recalculam saldo. */
+export const ARQUIVOS_SEM_SALDO_NO_CLIENTE = [
+  "components/impressao-3d/estoque-board.tsx",
+  "components/impressao-3d/pecas-estoque.tsx",
+  "components/impressao-3d/producao-board.tsx",
+  "components/impressao-3d/pedido-detalhe.tsx",
+  "components/impressao-3d/filamentos-lista.tsx",
+  "lib/impressao-3d/pecas.ts",
+  "lib/impressao-3d/filamentos.ts",
 ];

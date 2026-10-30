@@ -9,6 +9,7 @@
  * e só entra o que a pessoa marcar em "Incluir também".
  */
 import { parseNumero } from "@/lib/impressao-3d/numeros";
+import { montarMateriais, novaLinhaFilamento, type LinhaFilamento } from "@/lib/impressao-3d/filamentos";
 import type { ConfigPrecificacao } from "@/lib/impressao-3d/tipos";
 
 export const MULTIPLICADOR_PADRAO = 5;
@@ -85,13 +86,10 @@ export type ModoPrecoRapido = "multiplicador" | "margem";
 
 export interface EstadoRapido {
   nomePeca: string;
-  materialModo: "estoque" | "manual";
-  material_id: string;
-  preco_rolo: string;
-  peso_rolo_g: string;
+  /** Filamentos usados no projeto (mínimo 1 linha); o peso de cada linha é POR PEÇA (o que o fatiador mostra). */
+  filamentos: LinhaFilamento[];
   impressora_id: string;
   /** Por peça (o que o fatiador mostra). */
-  peso_g: string;
   horas: string;
   minutos: string;
   quantidade: string;
@@ -192,12 +190,8 @@ export function valoresIniciaisExtras(
 export function estadoInicialRapido(config: ConfigPrecificacao | null): EstadoRapido {
   return {
     nomePeca: "",
-    materialModo: "estoque",
-    material_id: "",
-    preco_rolo: "",
-    peso_rolo_g: "1000",
+    filamentos: [novaLinhaFilamento()],
     impressora_id: "",
-    peso_g: "",
     horas: "",
     minutos: "",
     quantidade: "1",
@@ -223,11 +217,8 @@ export interface EntradaRapida {
 
 const ROTULO_CAMPO: Record<string, string> = {
   tarifa_kwh: "Tarifa de energia",
-  peso_g: "Peso por peça",
   horas: "Horas",
   minutos: "Minutos",
-  preco_rolo: "Preço do rolo",
-  peso_rolo_g: "Peso do rolo",
   multiplicador: "Multiplicador",
   margem_pct: "Margem",
 };
@@ -276,30 +267,26 @@ export function montarEntradaRapida(
   }
   entrada.quantidade = x;
 
-  const pesoPeca = lerNumero(e.peso_g, ROTULO_CAMPO.peso_g);
   const horasPeca = (() => {
     const h = lerNumero(e.horas, ROTULO_CAMPO.horas);
     const m = lerNumero(e.minutos, ROTULO_CAMPO.minutos);
     if (h === null && m === null) return null;
     return (h ?? 0) + (m ?? 0) / 60;
   })();
-  entrada.peso_peca_g = arredondar((pesoPeca ?? 0) * x);
   entrada.horas_impressao = arredondar((horasPeca ?? 0) * x);
 
-  // Material: do estoque ou informado na hora.
-  if (e.materialModo === "estoque") {
-    if (e.material_id) entrada.material_id = e.material_id;
-    else if ((pesoPeca ?? 0) > 0) avisos.push("Sem material escolhido, o custo do material fica zerado.");
+  // Filamentos: o peso de cada linha é por peça; a RPC recebe o do LOTE (peso × quantidade). Com a
+  // lista, nada de material_id/preco_por_g/peso no topo (a lista é a fonte).
+  const mats = montarMateriais(e.filamentos, x);
+  erros.push(...mats.erros);
+  avisos.push(...mats.avisos);
+  if (mats.materiais.length > 0) {
+    entrada.materiais = mats.materiais;
   } else {
-    const preco = lerNumero(e.preco_rolo, ROTULO_CAMPO.preco_rolo, { positivo: true });
-    const peso = lerNumero(e.peso_rolo_g, ROTULO_CAMPO.peso_rolo_g, { positivo: true });
-    if (preco !== null && peso !== null) {
-      entrada.preco_rolo = preco;
-      entrada.peso_rolo_g = peso;
-    } else if ((pesoPeca ?? 0) > 0 && !erros.length) {
-      avisos.push("Informe o preço e o peso do rolo para o custo do material entrar.");
-    }
+    entrada.peso_peca_g = 0;
+    if (!mats.erros.length && !mats.avisos.length) avisos.push("Sem filamento e peso, o custo do material fica zerado.");
   }
+  const temPeso = mats.materiais.length > 0;
 
   // Impressora: sem ela, energia e depreciação ficam zeradas (explícito, não o padrão de ninguém).
   if (e.impressora_id) {
@@ -314,7 +301,7 @@ export function montarEntradaRapida(
         : "Sem impressora escolhida, energia e depreciação ficam zeradas."
     );
   }
-  if ((horasPeca ?? 0) <= 0 && (pesoPeca ?? 0) > 0) {
+  if ((horasPeca ?? 0) <= 0 && temPeso) {
     avisos.push("Sem o tempo de impressão, energia e depreciação ficam zeradas. Informe o tempo para elas entrarem no custo.");
   }
 
@@ -352,7 +339,7 @@ export function montarEntradaRapida(
     }
   }
 
-  const pronta = (pesoPeca ?? 0) > 0 || (horasPeca ?? 0) > 0;
+  const pronta = temPeso || (horasPeca ?? 0) > 0;
   return { entrada, erros, avisos, pronta };
 }
 

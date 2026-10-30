@@ -138,7 +138,18 @@ export function ComposicaoCalculo({
           <Linha rotulo="Peso total do fatiador" valor={formatGramas(d.material.peso_total_g)} />
           <Linha rotulo="Margem de desperdício" valor={formatGramas(d.material.desperdicio_g)} />
           <Linha rotulo="Consumo de material" valor={formatGramas(d.material.peso_consumo_g)} />
-          <Linha rotulo="Preço do material" valor={`${formatMoeda(d.material.preco_por_g, 4)}/g`} />
+          {d.material.itens.length > 0 ? (
+            d.material.itens.map((it, i) => (
+              <Linha
+                key={`${it.material_id ?? it.nome}-${i}`}
+                rotulo={[it.nome, it.cor].filter(Boolean).join(" · ") || `Filamento ${i + 1}`}
+                sub={`${formatGramas(it.peso_g)} × ${formatMoeda(it.preco_por_g, 4)}/g`}
+                valor={formatMoeda(it.custo)}
+              />
+            ))
+          ) : (
+            <Linha rotulo="Preço do material" valor={`${formatMoeda(d.material.preco_por_g, 4)}/g`} />
+          )}
           <Linha rotulo="Energia" valor={`${formatNumero(d.energia.kwh, 3)} kWh`} sub={`${formatNumero(d.energia.potencia_kw, 3)} kW × ${formatMoeda(d.energia.tarifa_kwh, 4)}/kWh`} />
           <Linha rotulo="Depreciação" valor={`${formatMoeda(d.depreciacao_por_hora, 4)}/h`} />
           <Linha rotulo="Tentativas esperadas (falhas)" valor={formatNumero(d.falha.tentativas_esperadas, 3)} />

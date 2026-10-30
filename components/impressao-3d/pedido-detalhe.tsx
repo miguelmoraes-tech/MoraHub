@@ -17,7 +17,7 @@ import {
 import { ComposicaoCalculo } from "@/components/impressao-3d/composicao-calculo";
 import { ParametrosUsados } from "@/components/impressao-3d/simulador";
 import {
-  atualizarPedido, excluirPedido, gerarProducaoDoPedido, mudarStatusPedido, registrarPagamento,
+  atualizarPedido, baixarPecasPedido, devolverPecasPedido, excluirPedido, gerarProducaoDoPedido, mudarStatusPedido, registrarPagamento,
   removerItemPedido, salvarItemPedido,
 } from "@/app/(dashboard)/impressao-3d/pedidos/actions";
 import { lerCalculo } from "@/lib/impressao-3d/calculo";
@@ -31,6 +31,7 @@ import {
   prazoVencido, saldoPedido,
 } from "@/lib/impressao-3d/regras-operacao";
 import { formatDataHora, formatMoeda, formatPercentualFracao } from "@/lib/impressao-3d/numeros";
+import { chaveEstoquePeca, itensBaixados, itensBaixaveis } from "@/lib/impressao-3d/pecas";
 import { formatDate } from "@/lib/format";
 
 type TrabalhoResumo = Pick<Trabalho, "id" | "numero" | "descricao" | "status" | "quantidade" | "qualidade">;
@@ -120,12 +121,15 @@ function ItemCard({
   pedido,
   editavel,
   verCustos,
+  emEstoque,
   aoEditar,
 }: {
   item: PedidoItem;
   pedido: Pedido;
   editavel: boolean;
   verCustos: boolean;
+  /** Peças deste produto no estoque de peças; null = sem acesso ao Estoque ou item sem produto. */
+  emEstoque: number | null;
   aoEditar: () => void;
 }) {
   const [aberto, setAberto] = useState(false);
@@ -141,8 +145,10 @@ function ItemCard({
           <p className="flex flex-wrap items-center gap-2 text-sm text-zinc-200">
             {item.descricao}
             {doOrcamento && <StatusChip tone="copper">Do orçamento</StatusChip>}
+            {item.pecas_baixadas_em && <StatusChip tone="emerald">Baixado do estoque</StatusChip>}
           </p>
           <p className="text-xs text-zinc-500">
+            {emEstoque !== null && `Em estoque: ${emEstoque} ${emEstoque === 1 ? "peça" : "peças"} · `}
             {item.quantidade} un. × {formatMoeda(item.preco_unitario)}
             {verCustos && ` · custo ${formatMoeda(item.custo_unitario)} · lucro ${formatMoeda(item.lucro)}`}
           </p>
@@ -150,7 +156,7 @@ function ItemCard({
         <div className="flex shrink-0 items-center gap-2">
           <p className="text-sm font-semibold text-zinc-100">{formatMoeda(item.preco_total)}</p>
           {doOrcamento && <BotaoTexto onClick={() => setAberto((v) => !v)}>{aberto ? "Ocultar" : "Composição"}</BotaoTexto>}
-          {editavel && !doOrcamento && (
+          {editavel && !doOrcamento && !item.pecas_baixadas_em && (
             <>
               <button type="button" aria-label="Editar item" onClick={aoEditar} className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">
                 <Pencil className="h-3.5 w-3.5" />
@@ -278,8 +284,14 @@ export function PedidoDetalhe({
   verCustos,
   podeGerarProducao: podeProducao,
   podeLancarFinanceiro,
+  estoquePecas,
+  podeBaixarPecas,
   hoje,
 }: {
+  /** chave produto|variação → peças em estoque; null = sem acesso ao Estoque. */
+  estoquePecas: Record<string, number> | null;
+  /** Edição em Pedidos E em Estoque. */
+  podeBaixarPecas: boolean;
   pedido: Pedido;
   itens: PedidoItem[];
   pagamentos: PedidoPagamento[];
@@ -309,6 +321,16 @@ export function PedidoDetalhe({
   const itemEmEdicao = formItem && formItem !== "novo" ? (itens.find((i) => i.id === formItem) ?? null) : null;
   const saldo = saldoPedido(pedido.total, pedido.pago_valor);
   const vencido = prazoVencido(pedido, hoje);
+
+  function executarPecas(fn: () => Promise<{ error: string } | { ok: true; mensagem: string }>, confirmar?: string) {
+    executar(
+      async () => {
+        const r = await fn();
+        return "error" in r ? r : { ok: true as const };
+      },
+      { confirmar, sucesso: "Estoque de peças atualizado.", aoConcluir: () => router.refresh() }
+    );
+  }
 
   function gerarProducao() {
     iniciarGerar(async () => {
@@ -357,6 +379,23 @@ export function PedidoDetalhe({
               <BotaoPrimario type="button" pendente={gerando} onClick={gerarProducao}>
                 {gerando ? "Gerando..." : "Gerar produção"}
               </BotaoPrimario>
+            )}
+            {podeBaixarPecas && pedido.status !== "cancelado" && itensBaixaveis(itens) > 0 && (
+              <BotaoPrimario
+                type="button"
+                pendente={pendente}
+                onClick={() => executarPecas(() => baixarPecasPedido(pedido.id))}
+              >
+                Baixar do estoque de peças
+              </BotaoPrimario>
+            )}
+            {podeBaixarPecas && itensBaixados(itens) > 0 && (
+              <BotaoTexto
+                disabled={pendente}
+                onClick={() => executarPecas(() => devolverPecasPedido(pedido.id), "Devolver as peças deste pedido ao estoque de peças?")}
+              >
+                Devolver peças ao estoque
+              </BotaoTexto>
             )}
             {acoes.map((a) => (
               <BotaoPrimario
@@ -483,6 +522,7 @@ export function PedidoDetalhe({
                 pedido={pedido}
                 editavel={editavelItens}
                 verCustos={verCustos}
+                emEstoque={estoquePecas && item.produto_id ? (estoquePecas[chaveEstoquePeca(item.produto_id, item.variacao_id)] ?? 0) : null}
                 aoEditar={() => setFormItem(item.id)}
               />
             ))

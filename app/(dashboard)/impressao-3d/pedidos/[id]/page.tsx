@@ -11,6 +11,7 @@ import {
   type Pedido, type PedidoHistorico, type PedidoItem, type PedidoPagamento, type Trabalho,
 } from "@/lib/impressao-3d/tipos-operacao";
 import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
+import { chaveEstoquePeca } from "@/lib/impressao-3d/pecas";
 
 export default async function PedidoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,7 +34,7 @@ export default async function PedidoDetalhePage({ params }: { params: Promise<{ 
   const acessoProducaoLeitura = await getAcessoModulo("p3d_producao");
   const [
     { data: itens }, { data: pagamentos }, { data: historico }, { data: trabalhos },
-    clientes, produtos, podeProducao, podeFinanceiro,
+    clientes, produtos, podeProducao, podeFinanceiro, acessoEstoqueLeitura, acessoEstoqueEdicao,
   ] = await Promise.all([
     supabase
       .from("p3d_pedido_itens")
@@ -51,7 +52,26 @@ export default async function PedidoDetalhePage({ params }: { params: Promise<{ 
     getAcessoEdicao("p3d_producao"),
     // O pagamento só pode virar conta a receber com o Financeiro ligado e edição nele.
     getAcessoEdicao("financeiro"),
+    // Estoque de peças: "Em estoque: N" com leitura; baixar/devolver exige edição em Pedidos E em Estoque.
+    getAcessoModulo("p3d_estoque"),
+    getAcessoEdicao("p3d_estoque"),
   ]);
+
+  let estoquePecas: Record<string, number> | null = null;
+  if (acessoEstoqueLeitura) {
+    const ids = [...new Set(((itens ?? []) as unknown as { produto_id: string | null }[]).flatMap((i) => (i.produto_id ? [i.produto_id] : [])))];
+    estoquePecas = {};
+    if (ids.length > 0) {
+      const { data: pecas } = await supabase
+        .from("p3d_pecas_estoque")
+        .select("produto_id, variacao_id, quantidade")
+        .eq("workspace_id", ws)
+        .in("produto_id", ids);
+      for (const p of (pecas ?? []) as { produto_id: string; variacao_id: string | null; quantidade: number }[]) {
+        estoquePecas[chaveEstoquePeca(p.produto_id, p.variacao_id)] = p.quantidade;
+      }
+    }
+  }
 
   // Sem o extra "custos", o snapshot sai só com preços e os parâmetros de custo ficam de fora.
   const listaItens = ((itens ?? []) as unknown as Partial<PedidoItem>[]).map((i) => ({
@@ -76,6 +96,8 @@ export default async function PedidoDetalhePage({ params }: { params: Promise<{ 
       verCustos={verCustos}
       podeGerarProducao={!!podeProducao}
       podeLancarFinanceiro={!!podeFinanceiro}
+      estoquePecas={estoquePecas}
+      podeBaixarPecas={podeEditar && !!acessoEstoqueEdicao}
       hoje={hojeSaoPaulo()}
     />
   );
