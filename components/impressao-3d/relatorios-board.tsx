@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { Aviso, Cartao, Vazio } from "@/components/impressao-3d/campos";
+import { GastosPorPessoa } from "@/components/impressao-3d/gastos-por-pessoa";
+import type { LinhaGastosComprador } from "@/lib/impressao-3d/comprador";
 import { Natureza } from "@/components/impressao-3d/natureza";
 import { SeletorPeriodo } from "@/components/impressao-3d/seletor-periodo";
 import {
@@ -46,7 +48,7 @@ function BotaoCsv({ desabilitado, aoClicar }: { desabilitado: boolean; aoClicar:
 }
 
 export function RelatoriosBoard({
-  aba, abas, periodo, erroPeriodo, agrupar, limite, verCustos, erro, vendas, produtos, produtividade,
+  aba, abas, periodo, erroPeriodo, agrupar, limite, verCustos, erro, vendas, produtos, produtividade, gastos,
 }: {
   aba: AbaRelatorio;
   /** Abas visíveis pela preferência de navegação (nunca vazia). */
@@ -60,6 +62,7 @@ export function RelatoriosBoard({
   vendas: LinhaVendas[];
   produtos: LinhaProduto[];
   produtividade: LinhaProdutividade[];
+  gastos: LinhaGastosComprador[];
 }) {
   const extras: Record<string, string> = { aba, ...(aba === "vendas" ? { agrupar } : {}), ...(aba === "produtos" ? { limite: String(limite) } : {}) };
   const hrefAba = (a: AbaRelatorio) => {
@@ -74,7 +77,7 @@ export function RelatoriosBoard({
       <div>
         <h1 className="text-lg font-semibold text-zinc-100">Relatórios</h1>
         <p className="text-sm text-zinc-500">
-          Vendas, produtos e produtividade de {formatDataIso(periodo.de)} a {formatDataIso(periodo.ate)}.
+          Vendas, produtos, produtividade e gastos de {formatDataIso(periodo.de)} a {formatDataIso(periodo.ate)}.
         </p>
       </div>
 
@@ -109,6 +112,7 @@ export function RelatoriosBoard({
       {!erro && aba === "produtos" && (
         <RelProdutos linhas={produtos} periodo={periodo} limite={limite} verCustos={verCustos} />
       )}
+      {!erro && aba === "gastos" && <GastosPorPessoa linhas={gastos} periodo={periodo} />}
       {!erro && aba === "produtividade" && (
         <RelProdutividade linhas={produtividade} periodo={periodo} verCustos={verCustos} />
       )}

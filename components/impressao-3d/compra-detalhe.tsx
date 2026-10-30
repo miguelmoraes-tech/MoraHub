@@ -22,13 +22,19 @@ import {
 } from "@/lib/impressao-3d/regras-operacao";
 import { formatMoeda, formatNumero } from "@/lib/impressao-3d/numeros";
 import { formatDate } from "@/lib/format";
+import type { DadosCompradores } from "@/components/impressao-3d/estoque-board";
+import { CorrigirComprador } from "@/components/impressao-3d/corrigir-comprador";
+import { corrigirCompradorCompra } from "@/app/(dashboard)/impressao-3d/fornecedores/actions";
+import { rotuloComprador } from "@/lib/impressao-3d/comprador";
 
-function FormCabecalho({ compra, fornecedores, aoFechar }: { compra: Compra; fornecedores: Fornecedor[]; aoFechar: () => void }) {
+function FormCabecalho({
+  compra, fornecedores, compradores, aoFechar,
+}: { compra: Compra; fornecedores: Fornecedor[]; compradores: DadosCompradores; aoFechar: () => void }) {
   const [state, formAction, pendente] = useActionState(atualizarCompra.bind(null, compra.id), undefined);
   useActionSuccess(state, aoFechar);
   return (
     <form action={formAction} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-      <CamposCompra item={compra} fornecedores={fornecedores} />
+      <CamposCompra item={compra} fornecedores={fornecedores} compradores={compradores} />
       <ErroForm state={state} />
       <div className="flex justify-end gap-2">
         <BotaoTexto onClick={aoFechar}>Cancelar</BotaoTexto>
@@ -193,7 +199,9 @@ export function CompraDetalhe({
   podeEditar,
   podeReceber,
   podeGerarContaPagar,
+  compradores,
 }: {
+  compradores: DadosCompradores;
   compra: Compra;
   itens: CompraItem[];
   fornecedores: Fornecedor[];
@@ -227,7 +235,7 @@ export function CompraDetalhe({
               <StatusChip tone={TOM_STATUS_COMPRA[compra.status]}>{STATUS_COMPRA_ROTULO[compra.status]}</StatusChip>
             </h1>
             <p className="text-sm text-zinc-500">
-              {formatDate(compra.data)}
+              Compra de {formatDate(compra.data)} · comprou: {rotuloComprador(compra, compradores.pessoas)}
               {compra.prazo_entrega && ` · entrega até ${formatDate(compra.prazo_entrega)}`}
               {compra.recebida_em && ` · recebida em ${formatDate(compra.recebida_em.slice(0, 10))}`}
             </p>
@@ -284,7 +292,7 @@ export function CompraDetalhe({
       {recebendo && <PainelReceber compra={compra} podeGerarContaPagar={podeGerarContaPagar} aoFechar={() => setRecebendo(false)} />}
 
       {editandoCabecalho && editavel ? (
-        <FormCabecalho compra={compra} fornecedores={fornecedores} aoFechar={() => setEditandoCabecalho(false)} />
+        <FormCabecalho compra={compra} fornecedores={fornecedores} compradores={compradores} aoFechar={() => setEditandoCabecalho(false)} />
       ) : (
         <Cartao
           titulo="Dados da compra"
@@ -292,6 +300,19 @@ export function CompraDetalhe({
         >
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
             <div><dt className="text-xs text-zinc-500">Fornecedor</dt><dd className="text-zinc-200">{fornecedor?.nome ?? "—"}</dd></div>
+            <div>
+              <dt className="text-xs text-zinc-500">Quem comprou</dt>
+              <dd className="flex flex-col items-start gap-1 text-zinc-200">
+                {rotuloComprador(compra, compradores.pessoas)}
+                {podeEditar && compra.status === "recebida" && (
+                  <CorrigirComprador
+                    acao={corrigirCompradorCompra.bind(null, compra.id)}
+                    atual={compra}
+                    pessoas={compradores.pessoas}
+                  />
+                )}
+              </dd>
+            </div>
             <div><dt className="text-xs text-zinc-500">Validade da cotação</dt><dd className="text-zinc-200">{formatDate(compra.validade_cotacao)}</dd></div>
             <div><dt className="text-xs text-zinc-500">Frete</dt><dd className="text-zinc-200">{formatMoeda(compra.frete)}</dd></div>
             <div><dt className="text-xs text-zinc-500">Desconto</dt><dd className="text-zinc-200">{formatMoeda(compra.desconto)}</dd></div>

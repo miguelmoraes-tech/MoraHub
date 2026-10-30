@@ -10,6 +10,7 @@ import {
   type AbaRelatorio, type LinhaProdutividade, type LinhaProduto, type LinhaVendas,
 } from "@/lib/impressao-3d/painel";
 import { mensagemRpc } from "@/lib/impressao-3d/erros";
+import { lerGastosPorComprador, type LinhaGastosComprador } from "@/lib/impressao-3d/comprador";
 import { RelatoriosBoard } from "@/components/impressao-3d/relatorios-board";
 import { abaInicial } from "@/lib/modulos/preferencias";
 
@@ -26,7 +27,8 @@ export default async function RelatoriosPage({
   const verCustos = podeVerCustos(acesso);
   const params = await searchParams;
   // Aba oculta na preferência (ou desconhecida): abre a primeira visível.
-  const abas = await getAbasVisiveis("p3d_relatorios");
+  // "Gastos por pessoa" é dado de custo: só fundador/cofundador ou quem tem o extra "custos" (o banco confere de novo).
+  const abas = (await getAbasVisiveis("p3d_relatorios")).filter((a) => a !== "gastos" || verCustos);
   const aba: AbaRelatorio = abaInicial(
     abas,
     ABAS_RELATORIO.find((a) => a === UM(params.aba)) ?? "vendas"
@@ -44,6 +46,7 @@ export default async function RelatoriosPage({
   let vendas: LinhaVendas[] = [];
   let produtos: LinhaProduto[] = [];
   let produtividade: LinhaProdutividade[] = [];
+  let gastos: LinhaGastosComprador[] = [];
   let erro: string | null = null;
 
   if (aba === "vendas") {
@@ -54,6 +57,10 @@ export default async function RelatoriosPage({
     const r = await supabase.rpc("p3d_relatorio_produtos", { ...base, p_limite: limite });
     if (r.error) erro = mensagemRpc(r.error, "Não foi possível gerar o relatório de produtos.");
     else produtos = lerRelatorioProdutos(r.data, verCustos);
+  } else if (aba === "gastos") {
+    const r = await supabase.rpc("p3d_gastos_por_comprador", base);
+    if (r.error) erro = mensagemRpc(r.error, "Não foi possível gerar os gastos por pessoa.");
+    else gastos = lerGastosPorComprador(r.data);
   } else {
     const r = await supabase.rpc("p3d_relatorio_produtividade", base);
     if (r.error) erro = mensagemRpc(r.error, "Não foi possível gerar o relatório de produtividade.");
@@ -73,6 +80,7 @@ export default async function RelatoriosPage({
       vendas={vendas}
       produtos={produtos}
       produtividade={produtividade}
+      gastos={gastos}
     />
   );
 }

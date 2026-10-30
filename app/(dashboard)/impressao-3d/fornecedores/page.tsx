@@ -4,6 +4,7 @@ import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
 import { getOpcoesMateriais } from "@/lib/impressao-3d/opcoes";
+import { getPessoasCompradoras } from "@/lib/impressao-3d/compradores";
 import { FornecedoresBoard } from "@/components/impressao-3d/fornecedores-board";
 import {
   COLUNAS_COMPRA, COLUNAS_FORNECEDOR, COLUNAS_HISTORICO_PRECOS,
@@ -19,7 +20,7 @@ export default async function FornecedoresPage() {
   const supabase = await createClient();
   const ws = acesso.workspaceId;
 
-  const [{ data: fornecedores }, { data: compras }, { data: historico }, materiais] = await Promise.all([
+  const [{ data: fornecedores }, { data: compras }, { data: historico }, materiais, pessoas] = await Promise.all([
     supabase.from("p3d_fornecedores").select(COLUNAS_FORNECEDOR).eq("workspace_id", ws).order("nome", { ascending: true }),
     supabase.from("p3d_compras").select(COLUNAS_COMPRA).eq("workspace_id", ws).order("numero", { ascending: false }),
     supabase
@@ -29,6 +30,7 @@ export default async function FornecedoresPage() {
       .order("data", { ascending: false })
       .limit(LIMITE_HISTORICO),
     getOpcoesMateriais(),
+    getPessoasCompradoras(ws),
   ]);
 
   return (
@@ -39,6 +41,7 @@ export default async function FornecedoresPage() {
       historico={(historico ?? []) as unknown as HistoricoPreco[]}
       materiais={materiais}
       podeEditar={acesso.nivel === "edicao"}
+      compradores={{ pessoas, usuarioId: acesso.userId }}
     />
   );
 }

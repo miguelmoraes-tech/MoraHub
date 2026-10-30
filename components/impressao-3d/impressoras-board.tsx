@@ -3,6 +3,10 @@
 import { useActionState, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Pencil, Plus, Printer, Trash2, Wrench, Archive, ArchiveRestore } from "lucide-react";
 import { StatusChip, type ChipTone } from "@/components/status-chip";
+import { CamposComprador } from "@/components/impressao-3d/campos-comprador";
+import type { DadosCompradores } from "@/components/impressao-3d/estoque-board";
+import { rotuloComprador, seletorDeComprador } from "@/lib/impressao-3d/comprador";
+import { formatDataIso, hojeSaoPaulo } from "@/lib/impressao-3d/datas";
 import { SegmentFilter } from "@/components/segment-filter";
 import { useActionSuccess } from "@/lib/hooks/use-action-success";
 import {
@@ -23,7 +27,6 @@ import {
 } from "@/lib/impressao-3d/regras";
 import { formatHoras, formatMoeda, formatNumero } from "@/lib/impressao-3d/numeros";
 import { custoHoraImpressora, kwParaWatts, wattsParaKw } from "@/lib/impressao-3d/calculadora-rapida";
-import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
 import { formatDate } from "@/lib/format";
 import { abaInicial } from "@/lib/modulos/preferencias";
 
@@ -34,7 +37,9 @@ const TOM_STATUS: Record<StatusImpressora, ChipTone> = {
   inativa: "zinc",
 };
 
-function CamposImpressora({ item, tarifaKwh }: { item?: Impressora; tarifaKwh: number | null }) {
+function CamposImpressora({
+  item, tarifaKwh, compradores,
+}: { item?: Impressora; tarifaKwh: number | null; compradores: DadosCompradores }) {
   const [aquisicao, setAquisicao] = useState(item?.valor_aquisicao ?? 0);
   const [residual, setResidual] = useState(item?.valor_residual ?? 0);
   const [vida, setVida] = useState(item?.vida_util_horas ?? 0);
@@ -114,7 +119,20 @@ function CamposImpressora({ item, tarifaKwh }: { item?: Impressora; tarifaKwh: n
             onChange={(e) => setResidual(Number(e.target.value) || 0)}
             ajuda="Quanto ela ainda vale no fim da vida útil. Não pode passar do preço pago."
           />
-          <Entrada rotulo="Data de aquisição" name="data_aquisicao" type="date" defaultValue={item?.data_aquisicao ?? ""} />
+          <Entrada
+            rotulo="Data da compra (aquisição)"
+            name="data_aquisicao"
+            type="date"
+            max={hojeSaoPaulo()}
+            defaultValue={item?.data_aquisicao ?? ""}
+            ajuda="Não pode ser depois de hoje."
+          />
+          <CamposComprador
+            pessoas={compradores.pessoas}
+            usuarioId={compradores.usuarioId}
+            inicial={item ? { seletor: seletorDeComprador(item, compradores.pessoas), nome: item.comprador_nome } : undefined}
+            className="col-span-2 sm:col-span-4"
+          />
           <Numero
             rotulo="Horas de uso"
             name="horas_uso"
@@ -157,10 +175,12 @@ function CamposImpressora({ item, tarifaKwh }: { item?: Impressora; tarifaKwh: n
 function FormImpressora({
   item,
   tarifaKwh,
+  compradores,
   aoFechar,
 }: {
   item?: Impressora;
   tarifaKwh: number | null;
+  compradores: DadosCompradores;
   aoFechar: () => void;
 }) {
   const acao = item ? atualizarImpressora.bind(null, item.id) : criarImpressora;
@@ -169,7 +189,7 @@ function FormImpressora({
 
   return (
     <form action={formAction} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-      <CamposImpressora item={item} tarifaKwh={tarifaKwh} />
+      <CamposImpressora item={item} tarifaKwh={tarifaKwh} compradores={compradores} />
       <ErroForm state={state} />
       <div className="flex justify-end gap-2">
         <BotaoTexto onClick={aoFechar}>Cancelar</BotaoTexto>
@@ -179,7 +199,7 @@ function FormImpressora({
   );
 }
 
-function CamposPeca({ item }: { item?: PecaDesgaste }) {
+function CamposPeca({ item, compradores }: { item?: PecaDesgaste; compradores: DadosCompradores }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
       <Entrada rotulo="Nome *" name="nome" required defaultValue={item?.nome} className="col-span-2 sm:col-span-1" />
@@ -191,17 +211,25 @@ function CamposPeca({ item }: { item?: PecaDesgaste }) {
       <Numero rotulo="Custo (R$) *" name="custo" required defaultValue={item?.custo ?? ""} />
       <Numero rotulo="Vida útil (h) *" name="vida_util_horas" required min="0.01" defaultValue={item?.vida_util_horas ?? ""} />
       <Numero rotulo="Horas na última troca" name="horas_ultima_troca" defaultValue={item?.horas_ultima_troca ?? ""} />
+      <CamposComprador
+        pessoas={compradores.pessoas}
+        usuarioId={compradores.usuarioId}
+        inicial={item ? { seletor: seletorDeComprador(item, compradores.pessoas), nome: item.comprador_nome } : undefined}
+        className="col-span-2 sm:col-span-5"
+      />
     </div>
   );
 }
 
-function FormPeca({ impressoraId, item, aoFechar }: { impressoraId: string; item?: PecaDesgaste; aoFechar: () => void }) {
+function FormPeca({
+  impressoraId, item, compradores, aoFechar,
+}: { impressoraId: string; item?: PecaDesgaste; compradores: DadosCompradores; aoFechar: () => void }) {
   const acao = item ? atualizarPecaDesgaste.bind(null, item.id) : criarPecaDesgaste.bind(null, impressoraId);
   const [state, formAction, pendente] = useActionState(acao, undefined);
   useActionSuccess(state, aoFechar);
   return (
     <form action={formAction} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-      <CamposPeca item={item} />
+      <CamposPeca item={item} compradores={compradores} />
       <ErroForm state={state} />
       <div className="flex justify-end gap-2">
         <BotaoTexto onClick={aoFechar}>Cancelar</BotaoTexto>
@@ -211,7 +239,9 @@ function FormPeca({ impressoraId, item, aoFechar }: { impressoraId: string; item
   );
 }
 
-function AbaPecas({ impressora, pecas, podeEditar }: { impressora: Impressora; pecas: PecaDesgaste[]; podeEditar: boolean }) {
+function AbaPecas({
+  impressora, pecas, podeEditar, compradores,
+}: { impressora: Impressora; pecas: PecaDesgaste[]; podeEditar: boolean; compradores: DadosCompradores }) {
   const [novo, setNovo] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
   const { executar, pendente } = useAcao();
@@ -231,14 +261,14 @@ function AbaPecas({ impressora, pecas, podeEditar }: { impressora: Impressora; p
           </BotaoNovo>
         )}
       </div>
-      {novo && <FormPeca impressoraId={impressora.id} aoFechar={() => setNovo(false)} />}
+      {novo && <FormPeca impressoraId={impressora.id} compradores={compradores} aoFechar={() => setNovo(false)} />}
       {pecas.length === 0 && !novo ? (
         <Vazio>Nenhuma peça de desgaste cadastrada (bico, correia, mesa...).</Vazio>
       ) : (
         <div className="space-y-2">
           {pecas.map((p) =>
             editando === p.id ? (
-              <FormPeca key={p.id} impressoraId={impressora.id} item={p} aoFechar={() => setEditando(null)} />
+              <FormPeca key={p.id} impressoraId={impressora.id} item={p} compradores={compradores} aoFechar={() => setEditando(null)} />
             ) : (
               <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800/80 px-3 py-2.5">
                 <div className="min-w-0">
@@ -249,7 +279,8 @@ function AbaPecas({ impressora, pecas, podeEditar }: { impressora: Impressora; p
                   </p>
                   <p className="text-xs text-zinc-500">
                     {formatMoeda(p.custo)} · vida útil {formatHoras(p.vida_util_horas)} · última troca em{" "}
-                    {formatHoras(p.horas_ultima_troca)} de uso · {formatMoeda(p.custo / p.vida_util_horas, 4)}/h
+                    {formatHoras(p.horas_ultima_troca)} de uso · {formatMoeda(p.custo / p.vida_util_horas, 4)}/h · comprou:{" "}
+                    {rotuloComprador(p, compradores.pessoas)}
                   </p>
                 </div>
                 {podeEditar && (
@@ -380,7 +411,9 @@ function Linha({
   trabalhoAtual,
   abas,
   tarifaKwh,
+  compradores,
 }: {
+  compradores: DadosCompradores;
   tarifaKwh: number | null;
   item: Impressora;
   pecas: PecaDesgaste[];
@@ -416,6 +449,10 @@ function Linha({
             {faltam != null && !vencida && ` · próxima manutenção em ${formatHoras(faltam)}`}
             {faltam != null && vencida && ` · ${formatHoras(Math.abs(faltam))} além do intervalo`}
             {deprec > 0 && ` · depreciação ${formatMoeda(deprec, 4)}/h (estimado)`}
+          </p>
+          <p className="truncate text-xs text-zinc-500">
+            Comprou: {rotuloComprador(item, compradores.pessoas)}
+            {item.data_aquisicao && ` em ${formatDataIso(item.data_aquisicao)}`}
           </p>
           {item.status === "imprimindo" && (
             <p className="truncate text-xs text-amber-400">
@@ -470,11 +507,11 @@ function Linha({
           </div>
           {aba === "dados" &&
             (podeEditar ? (
-              <FormImpressora item={item} tarifaKwh={tarifaKwh} aoFechar={() => setAberto(false)} />
+              <FormImpressora item={item} tarifaKwh={tarifaKwh} compradores={compradores} aoFechar={() => setAberto(false)} />
             ) : (
               <p className="text-xs text-zinc-500">Somente leitura: peça edição ao administrador para alterar os dados.</p>
             ))}
-          {aba === "pecas" && <AbaPecas impressora={item} pecas={pecas} podeEditar={podeEditar} />}
+          {aba === "pecas" && <AbaPecas impressora={item} pecas={pecas} podeEditar={podeEditar} compradores={compradores} />}
           {aba === "manutencoes" && <AbaManutencoes impressora={item} manutencoes={manutencoes} podeEditar={podeEditar} />}
         </div>
       )}
@@ -482,7 +519,7 @@ function Linha({
   );
 }
 
-function NovaImpressora({ tarifaKwh }: { tarifaKwh: number | null }) {
+function NovaImpressora({ tarifaKwh, compradores }: { tarifaKwh: number | null; compradores: DadosCompradores }) {
   const [aberto, setAberto] = useState(false);
   if (!aberto) {
     return (
@@ -491,7 +528,7 @@ function NovaImpressora({ tarifaKwh }: { tarifaKwh: number | null }) {
       </BotaoNovo>
     );
   }
-  return <FormImpressora tarifaKwh={tarifaKwh} aoFechar={() => setAberto(false)} />;
+  return <FormImpressora tarifaKwh={tarifaKwh} compradores={compradores} aoFechar={() => setAberto(false)} />;
 }
 
 export function ImpressorasBoard({
@@ -502,7 +539,9 @@ export function ImpressorasBoard({
   trabalhosAtuais,
   abas,
   tarifaKwh,
+  compradores,
 }: {
+  compradores: DadosCompradores;
   /** Tarifa de energia da empresa (R$/kWh) para o custo/hora ao vivo; null sem acesso a Precificação. */
   tarifaKwh: number | null;
   impressoras: Impressora[];
@@ -535,7 +574,7 @@ export function ImpressorasBoard({
           <h1 className="text-lg font-semibold text-zinc-100">Impressoras</h1>
           <p className="text-sm text-zinc-500">{filtradas.length} impressora(s)</p>
         </div>
-        {podeEditar && <NovaImpressora tarifaKwh={tarifaKwh} />}
+        {podeEditar && <NovaImpressora tarifaKwh={tarifaKwh} compradores={compradores} />}
       </div>
       {!podeEditar && (
         <div className="mb-4">
@@ -586,6 +625,7 @@ export function ImpressorasBoard({
                 abas={abas}
                 trabalhoAtual={trabalhosAtuais[i.id] ?? null}
                 tarifaKwh={tarifaKwh}
+                compradores={compradores}
               />
             ))}
           </div>

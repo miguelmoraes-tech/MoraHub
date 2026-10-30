@@ -12,14 +12,26 @@ import {
   formParaObjeto,
   primeiroErro,
 } from "@/lib/impressao-3d/validacao";
+import { lerComprador, validarDataCompra } from "@/lib/impressao-3d/comprador";
 import type { ActionState } from "@/lib/actions/types";
 
 const MODULO = "p3d_impressoras";
 const ROTA = "/impressao-3d/impressoras";
 
+/** Quem comprou (seletor) e a data da compra (data_aquisicao, nunca no futuro). */
+function lerQuemComprou(formData: FormData) {
+  const c = lerComprador((campo) => formData.get(campo));
+  if ("error" in c) return c;
+  const d = validarDataCompra(formData.get("data_aquisicao"));
+  if ("error" in d) return d;
+  return c;
+}
+
 export async function criarImpressora(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = ImpressoraSchema.safeParse(formParaObjeto(formData));
   if (!parsed.success) return { error: primeiroErro(parsed.error) };
+  const quem = lerQuemComprou(formData);
+  if ("error" in quem) return { error: quem.error };
 
   const acesso = await getAcessoEdicao(MODULO);
   if (!acesso) return { error: SEM_PERMISSAO };
@@ -27,7 +39,7 @@ export async function criarImpressora(_prev: ActionState, formData: FormData): P
   const supabase = await createClient();
   const { error } = await supabase
     .from("p3d_impressoras")
-    .insert({ workspace_id: acesso.workspaceId, ...parsed.data });
+    .insert({ workspace_id: acesso.workspaceId, ...parsed.data, ...quem.comprador });
   if (error) return { error: mensagemEscrita(error, "Não foi possível salvar a impressora.") };
 
   revalidatePath(ROTA);
@@ -41,6 +53,8 @@ export async function atualizarImpressora(
 ): Promise<ActionState> {
   const parsed = ImpressoraSchema.safeParse(formParaObjeto(formData));
   if (!parsed.success) return { error: primeiroErro(parsed.error) };
+  const quem = lerQuemComprou(formData);
+  if ("error" in quem) return { error: quem.error };
 
   const acesso = await getAcessoEdicao(MODULO);
   if (!acesso) return { error: SEM_PERMISSAO };
@@ -48,7 +62,7 @@ export async function atualizarImpressora(
   const supabase = await createClient();
   const { error } = await supabase
     .from("p3d_impressoras")
-    .update(parsed.data)
+    .update({ ...parsed.data, ...quem.comprador })
     .eq("id", impressoraId)
     .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: mensagemEscrita(error, "Não foi possível atualizar a impressora.") };
@@ -99,6 +113,8 @@ export async function criarPecaDesgaste(
 ): Promise<ActionState> {
   const parsed = PecaDesgasteSchema.safeParse(formParaObjeto(formData));
   if (!parsed.success) return { error: primeiroErro(parsed.error) };
+  const quem = lerComprador((campo) => formData.get(campo));
+  if ("error" in quem) return { error: quem.error };
 
   const acesso = await getAcessoEdicao(MODULO);
   if (!acesso) return { error: SEM_PERMISSAO };
@@ -106,7 +122,7 @@ export async function criarPecaDesgaste(
   const supabase = await createClient();
   const { error } = await supabase
     .from("p3d_pecas_desgaste")
-    .insert({ workspace_id: acesso.workspaceId, impressora_id: impressoraId, ...parsed.data });
+    .insert({ workspace_id: acesso.workspaceId, impressora_id: impressoraId, ...parsed.data, ...quem.comprador });
   if (error) return { error: mensagemEscrita(error, "Não foi possível salvar a peça.") };
 
   revalidatePath(ROTA);
@@ -120,6 +136,8 @@ export async function atualizarPecaDesgaste(
 ): Promise<ActionState> {
   const parsed = PecaDesgasteSchema.safeParse(formParaObjeto(formData));
   if (!parsed.success) return { error: primeiroErro(parsed.error) };
+  const quem = lerComprador((campo) => formData.get(campo));
+  if ("error" in quem) return { error: quem.error };
 
   const acesso = await getAcessoEdicao(MODULO);
   if (!acesso) return { error: SEM_PERMISSAO };
@@ -127,7 +145,7 @@ export async function atualizarPecaDesgaste(
   const supabase = await createClient();
   const { error } = await supabase
     .from("p3d_pecas_desgaste")
-    .update(parsed.data)
+    .update({ ...parsed.data, ...quem.comprador })
     .eq("id", pecaId)
     .eq("workspace_id", acesso.workspaceId);
   if (error) return { error: mensagemEscrita(error, "Não foi possível atualizar a peça.") };

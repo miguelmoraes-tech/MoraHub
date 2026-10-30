@@ -793,3 +793,20 @@ if (navegacaoForaDoContrato.length) process.exitCode = 1;
   for (const s of layoutRuim) console.log("  ! " + s);
   if (layoutRuim.length) process.exitCode = 1;
 }
+
+// --- Quem comprou: entrada de material só por p3d_registrar_entrada_material; comprador do movimento só por p3d_corrigir_comprador ---
+{
+  const caminhoComprador = "../lib/impressao-3d/auditoria-comprador.ts";
+  const { achadosComprador } = (await import(caminhoComprador)) as typeof import("../lib/impressao-3d/auditoria-comprador");
+  const ruins: string[] = [];
+  for (const pasta of ["app", "components", "lib"]) {
+    for (const arq of arquivos(join(raiz, pasta))) {
+      const rel = relative(raiz, arq).replace(/\\/g, "/");
+      if (!/\.(ts|tsx)$/.test(rel) || rel === "lib/impressao-3d/auditoria-comprador.ts" || rel.endsWith("database.types.ts")) continue;
+      for (const a of achadosComprador(readFileSync(arq, "utf8"))) ruins.push(`${rel}: ${a.regra} (${a.trecho})`);
+    }
+  }
+  console.log(`\nQuem comprou: entrada por p3d_movimentar_estoque / escrita direta em movimentos: ${ruins.length}`);
+  for (const s of ruins) console.log("  ! " + s);
+  if (ruins.length) process.exitCode = 1;
+}

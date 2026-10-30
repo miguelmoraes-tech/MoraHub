@@ -396,7 +396,7 @@ export const MODULOS: ModuloRegistro[] = [
     icone: "bar-chart-3",
     // Sem tabela própria: só RPCs de leitura (p3d_relatorio_*).
     tabelas: [],
-    abas: [{ chave: "vendas", rotulo: "Vendas" }, { chave: "produtos", rotulo: "Produtos" }, { chave: "produtividade", rotulo: "Produtividade" }],
+    abas: [{ chave: "vendas", rotulo: "Vendas" }, { chave: "produtos", rotulo: "Produtos" }, { chave: "produtividade", rotulo: "Produtividade" }, { chave: "gastos", rotulo: "Gastos por pessoa" }],
     menu: [{ label: "Relatórios 3D", href: "/impressao-3d/relatorios", icone: "bar-chart-3", grupo: "Impressão 3D" }],
   },
   {

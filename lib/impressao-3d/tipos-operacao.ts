@@ -41,6 +41,8 @@ export interface Compra {
   observacoes: string | null;
   recebida_em: string | null;
   conta_pagar_id: string | null;
+  comprador_user_id: string | null;
+  comprador_nome: string | null;
   created_at: string;
 }
 
@@ -358,7 +360,7 @@ export interface Envio {
 
 export const COLUNAS_FORNECEDOR = "id, nome, contato, telefone, email, site, categoria, observacoes, ativo";
 export const COLUNAS_COMPRA =
-  "id, numero, fornecedor_id, status, data, validade_cotacao, prazo_entrega, frete, desconto, subtotal, total, observacoes, recebida_em, conta_pagar_id, created_at";
+  "id, numero, fornecedor_id, status, data, validade_cotacao, prazo_entrega, frete, desconto, subtotal, total, observacoes, recebida_em, conta_pagar_id, comprador_user_id, comprador_nome, created_at";
 export const COLUNAS_COMPRA_ITEM = "id, compra_id, material_id, quantidade, preco_total, preco_unitario, observacao";
 export const COLUNAS_HISTORICO_PRECOS =
   "material_id, fornecedor_id, compra_id, compra_numero, compra_status, data, quantidade, preco_unitario, preco_total";

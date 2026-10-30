@@ -2613,6 +2613,8 @@ export type Database = {
       }
       p3d_compras: {
         Row: {
+          comprador_nome: string | null
+          comprador_user_id: string | null
           conta_pagar_id: string | null
           created_at: string
           data: string
@@ -2633,6 +2635,8 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          comprador_nome?: string | null
+          comprador_user_id?: string | null
           conta_pagar_id?: string | null
           created_at?: string
           data?: string
@@ -2653,6 +2657,8 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          comprador_nome?: string | null
+          comprador_user_id?: string | null
           conta_pagar_id?: string | null
           created_at?: string
           data?: string
@@ -3040,6 +3046,8 @@ export type Database = {
         Row: {
           ativo: boolean
           bico_mm: number | null
+          comprador_nome: string | null
+          comprador_user_id: string | null
           created_at: string
           data_aquisicao: string | null
           horas_ultima_manutencao: number
@@ -3070,6 +3078,8 @@ export type Database = {
         Insert: {
           ativo?: boolean
           bico_mm?: number | null
+          comprador_nome?: string | null
+          comprador_user_id?: string | null
           created_at?: string
           data_aquisicao?: string | null
           horas_ultima_manutencao?: number
@@ -3100,6 +3110,8 @@ export type Database = {
         Update: {
           ativo?: boolean
           bico_mm?: number | null
+          comprador_nome?: string | null
+          comprador_user_id?: string | null
           created_at?: string
           data_aquisicao?: string | null
           horas_ultima_manutencao?: number
@@ -3370,9 +3382,12 @@ export type Database = {
       }
       p3d_movimentos_estoque: {
         Row: {
+          comprador_nome: string | null
+          comprador_user_id: string | null
           created_at: string
           custo_total: number | null
           custo_unitario: number | null
+          data_compra: string | null
           delta: number
           id: string
           material_id: string
@@ -3385,9 +3400,12 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          comprador_nome?: string | null
+          comprador_user_id?: string | null
           created_at?: string
           custo_total?: number | null
           custo_unitario?: number | null
+          data_compra?: string | null
           delta: number
           id?: string
           material_id: string
@@ -3400,9 +3418,12 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          comprador_nome?: string | null
+          comprador_user_id?: string | null
           created_at?: string
           custo_total?: number | null
           custo_unitario?: number | null
+          data_compra?: string | null
           delta?: number
           id?: string
           material_id?: string
@@ -3693,6 +3714,8 @@ export type Database = {
       p3d_pecas_desgaste: {
         Row: {
           categoria: string
+          comprador_nome: string | null
+          comprador_user_id: string | null
           created_at: string
           custo: number
           horas_ultima_troca: number
@@ -3704,6 +3727,8 @@ export type Database = {
         }
         Insert: {
           categoria?: string
+          comprador_nome?: string | null
+          comprador_user_id?: string | null
           created_at?: string
           custo: number
           horas_ultima_troca?: number
@@ -3715,6 +3740,8 @@ export type Database = {
         }
         Update: {
           categoria?: string
+          comprador_nome?: string | null
+          comprador_user_id?: string | null
           created_at?: string
           custo?: number
           horas_ultima_troca?: number
@@ -6563,6 +6590,15 @@ export type Database = {
         }
         Returns: Json
       }
+      p3d_corrigir_comprador: {
+        Args: {
+          p_comprador_nome?: string
+          p_comprador_user_id?: string
+          p_id: string
+          p_tipo: string
+        }
+        Returns: undefined
+      }
       p3d_criar_pedido_de_orcamento: {
         Args: {
           p_orcamento_id: string
@@ -6591,6 +6627,10 @@ export type Database = {
         Returns: Json
       }
       p3d_garantir_config: { Args: { p_ws: string }; Returns: undefined }
+      p3d_gastos_por_comprador: {
+        Args: { p_ate: string; p_de: string; p_ws: string }
+        Returns: Json
+      }
       p3d_gerar_alertas_interno: { Args: { p_ws: string }; Returns: number }
       p3d_gerar_producao_do_pedido: {
         Args: { p_pedido_id: string }
@@ -6653,6 +6693,7 @@ export type Database = {
         Args: { p_motivo?: string; p_pedido_id: string; p_status: string }
         Returns: string
       }
+      p3d_nome_pessoa: { Args: { p_user: string }; Returns: string }
       p3d_num: { Args: { d?: number; k: string; p: Json }; Returns: number }
       p3d_painel: {
         Args: { p_ate?: string; p_de?: string; p_ws: string }
@@ -6682,6 +6723,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      p3d_pessoa_da_empresa: {
+        Args: { p_user: string; p_ws: string }
+        Returns: boolean
+      }
       p3d_recalc_compra: { Args: { p_id: string }; Returns: undefined }
       p3d_recalc_orcamento: { Args: { p_id: string }; Returns: undefined }
       p3d_recalc_pedido: { Args: { p_id: string }; Returns: undefined }
@@ -6690,6 +6735,19 @@ export type Database = {
           p_compra_id: string
           p_gerar_conta_pagar?: boolean
           p_vencimento?: string
+        }
+        Returns: Json
+      }
+      p3d_registrar_entrada_material: {
+        Args: {
+          p_comprador_nome?: string
+          p_comprador_user_id?: string
+          p_custo_total?: number
+          p_data_compra?: string
+          p_material_id: string
+          p_observacao?: string
+          p_quantidade: number
+          p_ws: string
         }
         Returns: Json
       }

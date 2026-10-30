@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { getAbasVisiveis } from "@/lib/modulos/preferencias-servidor";
+import { getPessoasCompradoras } from "@/lib/impressao-3d/compradores";
 import { ImpressorasBoard, type TrabalhoAtual } from "@/components/impressao-3d/impressoras-board";
 import {
   COLUNAS_IMPRESSORA,
@@ -18,7 +19,7 @@ export default async function ImpressorasPage() {
   const supabase = await createClient();
   const ws = acesso.workspaceId;
 
-  const [{ data: impressoras }, { data: pecas }, { data: manutencoes }] = await Promise.all([
+  const [{ data: impressoras }, { data: pecas }, { data: manutencoes }, pessoas] = await Promise.all([
     supabase
       .from("p3d_impressoras")
       .select(COLUNAS_IMPRESSORA)
@@ -26,7 +27,7 @@ export default async function ImpressorasPage() {
       .order("nome", { ascending: true }),
     supabase
       .from("p3d_pecas_desgaste")
-      .select("id, impressora_id, nome, categoria, custo, vida_util_horas, horas_ultima_troca")
+      .select("id, impressora_id, nome, categoria, custo, vida_util_horas, horas_ultima_troca, comprador_user_id, comprador_nome")
       .eq("workspace_id", ws)
       .order("nome", { ascending: true }),
     supabase
@@ -35,6 +36,7 @@ export default async function ImpressorasPage() {
       .eq("workspace_id", ws)
       .order("data", { ascending: false })
       .order("created_at", { ascending: false }),
+    getPessoasCompradoras(ws),
   ]);
 
   // Trabalho atual de cada impressora ocupada: só para quem também tem acesso a Produção.
@@ -64,6 +66,7 @@ export default async function ImpressorasPage() {
   return (
     <ImpressorasBoard
       tarifaKwh={tarifaKwh}
+      compradores={{ pessoas, usuarioId: acesso.userId }}
       abas={abas}
       impressoras={(impressoras ?? []) as unknown as Impressora[]}
       pecas={(pecas ?? []) as unknown as PecaDesgaste[]}

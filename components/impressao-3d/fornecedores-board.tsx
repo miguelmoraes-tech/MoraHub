@@ -21,6 +21,10 @@ import { cotacoesAbertas, historicoRecebido } from "@/lib/impressao-3d/regras-op
 import { formatMoeda } from "@/lib/impressao-3d/numeros";
 import { formatDate } from "@/lib/format";
 import { abaInicial } from "@/lib/modulos/preferencias";
+import { CamposComprador } from "@/components/impressao-3d/campos-comprador";
+import type { DadosCompradores } from "@/components/impressao-3d/estoque-board";
+import { rotuloComprador, seletorDeComprador } from "@/lib/impressao-3d/comprador";
+import { hojeSaoPaulo } from "@/lib/impressao-3d/datas";
 
 export const TOM_STATUS_COMPRA: Record<StatusCompra, ChipTone> = {
   cotacao: "sky",
@@ -114,7 +118,9 @@ function LinhaFornecedor({ item, podeEditar, compras }: { item: Fornecedor; pode
 }
 
 /** Campos do cabeçalho da compra (os únicos que vão em insert/update direto). */
-export function CamposCompra({ item, fornecedores }: { item?: Compra; fornecedores: Fornecedor[] }) {
+export function CamposCompra({
+  item, fornecedores, compradores,
+}: { item?: Compra; fornecedores: Fornecedor[]; compradores: DadosCompradores }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <Seletor rotulo="Fornecedor *" name="fornecedor_id" required defaultValue={item?.fornecedor_id ?? ""} className="col-span-2">
@@ -125,7 +131,13 @@ export function CamposCompra({ item, fornecedores }: { item?: Compra; fornecedor
             <option key={f.id} value={f.id}>{f.nome}{f.ativo ? "" : " (arquivado)"}</option>
           ))}
       </Seletor>
-      <Entrada rotulo="Data" name="data" type="date" defaultValue={item?.data ?? ""} ajuda="Vazio = hoje." />
+      <Entrada rotulo="Data da compra" name="data" type="date" max={hojeSaoPaulo()} defaultValue={item?.data ?? ""} ajuda="Vazio = hoje. Não pode ser depois de hoje." />
+      <CamposComprador
+        pessoas={compradores.pessoas}
+        usuarioId={compradores.usuarioId}
+        inicial={item ? { seletor: seletorDeComprador(item, compradores.pessoas), nome: item.comprador_nome } : undefined}
+        className="col-span-2 sm:col-span-4"
+      />
       <Entrada rotulo="Validade da cotação" name="validade_cotacao" type="date" defaultValue={item?.validade_cotacao ?? ""} />
       <Entrada rotulo="Prazo de entrega" name="prazo_entrega" type="date" defaultValue={item?.prazo_entrega ?? ""} />
       <Numero rotulo="Frete (R$)" name="frete" defaultValue={item?.frete ?? ""} />
@@ -135,12 +147,14 @@ export function CamposCompra({ item, fornecedores }: { item?: Compra; fornecedor
   );
 }
 
-function NovaCompra({ fornecedores, aoFechar }: { fornecedores: Fornecedor[]; aoFechar: () => void }) {
+function NovaCompra({
+  fornecedores, compradores, aoFechar,
+}: { fornecedores: Fornecedor[]; compradores: DadosCompradores; aoFechar: () => void }) {
   // Sucesso redireciona para a compra criada (a action faz o redirect).
   const [state, formAction, pendente] = useActionState(criarCompra, undefined);
   return (
     <form action={formAction} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-      <CamposCompra fornecedores={fornecedores} />
+      <CamposCompra fornecedores={fornecedores} compradores={compradores} />
       <ErroForm state={state} />
       <div className="flex justify-end gap-2">
         <BotaoTexto onClick={aoFechar}>Cancelar</BotaoTexto>
@@ -154,12 +168,21 @@ function AbaPrecos({
   historico,
   materiais,
   fornecedores,
+  compras,
+  compradores,
 }: {
   historico: HistoricoPreco[];
   materiais: Opcoes<OpcaoMaterial>;
   fornecedores: Fornecedor[];
+  compras: Compra[];
+  compradores: DadosCompradores;
 }) {
   const nomeFornecedor = useMemo(() => new Map(fornecedores.map((f) => [f.id, f.nome])), [fornecedores]);
+  // O histórico de preços (view) não traz o comprador: vem da compra a que a linha pertence.
+  const nomeComprador = useMemo(
+    () => new Map(compras.map((c) => [c.id, rotuloComprador(c, compradores.pessoas)])),
+    [compras, compradores.pessoas]
+  );
   const comDados = useMemo(() => {
     const ids = new Set(historico.map((h) => h.material_id).filter((x): x is string => !!x));
     return materiais.itens.filter((m) => ids.has(m.id));
@@ -200,6 +223,7 @@ function AbaPrecos({
           <TabelaPrecos
             un={un}
             nomeFornecedor={nomeFornecedor}
+            nomeComprador={nomeComprador}
             linhas={cotacoes}
             destacarMenor
           />
@@ -210,7 +234,7 @@ function AbaPrecos({
         {recebidas.length === 0 ? (
           <Vazio>Nenhuma compra recebida deste material ainda.</Vazio>
         ) : (
-          <TabelaPrecos un={un} nomeFornecedor={nomeFornecedor} linhas={recebidas} />
+          <TabelaPrecos un={un} nomeFornecedor={nomeFornecedor} nomeComprador={nomeComprador} linhas={recebidas} />
         )}
       </Cartao>
     </div>
@@ -220,11 +244,13 @@ function AbaPrecos({
 function TabelaPrecos({
   linhas,
   nomeFornecedor,
+  nomeComprador,
   un,
   destacarMenor,
 }: {
   linhas: HistoricoPreco[];
   nomeFornecedor: Map<string, string>;
+  nomeComprador: Map<string, string>;
   un: string;
   destacarMenor?: boolean;
 }) {
@@ -235,7 +261,8 @@ function TabelaPrecos({
           <tr>
             <th className="py-1.5 pr-3 font-medium">Fornecedor</th>
             <th className="py-1.5 pr-3 font-medium">Compra</th>
-            <th className="py-1.5 pr-3 font-medium">Data</th>
+            <th className="py-1.5 pr-3 font-medium">Data da compra</th>
+            <th className="py-1.5 pr-3 font-medium">Comprador</th>
             <th className="py-1.5 pr-3 text-right font-medium">Quantidade</th>
             <th className="py-1.5 pr-3 text-right font-medium">Valor do item</th>
             <th className="py-1.5 text-right font-medium">Preço por {un || "unidade"}</th>
@@ -253,6 +280,7 @@ function TabelaPrecos({
                 ) : "—"}
               </td>
               <td className="py-1.5 pr-3">{formatDate(l.data)}</td>
+              <td className="py-1.5 pr-3">{l.compra_id ? (nomeComprador.get(l.compra_id) ?? "Não informado") : "—"}</td>
               <td className="py-1.5 pr-3 text-right tabular-nums">{l.quantidade ?? "—"} {un}</td>
               <td className="py-1.5 pr-3 text-right tabular-nums">{l.preco_total !== null ? formatMoeda(l.preco_total) : "—"}</td>
               <td className={`py-1.5 text-right tabular-nums ${destacarMenor && i === 0 ? "font-semibold text-emerald-400" : ""}`}>
@@ -274,7 +302,9 @@ export function FornecedoresBoard({
   materiais,
   podeEditar,
   abas,
+  compradores,
 }: {
+  compradores: DadosCompradores;
   fornecedores: Fornecedor[];
   compras: Compra[];
   historico: HistoricoPreco[];
@@ -370,7 +400,7 @@ export function FornecedoresBoard({
         <div className="space-y-5">
           {novo &&
             (fornecedores.some((f) => f.ativo) ? (
-              <NovaCompra fornecedores={fornecedores} aoFechar={() => setNovo(false)} />
+              <NovaCompra fornecedores={fornecedores} compradores={compradores} aoFechar={() => setNovo(false)} />
             ) : (
               <Aviso tom="alerta">Cadastre um fornecedor ativo na aba Fornecedores antes de criar uma compra.</Aviso>
             ))}
@@ -395,7 +425,7 @@ export function FornecedoresBoard({
                         <StatusChip tone={TOM_STATUS_COMPRA[c.status]}>{STATUS_COMPRA_ROTULO[c.status]}</StatusChip>
                       </p>
                       <p className="truncate text-xs text-zinc-500">
-                        {formatDate(c.data)}
+                        {formatDate(c.data)} · comprou: {rotuloComprador(c, compradores.pessoas)}
                         {c.prazo_entrega && ` · entrega até ${formatDate(c.prazo_entrega)}`}
                         {c.status === "cotacao" && c.validade_cotacao && ` · cotação válida até ${formatDate(c.validade_cotacao)}`}
                       </p>
@@ -409,7 +439,7 @@ export function FornecedoresBoard({
         </div>
       )}
 
-      {aba === "precos" && <AbaPrecos historico={historico} materiais={materiais} fornecedores={fornecedores} />}
+      {aba === "precos" && <AbaPrecos historico={historico} materiais={materiais} fornecedores={fornecedores} compras={compras} compradores={compradores} />}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { mensagemEscrita, mensagemRpc } from "@/lib/impressao-3d/erros";
 import { SEM_PERMISSAO, SEM_PERMISSAO_CUSTOS, gramasDeRolos, podeVerCustos } from "@/lib/impressao-3d/regras";
 import { parseNumero } from "@/lib/impressao-3d/numeros";
 import { validarMovimentoPeca } from "@/lib/impressao-3d/pecas";
+import { lerCompra, lerComprador } from "@/lib/impressao-3d/comprador";
 import { PESO_KG_G, entradaDeCompraKg, entradaDeCompraUnidade } from "@/lib/impressao-3d/filamentos";
 import {
   MaterialSchema,
@@ -20,6 +21,15 @@ import type { ActionState } from "@/lib/actions/types";
 
 const MODULO = "p3d_estoque";
 const ROTA = "/impressao-3d/estoque";
+
+/** Só envia o que foi informado: o banco assume hoje e "sem comprador" para o que faltar. */
+function paramsComprador(c: { comprador_user_id: string | null; comprador_nome: string | null }, data: string | null) {
+  return {
+    ...(c.comprador_user_id ? { p_comprador_user_id: c.comprador_user_id } : {}),
+    ...(c.comprador_nome ? { p_comprador_nome: c.comprador_nome } : {}),
+    ...(data ? { p_data_compra: data } : {}),
+  };
+}
 
 /**
  * Cadastro do material. NUNCA envia estoque_atual, custo_medio nem ultimo_custo
@@ -45,6 +55,9 @@ export async function criarMaterial(_prev: ActionState, formData: FormData): Pro
   if (comprei !== null && (Number.isNaN(comprei) || comprei < 0)) {
     return { error: "Quanto comprei: informe um número válido (zero ou maior)." };
   }
+  // Quem comprou e a data só valem se houver entrada; valida antes de criar o material.
+  const compra = lerCompra((c) => formData.get(c));
+  if ("error" in compra) return { error: compra.error };
   const verCustos = podeVerCustos(acesso);
   const unidadeCompra = formData.get("unidade_compra") === "g" ? "g" : "kg";
   const entrada = porPeso
@@ -65,12 +78,12 @@ export async function criarMaterial(_prev: ActionState, formData: FormData): Pro
   if (error || !criado) return { error: mensagemEscrita(error, "Não foi possível salvar o material.") };
 
   if (entrada) {
-    const { error: erroEntrada } = await supabase.rpc("p3d_movimentar_estoque", {
+    const { error: erroEntrada } = await supabase.rpc("p3d_registrar_entrada_material", {
       p_ws: acesso.workspaceId,
       p_material_id: criado.id,
-      p_tipo: "entrada",
       p_quantidade: entrada.quantidade,
       ...(entrada.custoTotal !== null ? { p_custo_total: entrada.custoTotal } : {}),
+      ...paramsComprador(compra.comprador, compra.data),
       p_observacao: "Compra registrada no cadastro",
     });
     if (erroEntrada) {
@@ -137,6 +150,8 @@ export async function registrarCompraMaterial(
   }
   const verCustos = podeVerCustos(acesso);
   if (valor !== null && valor > 0 && !verCustos) return { error: SEM_PERMISSAO_CUSTOS };
+  const compra = lerCompra((c) => formData.get(c));
+  if ("error" in compra) return { error: compra.error };
 
   const supabase = await createClient();
   const { data: material } = await supabase
@@ -154,12 +169,12 @@ export async function registrarCompraMaterial(
       : entradaDeCompraUnidade({ quantidade, precoUnitario: valor });
   if (!entrada) return { error: "Quanto comprei: informe um valor maior que zero." };
 
-  const { error } = await supabase.rpc("p3d_movimentar_estoque", {
+  const { error } = await supabase.rpc("p3d_registrar_entrada_material", {
     p_ws: acesso.workspaceId,
     p_material_id: materialId,
-    p_tipo: "entrada",
     p_quantidade: entrada.quantidade,
     ...(entrada.custoTotal !== null ? { p_custo_total: entrada.custoTotal } : {}),
+    ...paramsComprador(compra.comprador, compra.data),
     p_observacao: "Nova compra",
   });
   if (error) return { error: mensagemRpc(error, "Não foi possível registrar a compra.") };
@@ -209,7 +224,7 @@ export async function excluirMaterial(materialId: string): Promise<ActionState> 
 }
 
 /**
- * Entrada, ajuste ou perda de estoque, sempre pela RPC p3d_movimentar_estoque
+ * Entrada (compra: p3d_registrar_entrada_material, com quem comprou e a data), ajuste ou perda (p3d_movimentar_estoque)
  * (mantém saldo, custo médio e histórico). O texto de erro da RPC é mostrado
  * como veio. Entrada por rolos: o servidor multiplica rolos × peso líquido do
  * cadastro, em gramas.
@@ -254,12 +269,29 @@ export async function movimentarEstoque(
   // Custo da entrada é dado de custo: só com o extra "custos".
   if (custo_total !== null && !podeVerCustos(acesso)) return { error: SEM_PERMISSAO_CUSTOS };
 
+  // ENTRADA é compra: vai por p3d_registrar_entrada_material (com quem comprou e a data). Ajuste e perda
+  // seguem por p3d_movimentar_estoque.
+  if (tipo === "entrada") {
+    const compra = lerCompra((c) => formData.get(c));
+    if ("error" in compra) return { error: compra.error };
+    const { error } = await supabase.rpc("p3d_registrar_entrada_material", {
+      p_ws: acesso.workspaceId,
+      p_material_id: materialId,
+      p_quantidade: quantidade,
+      ...(custo_total !== null ? { p_custo_total: custo_total } : {}),
+      ...paramsComprador(compra.comprador, compra.data),
+      ...(observacao ? { p_observacao: observacao } : {}),
+    });
+    if (error) return { error: mensagemRpc(error, "Não foi possível registrar a entrada.") };
+    revalidatePath(ROTA);
+    return { ok: true };
+  }
+
   const { error } = await supabase.rpc("p3d_movimentar_estoque", {
     p_ws: acesso.workspaceId,
     p_material_id: materialId,
     p_tipo: tipo,
     p_quantidade: quantidade,
-    ...(tipo === "entrada" && custo_total !== null ? { p_custo_total: custo_total } : {}),
     ...(observacao ? { p_observacao: observacao } : {}),
   });
   if (error) return { error: mensagemRpc(error, "Não foi possível registrar o movimento.") };
@@ -425,4 +457,31 @@ export async function criarProdutoRapido(nome: string): Promise<ResultadoProduto
   revalidatePath(ROTA);
   revalidatePath("/impressao-3d/produtos");
   return { id: data.id };
+}
+
+/**
+ * Corrige quem comprou uma ENTRADA já registrada (p3d_corrigir_comprador, tipo "movimento"). Exige edição
+ * em Estoque; o banco confere de novo. Sem comprador (seletor vazio) limpa o campo.
+ */
+export async function corrigirCompradorMovimento(
+  movimentoId: string,
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const c = lerComprador((campo) => formData.get(campo));
+  if ("error" in c) return { error: c.error };
+
+  const acesso = await getAcessoEdicao(MODULO);
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  const { error } = await (await createClient()).rpc("p3d_corrigir_comprador", {
+    p_tipo: "movimento",
+    p_id: movimentoId,
+    ...(c.comprador.comprador_user_id ? { p_comprador_user_id: c.comprador.comprador_user_id } : {}),
+    ...(c.comprador.comprador_nome ? { p_comprador_nome: c.comprador.comprador_nome } : {}),
+  });
+  if (error) return { error: mensagemRpc(error, "Não foi possível corrigir o comprador.") };
+
+  revalidatePath(ROTA);
+  return { ok: true };
 }

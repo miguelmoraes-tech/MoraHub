@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
+import Link from "next/link";
 import { Archive, ArchiveRestore, Boxes, Pencil, Plus, Trash2 } from "lucide-react";
 import { StatusChip } from "@/components/status-chip";
 import { SegmentFilter } from "@/components/segment-filter";
@@ -26,15 +27,28 @@ import {
 } from "@/lib/impressao-3d/numeros";
 import { abaInicial } from "@/lib/modulos/preferencias";
 import { PecasEstoque, type DadosPecas } from "@/components/impressao-3d/pecas-estoque";
+import { CamposComprador } from "@/components/impressao-3d/campos-comprador";
+import { CorrigirComprador } from "@/components/impressao-3d/corrigir-comprador";
+import { corrigirCompradorMovimento } from "@/app/(dashboard)/impressao-3d/estoque/actions";
+import { rotuloComprador, type PessoaComprador } from "@/lib/impressao-3d/comprador";
+import { formatDataIso } from "@/lib/impressao-3d/datas";
+
+/** Quem pode ser escolhido em "Quem comprou" e quem está logado (padrão do seletor). */
+export interface DadosCompradores {
+  pessoas: PessoaComprador[];
+  usuarioId: string | null;
+}
 
 function CamposMaterial({
   item,
   verCustos,
   fornecedores,
+  compradores,
 }: {
   item?: Material;
   verCustos: boolean;
   fornecedores: Opcoes<OpcaoFornecedor>;
+  compradores: DadosCompradores;
 }) {
   const [unidade, setUnidade] = useState(item?.unidade ?? "g");
   const porPeso = unidade === "g";
@@ -126,6 +140,14 @@ function CamposMaterial({
             )}
           </>
         )}
+        {!item && compreiNum > 0 && (
+          <CamposComprador
+            pessoas={compradores.pessoas}
+            usuarioId={compradores.usuarioId}
+            nomeData="data_compra"
+            className="col-span-2 sm:col-span-4"
+          />
+        )}
         {verCustos && porPeso && valorNum > 0 && (
           <div className="flex flex-col justify-end">
             <p className="text-xs font-medium text-zinc-400">Custo por g</p>
@@ -187,7 +209,9 @@ function CamposMaterial({
 }
 
 /** Nova compra de um filamento já cadastrado: nova entrada com o valor pago (atualiza o custo médio). */
-function FormCompra({ material, verCustos, aoFechar }: { material: Material; verCustos: boolean; aoFechar: () => void }) {
+function FormCompra({
+  material, verCustos, compradores, aoFechar,
+}: { material: Material; verCustos: boolean; compradores: DadosCompradores; aoFechar: () => void }) {
   const [state, formAction, pendente] = useActionState(registrarCompraMaterial.bind(null, material.id), undefined);
   useActionSuccess(state, aoFechar);
   const porPeso = material.unidade === "g";
@@ -240,6 +264,7 @@ function FormCompra({ material, verCustos, aoFechar }: { material: Material; ver
           />
         )}
       </div>
+      <CamposComprador pessoas={compradores.pessoas} usuarioId={compradores.usuarioId} nomeData="data_compra" />
       {!verCustos && <p className="text-[11px] text-zinc-500">Sem a permissão de custos, a entrada é registrada sem valor.</p>}
       <ErroForm state={state} />
       <div className="flex justify-end gap-2">
@@ -261,11 +286,13 @@ function FormMaterial({
   item,
   verCustos,
   fornecedores,
+  compradores,
   aoFechar,
 }: {
   item?: Material;
   verCustos: boolean;
   fornecedores: Opcoes<OpcaoFornecedor>;
+  compradores: DadosCompradores;
   aoFechar: () => void;
 }) {
   const acao = item ? atualizarMaterial.bind(null, item.id) : criarMaterial;
@@ -273,7 +300,7 @@ function FormMaterial({
   useActionSuccess(state, aoFechar);
   return (
     <form action={formAction} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-      <CamposMaterial item={item} verCustos={verCustos} fornecedores={fornecedores} />
+      <CamposMaterial item={item} verCustos={verCustos} fornecedores={fornecedores} compradores={compradores} />
       <ErroForm state={state} />
       <div className="flex justify-end gap-2">
         <BotaoTexto onClick={aoFechar}>Cancelar</BotaoTexto>
@@ -294,11 +321,13 @@ function FormMovimento({
   material,
   tipo,
   verCustos,
+  compradores,
   aoFechar,
 }: {
   material: Material;
   tipo: TipoAcao;
   verCustos: boolean;
+  compradores: DadosCompradores;
   aoFechar: () => void;
 }) {
   const [state, formAction, pendente] = useActionState(movimentarEstoque.bind(null, material.id), undefined);
@@ -376,6 +405,9 @@ function FormMovimento({
           className="col-span-2"
         />
       </div>
+      {tipo === "entrada" && (
+        <CamposComprador pessoas={compradores.pessoas} usuarioId={compradores.usuarioId} nomeData="data_compra" />
+      )}
       {tipo === "entrada" && !verCustos && (
         <p className="text-[11px] text-zinc-500">Sem a permissão de custos, a entrada é registrada sem valor.</p>
       )}
@@ -393,11 +425,13 @@ function LinhaMaterial({
   podeEditar,
   verCustos,
   fornecedores,
+  compradores,
 }: {
   item: Material;
   podeEditar: boolean;
   verCustos: boolean;
   fornecedores: Opcoes<OpcaoFornecedor>;
+  compradores: DadosCompradores;
 }) {
   const [modo, setModo] = useState<"nenhum" | "editar" | "compra" | TipoAcao>("nenhum");
   const { executar, pendente } = useAcao();
@@ -482,10 +516,10 @@ function LinhaMaterial({
           )}
         </div>
       </div>
-      {modo === "editar" && <FormMaterial item={item} verCustos={verCustos} fornecedores={fornecedores} aoFechar={fechar} />}
-      {modo === "compra" && <FormCompra material={item} verCustos={verCustos} aoFechar={fechar} />}
+      {modo === "editar" && <FormMaterial item={item} verCustos={verCustos} fornecedores={fornecedores} compradores={compradores} aoFechar={fechar} />}
+      {modo === "compra" && <FormCompra material={item} verCustos={verCustos} compradores={compradores} aoFechar={fechar} />}
       {(modo === "entrada" || modo === "ajuste" || modo === "perda") && (
-        <FormMovimento material={item} tipo={modo} verCustos={verCustos} aoFechar={fechar} />
+        <FormMovimento material={item} tipo={modo} verCustos={verCustos} compradores={compradores} aoFechar={fechar} />
       )}
     </div>
   );
@@ -496,11 +530,15 @@ function Historico({
   movimentos,
   verCustos,
   limite,
+  podeEditar,
+  compradores,
 }: {
   materiais: Material[];
   movimentos: MovimentoEstoque[];
   verCustos: boolean;
   limite: number;
+  podeEditar: boolean;
+  compradores: DadosCompradores;
 }) {
   const [materialFiltro, setMaterialFiltro] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState("");
@@ -541,6 +579,8 @@ function Historico({
                 <th className="px-3 py-2 text-right font-medium">Saldo após</th>
                 {verCustos && <th className="px-3 py-2 text-right font-medium">Custo unit.</th>}
                 {verCustos && <th className="px-3 py-2 text-right font-medium">Custo total</th>}
+                <th className="px-3 py-2 font-medium">Comprador</th>
+                <th className="px-3 py-2 font-medium">Data da compra</th>
                 <th className="px-3 py-2 font-medium">Observação</th>
               </tr>
             </thead>
@@ -563,6 +603,19 @@ function Historico({
                     {verCustos && (
                       <td className="whitespace-nowrap px-3 py-2 text-right">{m.custo_total != null ? formatMoeda(m.custo_total) : "—"}</td>
                     )}
+                    <td className="px-3 py-2">
+                      {m.tipo === "entrada" ? (
+                        <div className="flex flex-col items-start gap-1">
+                          <span>{rotuloComprador(m, compradores.pessoas)}</span>
+                          {podeEditar && (
+                            <CorrigirComprador acao={corrigirCompradorMovimento.bind(null, m.id)} atual={m} pessoas={compradores.pessoas} />
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-zinc-600">—</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">{m.tipo === "entrada" && m.data_compra ? formatDataIso(m.data_compra) : "—"}</td>
                     <td className="px-3 py-2 text-zinc-500">{m.observacao ?? ""}</td>
                   </tr>
                 );
@@ -587,7 +640,12 @@ export function EstoqueBoard({
   fornecedores,
   pecas,
   abas,
+  compradores,
+  atalhoGastos,
 }: {
+  compradores: DadosCompradores;
+  /** Link para "Gastos por pessoa" (só quando a pessoa pode ver e o módulo Relatórios está desligado). */
+  atalhoGastos?: string;
   pecas: DadosPecas;
   materiais: Material[];
   movimentos: MovimentoEstoque[];
@@ -618,6 +676,11 @@ export function EstoqueBoard({
           <h1 className="text-lg font-semibold text-zinc-100">Estoque</h1>
           <p className="text-sm text-zinc-500">{visiveis.length} item(ns)</p>
         </div>
+        {atalhoGastos && (
+          <Link href={atalhoGastos} className="rounded-lg border border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-200 hover:bg-zinc-800">
+            Gastos por pessoa
+          </Link>
+        )}
         {podeEditar && aba === "materiais" && !novo && (
           <BotaoNovo onClick={() => setNovo(true)}>
             <Plus className="h-4 w-4" /> Novo material
@@ -670,11 +733,11 @@ export function EstoqueBoard({
         <PecasEstoque dados={pecas} podeEditar={podeEditar} verCustos={verCustos} limiteMovimentos={limiteMovimentos} />
       ) : aba === "historico" ? (
         <Cartao titulo="Histórico de movimentos" icone={<Boxes className="h-4 w-4" />}>
-          <Historico materiais={materiais} movimentos={movimentos} verCustos={verCustos} limite={limiteMovimentos} />
+          <Historico materiais={materiais} movimentos={movimentos} verCustos={verCustos} limite={limiteMovimentos} podeEditar={podeEditar} compradores={compradores} />
         </Cartao>
       ) : (
         <div className="space-y-5">
-          {novo && <FormMaterial verCustos={verCustos} fornecedores={fornecedores} aoFechar={() => setNovo(false)} />}
+          {novo && <FormMaterial verCustos={verCustos} fornecedores={fornecedores} compradores={compradores} aoFechar={() => setNovo(false)} />}
           {visiveis.length === 0 && !novo ? (
             <Cartao titulo="Materiais" icone={<Boxes className="h-4 w-4" />}>
               <Vazio>
@@ -690,7 +753,7 @@ export function EstoqueBoard({
                   {visiveis
                     .filter((m) => m.tipo === t)
                     .map((m) => (
-                      <LinhaMaterial key={m.id} item={m} podeEditar={podeEditar} verCustos={verCustos} fornecedores={fornecedores} />
+                      <LinhaMaterial key={m.id} item={m} podeEditar={podeEditar} verCustos={verCustos} fornecedores={fornecedores} compradores={compradores} />
                     ))}
                 </div>
               </Cartao>

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAcessoEdicao, getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { getOpcoesMateriais } from "@/lib/impressao-3d/opcoes";
+import { getPessoasCompradoras } from "@/lib/impressao-3d/compradores";
 import { CompraDetalhe } from "@/components/impressao-3d/compra-detalhe";
 import {
   COLUNAS_COMPRA, COLUNAS_COMPRA_ITEM, COLUNAS_FORNECEDOR,
@@ -24,12 +25,13 @@ export default async function CompraDetalhePage({ params }: { params: Promise<{ 
     .maybeSingle();
   if (!compra) notFound();
 
-  const [{ data: itens }, { data: fornecedores }, materiais, acessoEstoque, acessoFinanceiro] = await Promise.all([
+  const [{ data: itens }, { data: fornecedores }, materiais, acessoEstoque, acessoFinanceiro, pessoas] = await Promise.all([
     supabase.from("p3d_compra_itens").select(COLUNAS_COMPRA_ITEM).eq("compra_id", id).eq("workspace_id", ws).order("created_at", { ascending: true }),
     supabase.from("p3d_fornecedores").select(COLUNAS_FORNECEDOR).eq("workspace_id", ws).order("nome", { ascending: true }),
     getOpcoesMateriais(),
     getAcessoEdicao("p3d_estoque"),
     getAcessoEdicao("financeiro"),
+    getPessoasCompradoras(ws),
   ]);
 
   return (
@@ -42,6 +44,7 @@ export default async function CompraDetalhePage({ params }: { params: Promise<{ 
       // Receber exige edição em Fornecedores E Estoque; conta a pagar exige edição no Financeiro.
       podeReceber={acesso.nivel === "edicao" && !!acessoEstoque}
       podeGerarContaPagar={!!acessoFinanceiro}
+      compradores={{ pessoas, usuarioId: acesso.userId }}
     />
   );
 }

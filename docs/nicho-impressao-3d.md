@@ -829,3 +829,28 @@ O convite por link continua só para sócio e funcionário (a opção "Cofundado
   original não é removível; cofundador, sócio e funcionário saem por `remover_membro` (com confirmação).
 - **Auditoria**: falha em escrita direta em `membros`, `convites`, `perfis_tipos_ativos`, `solicitacoes_vendedor` e
   `workspace_codigos_cofundador` (a tela de equipe só usa RPC); as leituras do código são sempre por `workspace_id`.
+
+## Quem comprou e a data da compra
+
+Cada compra registra **quem pagou** e **quando**. Serve para acertar quem pagou o quê entre os sócios.
+
+- **Seletor "Quem comprou"**: as pessoas da empresa (`pessoas_da_empresa`: fundador, cofundador, sócios e funcionários; o
+  padrão é quem está logado), **"Outra pessoa (digitar nome)"** (grava só `comprador_nome`, até 80 caracteres) e
+  **"Não informado"**. Pessoa da lista grava só `comprador_user_id`; o banco preenche o nome. A montagem do par e a regra da
+  data (vazia = hoje; **nunca depois de hoje**, em America/Sao_Paulo) são funções puras em `lib/impressao-3d/comprador.ts`.
+- **Onde aparece**: cadastro de material ("Quanto comprei"), **Nova compra**, **Entrada** (os três chamam
+  `p3d_registrar_entrada_material`, que passou a ser o caminho de toda compra de material; `p3d_movimentar_estoque` ficou
+  para ajuste e perda); cabeçalho da **compra** (a data que já existia é a "Data da compra"; ao receber, o banco repassa
+  para as entradas); **impressoras** (`data_aquisicao` é a data da compra) e **peças de desgaste** (só quem comprou: a
+  tabela não tem data de compra).
+- **Histórico**: a aba *Histórico de material* ganhou as colunas **Comprador** e **Data da compra** nas entradas, com
+  **Corrigir comprador** por entrada (`p3d_corrigir_comprador`, tipo `movimento`, exige edição em Estoque). Na compra já
+  recebida, o mesmo (tipo `compra`, exige edição em Fornecedores) e o banco atualiza também as entradas. A aba *Preços* de
+  Fornecedores mostra o comprador da compra de cada linha (a visão `p3d_historico_precos` não traz o comprador).
+- **Gastos por pessoa** (`p3d_gastos_por_comprador(p_ws, p_de, p_ate)`: materiais, equipamentos e total por pessoa, com
+  CSV como os demais relatórios): é a aba **Gastos por pessoa** de *Relatórios* quando o módulo está ligado, visível só a
+  fundador/cofundador ou a quem tem o extra **custos**; sem Relatórios, é um atalho no *Estoque* (`/impressao-3d/estoque/gastos`)
+  só para fundador/cofundador. Sem comprador = "Não informado". O banco confere a permissão de novo.
+- **Auditoria** (`lib/impressao-3d/auditoria-comprador.ts`): falha se uma tela chamar `p3d_movimentar_estoque` com tipo
+  `entrada` ou escrever direto em `p3d_movimentos_estoque` (comprador e data são somente leitura).
+- **Celular**: os campos novos ficam em coluna única, com fonte de 16 px e alvos de 44 px (regras globais de formulário).

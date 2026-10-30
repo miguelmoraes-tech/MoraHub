@@ -234,12 +234,13 @@ export function agrupamentoValido(v: unknown): Agrupamento {
   return v === "dia" || v === "semana" || v === "mes" ? v : "dia";
 }
 
-export type AbaRelatorio = "vendas" | "produtos" | "produtividade";
-export const ABAS_RELATORIO: readonly AbaRelatorio[] = ["vendas", "produtos", "produtividade"];
+export type AbaRelatorio = "vendas" | "produtos" | "produtividade" | "gastos";
+export const ABAS_RELATORIO: readonly AbaRelatorio[] = ["vendas", "produtos", "produtividade", "gastos"];
 export const ABA_RELATORIO_ROTULO: Record<AbaRelatorio, string> = {
   vendas: "Vendas",
   produtos: "Produtos",
   produtividade: "Produtividade",
+  gastos: "Gastos por pessoa",
 };
 /** Quantos produtos o relatório de produtos pode trazer (p_limite). */
 export const LIMITES_PRODUTOS: readonly number[] = [10, 20, 50, 100];

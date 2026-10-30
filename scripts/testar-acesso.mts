@@ -189,6 +189,11 @@ import {
   modoSidebar, opacidadeDoFundo, tituloDaTela,
 } from "@/lib/sidebar-mobile";
 import { achadosLayoutMobile } from "@/lib/auditoria-layout-mobile";
+import {
+  COMPRADOR_NENHUM, COMPRADOR_NOME_MAX, COMPRADOR_OUTRO, lerCompra, lerGastosPorComprador, lerPessoasCompradoras,
+  montarComprador, rotuloComprador, seletorDeComprador, seletorInicial, totaisGastos, validarDataCompra,
+} from "@/lib/impressao-3d/comprador";
+import { achadosComprador } from "@/lib/impressao-3d/auditoria-comprador";
 import { ARQUIVOS_CALCULADORA_RAPIDA, precoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
 import { FRASE_MODULO } from "@/lib/impressao-3d/frases-modulos";
 
@@ -3482,7 +3487,7 @@ await teste("o registro tem abas com chave estável nas telas do nicho; chaves �
     "p3d_producao", "p3d_qualidade", "p3d_relatorios",
   ].sort());
   assert.deepEqual(abasDe("p3d_fornecedores").map((a) => a.chave), ["compras", "fornecedores", "precos"]);
-  assert.deepEqual(abasDe("p3d_relatorios").map((a) => a.chave), ["vendas", "produtos", "produtividade"]);
+  assert.deepEqual(abasDe("p3d_relatorios").map((a) => a.chave), ["vendas", "produtos", "produtividade", "gastos"]);
   assert.deepEqual(abasDe("p3d_impressoras").map((a) => a.chave), ["dados", "pecas", "manutencoes"]);
   assert.deepEqual(abasDe(CHAVE_VISAO_GERAL).map((a) => a.chave), ["primeiros_passos", "resumo"]);
   for (const chave of [...COM_ABAS, CHAVE_VISAO_GERAL]) {
@@ -3803,10 +3808,10 @@ await teste("cadastro de filamento: valor do kg → preco_compra + rolo de 1000 
   assert.equal(saldoEmRolos(2500, "g", 1000), 2.5);
   const acao = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
   const criar = acao.slice(acao.indexOf("export async function criarMaterial"), acao.indexOf("export async function atualizarMaterial"));
-  assert.ok(criar.includes('formData.get("quanto_comprei")') && criar.includes('"p3d_movimentar_estoque"') && criar.includes("p_custo_total: entrada.custoTotal"));
+  assert.ok(criar.includes('formData.get("quanto_comprei")') && criar.includes('"p3d_registrar_entrada_material"') && criar.includes("p_custo_total: entrada.custoTotal"));
   assert.ok(criar.includes("peso_liquido_rolo_g: PESO_KG_G") && criar.includes("verCustos ? preco_compra : null"), "kg: rolo de 1000 g; custo só com o extra");
   assert.ok(!/estoque_atual|custo_medio|ultimo_custo/.test(acao.slice(acao.indexOf("export async function criarMaterial"), acao.indexOf("export async function alternarMaterialAtivo"))), "saldo e custo médio só pela RPC");
-  assert.ok(/registrarCompraMaterial[\s\S]*p3d_movimentar_estoque[\s\S]*Nova compra/.test(acao), "nova compra = nova entrada com o valor pago");
+  assert.ok(/registrarCompraMaterial[\s\S]*p3d_registrar_entrada_material[\s\S]*Nova compra/.test(acao), "nova compra = nova entrada com o valor pago (e quem comprou)");
   const tela = lerFonte("components/impressao-3d/estoque-board.tsx");
   assert.ok(tela.includes('name="quanto_comprei"') && tela.includes("Valor pago por kg") && tela.includes("Nova compra") && tela.includes("<details"));
   for (const campo of ["marca", "diametro_mm", "estoque_minimo", "fornecedor_id", "localizacao", "unidade"]) {
@@ -4528,6 +4533,129 @@ await teste("auditoria de layout: w-screen/100vw em contêiner e largura fixa > 
   assert.equal(achadosLayoutMobile('// w-screen\n<div className="p-4" />').length, 0, "comentário não conta");
   const audit = lerFonte("scripts/auditar-isolamento.mts");
   assert.ok(audit.includes("achadosLayoutMobile") && audit.includes("if (layoutRuim.length) process.exitCode = 1;"));
+});
+
+console.log("\nQuem comprou — comprador e data da compra");
+const U1 = "11111111-1111-4111-8111-111111111111";
+const U2 = "22222222-2222-4222-8222-222222222222";
+const PESSOAS = [
+  { id: U1, nome: "Miguel", papel: "dono" },
+  { id: U2, nome: "Ana", papel: "socio" },
+];
+await teste("seletor → par: pessoa da lista grava só o id; 'Outra pessoa' só o nome; vazio = ninguém", () => {
+  assert.deepEqual(montarComprador(U1, ""), { comprador: { comprador_user_id: U1, comprador_nome: null } });
+  assert.deepEqual(montarComprador(U1, "ignorado"), { comprador: { comprador_user_id: U1, comprador_nome: null } }, "nome livre é ignorado quando há pessoa");
+  assert.deepEqual(montarComprador(COMPRADOR_OUTRO, "  Maria   da Silva "), { comprador: { comprador_user_id: null, comprador_nome: "Maria da Silva" } });
+  assert.deepEqual(montarComprador(COMPRADOR_NENHUM, "x"), { comprador: { comprador_user_id: null, comprador_nome: null } });
+  assert.deepEqual(montarComprador(undefined, undefined), { comprador: { comprador_user_id: null, comprador_nome: null } });
+});
+await teste("seletor inválido: 'Outra pessoa' sem nome, nome acima de 80 caracteres e id que não é uuid são recusados", () => {
+  assert.ok("error" in montarComprador(COMPRADOR_OUTRO, "   "));
+  assert.ok("error" in montarComprador(COMPRADOR_OUTRO, "a".repeat(COMPRADOR_NOME_MAX + 1)));
+  assert.ok(!("error" in montarComprador(COMPRADOR_OUTRO, "a".repeat(COMPRADOR_NOME_MAX))));
+  assert.ok("error" in montarComprador("nao-e-uuid", ""));
+  assert.equal(COMPRADOR_NOME_MAX, 80);
+});
+await teste("data da compra: vazia = padrão do banco (hoje); futura é recusada; hoje e passado valem; data de calendário real", () => {
+  const hoje = "2026-10-30";
+  assert.deepEqual(validarDataCompra("", hoje), { data: null });
+  assert.deepEqual(validarDataCompra(undefined, hoje), { data: null });
+  assert.deepEqual(validarDataCompra("2026-10-30", hoje), { data: "2026-10-30" });
+  assert.deepEqual(validarDataCompra("2026-01-05", hoje), { data: "2026-01-05" });
+  assert.deepEqual(validarDataCompra("2026-10-31", hoje), { error: "Data da compra: não pode ser no futuro." });
+  assert.ok("error" in validarDataCompra("2026-02-31", hoje), "31 de fevereiro não existe");
+  assert.ok("error" in validarDataCompra("30/10/2026", hoje));
+});
+await teste("lerCompra junta quem comprou e a data; qualquer erro interrompe", () => {
+  const form = (o: Record<string, string>) => (c: string) => (c in o ? o[c] : null);
+  assert.deepEqual(lerCompra(form({ comprador: U2, data_compra: "2026-10-01" }), "data_compra", "2026-10-30"), {
+    comprador: { comprador_user_id: U2, comprador_nome: null },
+    data: "2026-10-01",
+  });
+  assert.ok("error" in lerCompra(form({ comprador: COMPRADOR_OUTRO, comprador_nome: "", data_compra: "2026-10-01" }), "data_compra", "2026-10-30"));
+  assert.ok("error" in lerCompra(form({ comprador: U1, data_compra: "2027-01-01" }), "data_compra", "2026-10-30"));
+});
+await teste("padrão do seletor = usuário logado (se for da empresa); edição reaproveita o que está gravado", () => {
+  assert.equal(seletorInicial(U1, PESSOAS), U1);
+  assert.equal(seletorInicial("33333333-3333-4333-8333-333333333333", PESSOAS), COMPRADOR_NENHUM, "fora da lista = não informado");
+  assert.equal(seletorInicial(null, PESSOAS), COMPRADOR_NENHUM);
+  assert.equal(seletorDeComprador({ comprador_user_id: U2, comprador_nome: "Ana" }, PESSOAS), U2);
+  assert.equal(seletorDeComprador({ comprador_user_id: null, comprador_nome: "Maria" }, PESSOAS), COMPRADOR_OUTRO);
+  assert.equal(seletorDeComprador({ comprador_user_id: null, comprador_nome: null }, PESSOAS), COMPRADOR_NENHUM);
+  assert.equal(rotuloComprador({ comprador_user_id: U2, comprador_nome: "Ana Paula" }, PESSOAS), "Ana Paula");
+  assert.equal(rotuloComprador({ comprador_user_id: U2, comprador_nome: null }, PESSOAS), "Ana");
+  assert.equal(rotuloComprador({ comprador_user_id: null, comprador_nome: null }, PESSOAS), "Não informado");
+});
+await teste("pessoas_da_empresa: só papéis da equipe e ids válidos; sem nome vira 'Sem nome'; falha = lista vazia", () => {
+  const lida = lerPessoasCompradoras([
+    { pessoa_id: U1, nome: "Miguel", papel: "dono" },
+    { pessoa_id: U2, nome: null, papel: "funcionario" },
+    { pessoa_id: "33333333-3333-4333-8333-333333333333", nome: "Vendedor", papel: "comercial" },
+    { pessoa_id: "x", nome: "Inválido", papel: "socio" },
+  ]);
+  assert.deepEqual(lida.map((p) => [p.nome, p.papel]), [["Miguel", "dono"], ["Sem nome", "funcionario"]]);
+  assert.deepEqual(lerPessoasCompradoras(null), []);
+});
+await teste("gastos por pessoa: lê a resposta do banco; sem comprador = 'Não informado'; total vem do banco e a tabela soma as linhas", () => {
+  const linhas = lerGastosPorComprador([
+    { comprador_user_id: U1, comprador_nome: "Miguel", materiais: "100.50", equipamentos: 2000, total: "2100.50" },
+    { comprador_user_id: null, comprador_nome: null, materiais: 30, equipamentos: 0 },
+  ]);
+  assert.equal(linhas[0].nome, "Miguel");
+  assert.equal(linhas[0].total, 2100.5);
+  assert.equal(linhas[1].nome, "Não informado");
+  assert.equal(linhas[1].total, 30, "sem total no retorno, soma só para exibir");
+  assert.deepEqual(totaisGastos(linhas), { materiais: 130.5, equipamentos: 2000, total: 2130.5 });
+  assert.deepEqual(lerGastosPorComprador("x"), []);
+});
+await teste("auditoria: entrada por p3d_movimentar_estoque e escrita direta em movimentos falham", () => {
+  const ruim = (t: string) => achadosComprador(t).length;
+  assert.equal(ruim('await s.rpc("p3d_movimentar_estoque", { p_ws: w, p_tipo: "entrada", p_quantidade: 1 });'), 1);
+  assert.equal(ruim('await s.rpc("p3d_movimentar_estoque", { p_ws: w, p_tipo: "ajuste", p_quantidade: 1 });'), 0);
+  assert.equal(ruim('await s.rpc("p3d_movimentar_estoque", { p_tipo: tipo });'), 1, "tipo variável sem desviar a entrada");
+  assert.equal(ruim('await s.rpc("p3d_registrar_entrada_material", {}); await s.rpc("p3d_movimentar_estoque", { p_tipo: tipo });'), 0);
+  assert.equal(ruim('await s.from("p3d_movimentos_estoque").update({ comprador_nome: "x" }).eq("id", i);'), 1);
+  assert.equal(ruim('await s.from("p3d_movimentos_estoque").insert({ data_compra: "2026-01-01" });'), 1);
+  assert.equal(ruim('await s.from("p3d_movimentos_estoque").select("id, comprador_nome");'), 0, "ler pode");
+  assert.equal(ruim('// await s.rpc("p3d_movimentar_estoque", { p_tipo: "entrada" })'), 0, "comentário não conta");
+  const audit = lerFonte("scripts/auditar-isolamento.mts");
+  assert.ok(audit.includes("achadosComprador") && audit.includes("if (ruins.length) process.exitCode = 1;"));
+});
+await teste("telas: entradas e Nova compra pela RPC nova; correção só por p3d_corrigir_comprador; relatório por RPC", () => {
+  const est = lerFonte("app/(dashboard)/impressao-3d/estoque/actions.ts");
+  assert.equal((est.match(/rpc\("p3d_registrar_entrada_material"/g) ?? []).length, 3, "cadastro, nova compra e entrada");
+  assert.ok(!/p_tipo:\s*"entrada"/.test(est), "nenhuma entrada por p3d_movimentar_estoque");
+  assert.ok(est.includes('rpc("p3d_corrigir_comprador"') && est.includes('p_tipo: "movimento"'));
+  const forn = lerFonte("app/(dashboard)/impressao-3d/fornecedores/actions.ts");
+  assert.ok(forn.includes('rpc("p3d_corrigir_comprador"') && forn.includes('p_tipo: "compra"'));
+  assert.ok(forn.includes("...quem.comprador"), "compra grava comprador_user_id/nome no cabeçalho");
+  assert.ok(forn.includes('validarDataCompra(formData.get("data"))'), "data da compra não pode ser futura");
+  const imp = lerFonte("app/(dashboard)/impressao-3d/impressoras/actions.ts");
+  assert.ok((imp.match(/\.\.\.quem\.comprador/g) ?? []).length === 4, "impressora e peça de desgaste, criar e atualizar");
+  assert.ok(imp.includes('validarDataCompra(formData.get("data_aquisicao"))'));
+  // Nenhuma escrita deixa o comprador de fora da empresa ativa: tudo continua com workspace_id/eq.
+  assert.ok(imp.includes(".eq(\"workspace_id\", acesso.workspaceId)"));
+  const rel = lerFonte("app/(dashboard)/impressao-3d/relatorios/page.tsx");
+  assert.ok(rel.includes('rpc("p3d_gastos_por_comprador"') && rel.includes('a !== "gastos" || verCustos'), "aba só com custos");
+  const atalho = lerFonte("app/(dashboard)/impressao-3d/estoque/gastos/page.tsx");
+  assert.ok(atalho.includes("!acesso.ehDono") && atalho.includes('includes("p3d_relatorios")') && atalho.includes('rpc("p3d_gastos_por_comprador"'));
+  const pagEst = lerFonte("app/(dashboard)/impressao-3d/estoque/page.tsx");
+  assert.ok(pagEst.includes('acesso.ehDono && !habilitados.includes("p3d_relatorios")'), "atalho só sem Relatórios e só para fundador/cofundador");
+  assert.ok(pagEst.includes("comprador_user_id, comprador_nome, data_compra"));
+});
+await teste("telas: campos em coluna única no celular, histórico com Comprador e Data da compra, correção por entrada", () => {
+  const campos = lerFonte("components/impressao-3d/campos-comprador.tsx");
+  assert.ok(campos.includes("grid-cols-1") && campos.includes("Outra pessoa (digitar nome)") && campos.includes("max={hoje}") && campos.includes('name="comprador"'));
+  const est = lerFonte("components/impressao-3d/estoque-board.tsx");
+  assert.ok(est.includes("Data da compra") && est.includes(">Comprador<") && est.includes("CorrigirComprador"));
+  assert.ok((est.match(/nomeData="data_compra"/g) ?? []).length >= 3, "cadastro, Nova compra e Entrada");
+  const forn = lerFonte("components/impressao-3d/fornecedores-board.tsx");
+  assert.ok(forn.includes("Data da compra") && forn.includes("Comprador") && forn.includes("comprou: "));
+  assert.ok(lerFonte("components/impressao-3d/compra-detalhe.tsx").includes('compra.status === "recebida"'), "correção na compra já recebida");
+  const imp = lerFonte("components/impressao-3d/impressoras-board.tsx");
+  assert.ok(imp.includes("Data da compra (aquisição)") && imp.includes("Comprou: "));
+  const rel = lerFonte("components/impressao-3d/gastos-por-pessoa.tsx");
+  assert.ok(rel.includes("Exportar CSV"));
 });
 
 console.log(`\n${total} testes`);

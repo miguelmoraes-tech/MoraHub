@@ -107,6 +107,8 @@ export interface Impressora {
   valor_residual: number;
   vida_util_horas: number;
   data_aquisicao: string | null;
+  comprador_user_id: string | null;
+  comprador_nome: string | null;
   horas_uso: number;
   manutencao_hora: number;
   manutencao_ciclo: number;
@@ -126,6 +128,8 @@ export interface PecaDesgaste {
   custo: number;
   vida_util_horas: number;
   horas_ultima_troca: number;
+  comprador_user_id: string | null;
+  comprador_nome: string | null;
 }
 
 export interface Manutencao {
@@ -170,6 +174,10 @@ export interface MovimentoEstoque {
   custo_unitario: number | null;
   custo_total: number | null;
   observacao: string | null;
+  /** Só entradas: quem comprou e a data da compra (somente leitura; mudam por p3d_corrigir_comprador). */
+  comprador_user_id: string | null;
+  comprador_nome: string | null;
+  data_compra: string | null;
   created_at: string;
 }
 
@@ -272,7 +280,7 @@ export interface ItemOrcamento {
 
 /** Colunas de cada select (nunca `*`: quem não tem o extra "custos" não recebe custo). */
 export const COLUNAS_IMPRESSORA =
-  "id, workspace_id, nome, marca, modelo, tecnologia, volume_x_mm, volume_y_mm, volume_z_mm, bico_mm, status, potencia_media_kw, valor_aquisicao, valor_residual, vida_util_horas, data_aquisicao, horas_uso, manutencao_hora, manutencao_ciclo, intervalo_manutencao_horas, horas_ultima_manutencao, integracao_tipo, integracao_url, observacoes, ativo";
+  "id, workspace_id, nome, marca, modelo, tecnologia, volume_x_mm, volume_y_mm, volume_z_mm, bico_mm, status, potencia_media_kw, valor_aquisicao, valor_residual, vida_util_horas, data_aquisicao, comprador_user_id, comprador_nome, horas_uso, manutencao_hora, manutencao_ciclo, intervalo_manutencao_horas, horas_ultima_manutencao, integracao_tipo, integracao_url, observacoes, ativo";
 
 // --- Estoque de peças (peças impressas prontas) -------------------------------------------------
 

@@ -12,6 +12,7 @@ import {
   CompraItemSchema, CompraSchema, FornecedorSchema, RecebimentoSchema,
 } from "@/lib/impressao-3d/validacao-operacao";
 import { formatMoeda } from "@/lib/impressao-3d/numeros";
+import { lerComprador, validarDataCompra, type Comprador } from "@/lib/impressao-3d/comprador";
 import type { ActionState } from "@/lib/actions/types";
 
 const MODULO = "p3d_fornecedores";
@@ -113,16 +114,27 @@ function payloadCompra(d: { data: string | null } & Record<string, unknown>) {
   };
 }
 
+/** Quem comprou (par user_id/nome do seletor) e a data da compra (a coluna "data", nunca no futuro). */
+function lerCompradorDaCompra(formData: FormData): { comprador: Comprador } | { error: string } {
+  const c = lerComprador((campo) => formData.get(campo));
+  if ("error" in c) return c;
+  const d = validarDataCompra(formData.get("data"));
+  if ("error" in d) return d;
+  return c;
+}
+
 export async function criarCompra(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = CompraSchema.safeParse(formParaObjeto(formData));
   if (!parsed.success) return { error: primeiroErro(parsed.error) };
+  const quem = lerCompradorDaCompra(formData);
+  if ("error" in quem) return { error: quem.error };
 
   const acesso = await getAcessoEdicao(MODULO);
   if (!acesso) return { error: SEM_PERMISSAO };
 
   const { data, error } = await (await createClient())
     .from("p3d_compras")
-    .insert({ workspace_id: acesso.workspaceId, ...payloadCompra(parsed.data) })
+    .insert({ workspace_id: acesso.workspaceId, ...payloadCompra(parsed.data), ...quem.comprador })
     .select("id")
     .single();
   if (error || !data) return { error: mensagemEscrita(error, "Não foi possível criar a compra.") };
@@ -134,13 +146,15 @@ export async function criarCompra(_prev: ActionState, formData: FormData): Promi
 export async function atualizarCompra(compraId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = CompraSchema.safeParse(formParaObjeto(formData));
   if (!parsed.success) return { error: primeiroErro(parsed.error) };
+  const quem = lerCompradorDaCompra(formData);
+  if ("error" in quem) return { error: quem.error };
 
   const acesso = await getAcessoEdicao(MODULO);
   if (!acesso) return { error: SEM_PERMISSAO };
 
   const { data, error } = await (await createClient())
     .from("p3d_compras")
-    .update(payloadCompra(parsed.data))
+    .update({ ...payloadCompra(parsed.data), ...quem.comprador })
     .eq("id", compraId)
     .eq("workspace_id", acesso.workspaceId)
     .in("status", ["cotacao", "aprovada"])
@@ -283,4 +297,33 @@ export async function receberCompra(compraId: string, formData: FormData): Promi
       r.conta_pagar_id ? " Conta a pagar criada no Financeiro." : ""
     }`,
   };
+}
+
+/**
+ * Corrige quem comprou uma compra JÁ RECEBIDA (p3d_corrigir_comprador, tipo "compra"): o banco atualiza
+ * também as entradas de estoque dessa compra. Exige edição em Fornecedores; o banco confere de novo.
+ */
+export async function corrigirCompradorCompra(
+  compraId: string,
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const c = lerComprador((campo) => formData.get(campo));
+  if ("error" in c) return { error: c.error };
+
+  const acesso = await getAcessoEdicao(MODULO);
+  if (!acesso) return { error: SEM_PERMISSAO };
+
+  const { error } = await (await createClient()).rpc("p3d_corrigir_comprador", {
+    p_tipo: "compra",
+    p_id: compraId,
+    ...(c.comprador.comprador_user_id ? { p_comprador_user_id: c.comprador.comprador_user_id } : {}),
+    ...(c.comprador.comprador_nome ? { p_comprador_nome: c.comprador.comprador_nome } : {}),
+  });
+  if (error) return { error: mensagemRpc(error, "Não foi possível corrigir o comprador.") };
+
+  revalidatePath(`${ROTA}/compras/${compraId}`);
+  revalidatePath(ROTA);
+  revalidatePath("/impressao-3d/estoque");
+  return { ok: true };
 }
