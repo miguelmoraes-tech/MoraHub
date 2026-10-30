@@ -5,8 +5,8 @@ import { EquipeSection } from "@/components/socios/equipe-section";
 import { SetoresSection } from "@/components/socios/setores-section";
 import type {
   ConviteEquipe,
-  MembroEquipe,
   ModuloPermissivel,
+  PessoaEquipe,
   SetorAcesso,
 } from "@/lib/socios-shared";
 
@@ -15,13 +15,16 @@ type Aba = "equipe" | "setores";
 export function SociosBoard({
   modulos,
   membros,
+  qtdFundadores,
   convites,
   setores,
   codigoVendedor,
   userId,
 }: {
   modulos: ModuloPermissivel[];
-  membros: MembroEquipe[];
+  membros: PessoaEquipe[];
+  /** Quantos fundadores (fundador + cofundadores) a empresa tem hoje. */
+  qtdFundadores: number;
   convites: ConviteEquipe[];
   setores: SetorAcesso[];
   codigoVendedor: string | null;
@@ -55,6 +58,7 @@ export function SociosBoard({
         <EquipeSection
           modulos={modulos}
           membros={membros}
+          qtdFundadores={qtdFundadores}
           convites={convites}
           userId={userId}
         />

@@ -175,6 +175,8 @@ import {
 } from "@/lib/impressao-3d/pecas";
 import { avisosConclusaoMulti, lerConclusaoMulti } from "@/lib/impressao-3d/regras-operacao";
 import { ARQUIVOS_SEM_SALDO_NO_CLIENTE, saldoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
+import { montarPessoas, pessoaRemovivel } from "@/lib/socios-shared";
+import { GRUPO_EMPRESA } from "@/lib/modulos/preferencias";
 import { ARQUIVOS_CALCULADORA_RAPIDA, precoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
 import { FRASE_MODULO } from "@/lib/impressao-3d/frases-modulos";
 
@@ -4011,6 +4013,116 @@ await teste("documentação da Etapa E (parte 2)", () => {
   for (const t of ["Filamentos marcados", "p_entrada.materiais", "Estoque de peças", "p3d_movimentar_pecas", "p3d_concluir_producao_multi", "p3d_baixar_pecas_pedido", "Valor pago por kg"]) {
     assert.ok(doc.includes(t), `doc sem "${t}"`);
   }
+});
+
+console.log("\nEquipe e cofundadores — item sempre visível para fundador e cofundador");
+const MODULOS_MINIMOS = ["p3d_estoque", "p3d_impressoras", "p3d_precificacao", "p3d_produtos"];
+const hrefsDe = (grupos: { itens: { href: string }[] }[]) => grupos.flatMap((g) => g.itens.map((i) => i.href));
+await teste("o item existe no menu de fundador e cofundador em empresa com módulos mínimos, só do nicho e sem nenhum módulo", () => {
+  for (const modulos of [MODULOS_MINIMOS, ["p3d_estoque"], [], ["leads", "renegados", "clientes", "agenda", "vendedores"]]) {
+    // Fundador (dono) e cofundador têm o mesmo painel: painelCompleto = true, não restrito.
+    const grupos = gruposDoMenu(modulos, true, false);
+    assert.ok(hrefsDe(grupos).includes("/socios"), `Equipe em [${modulos.join(",")}]`);
+    const empresa = grupos.find((g) => g.titulo === GRUPO_EMPRESA);
+    assert.ok(empresa, "bloco Empresa existe");
+    assert.deepEqual(empresa.itens.map((i) => i.label), ["Módulos", "Equipe e cofundadores", "Aprovações", "Configurações"]);
+    // Visão Geral, Módulos, Equipe e Configurações vêm juntos no bloco fixo.
+    assert.ok(hrefsDe(grupos).includes("/dashboard") && hrefsDe(grupos).includes("/modulos") && hrefsDe(grupos).includes("/configuracoes"));
+  }
+});
+await teste("sócio, funcionário e vendedor não veem o item", () => {
+  for (const modulos of [MODULOS_MINIMOS, []]) {
+    assert.ok(!hrefsDe(gruposDoMenu(modulos, false, true)).includes("/socios"), "restrito (sócio/funcionário)");
+    assert.ok(!hrefsDe(gruposDoMenu(modulos, false, false)).includes("/socios"), "sem painel e sem restrição (vendedor)");
+  }
+  for (const papel of ["socio", "funcionario", "comercial"] as const) {
+    const d = decidirAcesso({ path: "/socios", resolucao: { status: "ok", workspaceId: WS_A, papel, corrigirCookie: false }, habilitados: MODULOS_MINIMOS, permissoes: MODULOS_MINIMOS, permiteMembros: MODULOS_MINIMOS, funcionarioSemVinculo: false });
+    assert.equal(d.tipo, "redirecionar", `${papel} não abre /socios`);
+  }
+});
+await teste("o item não pode ser ocultado em Personalizar navegação (nem por preferência já gravada)", () => {
+  assert.equal(itemFixo("socios"), true);
+  assert.ok((ITENS_FIXOS as readonly string[]).includes("socios"));
+  const tudoOculto = { itens: ["dashboard", "modulos", "socios", "aprovacoes", "configuracoes"].map((chave, ordem) => ({ chave, visivel: false, ordem })), abasOcultas: {} };
+  for (const modulos of [MODULOS_MINIMOS, []]) {
+    const hrefs = hrefsDe(aplicarPreferenciaMenu(gruposDoMenu(modulos, true, false), tudoOculto));
+    for (const h of ["/dashboard", "/modulos", "/socios", "/configuracoes"]) assert.ok(hrefs.includes(h), `${h} continua`);
+    assert.ok(!hrefs.includes("/aprovacoes"), "só os itens fixos são imunes");
+  }
+  const prep = prepararPreferencia(tudoOculto, { itensVisiveis: ["dashboard", "modulos", "socios", "aprovacoes", "configuracoes"], chavesComAbas: [] }, null);
+  assert.ok(prep.ok);
+  if (prep.ok) assert.equal(prep.pref.itens.find((i) => i.chave === "socios")?.visivel, true, "gravado visível");
+  const nav = lerFonte("components/empresa/navegacao-board.tsx");
+  assert.ok(nav.includes("fixo"), "a tela de personalização trata item fixo");
+});
+await teste("a rota /socios é liberada no proxy para fundador e cofundador, com qualquer conjunto de módulos", () => {
+  for (const papel of ["dono", "cofundador"] as const) {
+    for (const habilitados of [MODULOS_MINIMOS, ["p3d_estoque"], []]) {
+      const d = decidirAcesso({ path: "/socios", resolucao: { status: "ok", workspaceId: WS_A, papel, corrigirCookie: false }, habilitados, funcionarioSemVinculo: false });
+      assert.equal(d.tipo, "seguir", `${papel} abre /socios com [${habilitados.join(",")}]`);
+    }
+  }
+  assert.equal(rotaPermitida("/socios", []), true, "rota livre: não depende de módulo");
+  assert.equal(precisaDeModulos("/socios"), false, "o proxy nem lê módulos para abri-la");
+  // A página confere o painel no servidor (fundador/cofundador) e o layout monta o bloco só com painel.
+  const pagina = lerFonte("app/(dashboard)/socios/page.tsx");
+  assert.ok(pagina.includes("getEmpresaPainel()") && !pagina.includes("getAcessoModulo"), "página só do painel, sem módulo");
+  assert.ok(lerFonte("app/(dashboard)/layout.tsx").includes("painelCompleto={!!painel}"));
+});
+await teste("a barra lateral mantém o bloco Empresa sempre visível (fora da área que rola)", () => {
+  const side = lerFonte("components/sidebar.tsx");
+  assert.ok(side.includes("GRUPO_EMPRESA") && side.includes('data-menu-fixo="empresa"'));
+  const iNav = side.indexOf('<nav className="flex-1 overflow-y-auto');
+  const iFim = side.indexOf("</nav>");
+  const iFixo = side.indexOf('data-menu-fixo="empresa"');
+  assert.ok(iNav > 0 && iFixo > iFim, "o bloco fixo vem depois do </nav> que rola");
+  assert.ok(!side.slice(iNav, iFim).includes("grupoEmpresa"), "o bloco não está dentro da área rolável");
+});
+await teste("tela de equipe: fundadores + membros sem repetir, fundador original não sai, erros das RPCs como vieram", () => {
+  const membros = [
+    { membroId: "u2", email: "co@x.com", nome: "Co", papel: "cofundador", createdAt: "", permissoes: [] },
+    { membroId: "u3", email: "so@x.com", nome: "So", papel: "socio", createdAt: "", permissoes: [] },
+  ];
+  const fundadores = [
+    { user_id: "u1", nome: "Miguel", email: "m@x.com", papel: "dono" },
+    { user_id: "u2", nome: "Co", email: "CO@x.com", papel: "cofundador" },
+  ];
+  const pessoas = montarPessoas(fundadores, membros);
+  assert.deepEqual(pessoas.map((p) => [p.email, p.papel]), [["m@x.com", "dono"], ["co@x.com", "cofundador"], ["so@x.com", "socio"]], "sem repetir pelo e-mail, fundador primeiro");
+  assert.equal(pessoas[0].semMembro, true);
+  assert.equal(pessoaRemovivel(pessoas[0], "u9"), false, "fundador original não é removível");
+  assert.equal(pessoaRemovivel(pessoas[1], "u9"), true, "cofundador é removível (a RPC e a aprovação conferem)");
+  assert.equal(pessoaRemovivel(pessoas[1], "u2"), false, "ninguém remove a si mesmo");
+  assert.equal(pessoaRemovivel(pessoas[2], "u9"), true);
+  assert.equal(sociosErrorMessage("Esta ação exige a aprovação dos fundadores da empresa."), "Esta ação exige a aprovação dos fundadores da empresa.", "mensagem do banco como veio");
+  assert.equal(sociosErrorMessage("  E-mail já convidado.  "), "E-mail já convidado.");
+  assert.match(sociosErrorMessage(""), /Não foi possível concluir/);
+  assert.match(sociosErrorMessage("not_authenticated"), /Sessão expirada/);
+  const acoes = lerFonte("app/(dashboard)/socios/actions.ts");
+  for (const rpc of ["convidar_membro", "cancelar_convite_empresa", "remover_membro", "atualizar_permissoes_membro"]) assert.ok(acoes.includes(`"${rpc}"`), rpc);
+  const pagina = lerFonte("app/(dashboard)/socios/page.tsx");
+  for (const rpc of ["listar_membros_empresa", "listar_convites_empresa"]) assert.ok(pagina.includes(`"${rpc}"`), rpc);
+  assert.ok(pagina.includes("getFundadores(") && pagina.includes("montarPessoas("));
+  assert.ok(!/\.from\("(membros|convites)"\)/.test(acoes + pagina + lerFonte("components/socios/equipe-section.tsx") + lerFonte("components/socios/convidar-membro.tsx")), "nada escreve direto em membros/convites");
+});
+await teste("convite: com 1 fundador mostra o link /convite/<token> (copiar + mensagem); com 2+ explica a aprovação", () => {
+  const f = lerFonte("components/socios/convidar-membro.tsx");
+  assert.ok(f.includes("/convite/${r.token}") && f.includes("window.location.origin") && f.includes("Copiar"));
+  assert.ok(f.includes("Envie este link para a pessoa. Ela precisa criar a conta com este mesmo e-mail e abrir o link. O app não envia e-mail."));
+  assert.ok(f.includes("qtdFundadores >= 2") && f.includes("vai para aprovação de todos em Aprovações") && f.includes("Convite enviado para aprovação"));
+  const acao = lerFonte("app/(dashboard)/socios/actions.ts");
+  assert.ok(acao.includes('typeof data !== "string" || !data) return ENVIADO'), "RPC devolveu NULL = pendente; token = link");
+  assert.ok(f.includes("Convidar cofundador") && f.includes("Convidar sócio ou funcionário"));
+  const eq = lerFonte("components/socios/equipe-section.tsx");
+  assert.ok(eq.includes("Convites pendentes") && eq.includes("cancelarConvite") && eq.includes("expira em") && eq.includes("Pessoas da empresa") && eq.includes("removerMembro") && eq.includes("atualizarPermissoesMembro"));
+  assert.ok(lerFonte("components/socios/matriz-permissoes.tsx").includes("nenhum módulo ligado nesta empresa aceita permissão".replace("nenhum", "Nenhum")) || lerFonte("components/socios/matriz-permissoes.tsx").includes("Nenhum módulo ligado nesta empresa"), "matriz vazia não cita Leads/Agenda");
+  assert.ok(!lerFonte("components/socios/matriz-permissoes.tsx").includes("renegados"));
+});
+await teste("a auditoria falha em escrita direta em membros/convites (todas as pastas, só a exceção conhecida)", () => {
+  const audit = lerFonte("scripts/auditar-isolamento.mts");
+  assert.ok(audit.includes('const TABELAS_DE_EQUIPE = ["membros", "convites", "perfis_tipos_ativos"]'));
+  assert.ok(audit.includes('for (const pasta of ["app", "components", "lib", "proxy.ts"])') && audit.includes("if (naoPermitidas.length) process.exitCode = 1;"));
+  assert.ok(audit.includes('"lib/perfil.ts"') && !audit.includes('"components/socios'), "a tela de equipe não tem exceção");
 });
 
 console.log(`\n${total} testes`);

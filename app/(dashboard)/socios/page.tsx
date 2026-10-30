@@ -11,6 +11,7 @@ import {
   extrasDoCatalogo,
   modulosOferecidos,
   paraConvites,
+  montarPessoas,
   paraMembros,
   paraSetores,
   type ModuloPermissivel,
@@ -93,7 +94,8 @@ export default async function SociosPage() {
         </div>
         <SociosBoard
           modulos={modulos}
-          membros={paraMembros(membros)}
+          membros={montarPessoas(fundadores, paraMembros(membros))}
+          qtdFundadores={fundadores.length}
           convites={paraConvites(convites)}
           setores={paraSetores(setores)}
           codigoVendedor={typeof codigoVendedor === "string" ? codigoVendedor : null}

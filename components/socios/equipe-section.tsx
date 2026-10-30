@@ -13,11 +13,12 @@ import { MatrizPermissoes } from "@/components/socios/matriz-permissoes";
 import { ConvidarMembro } from "@/components/socios/convidar-membro";
 import { formatDate } from "@/lib/format";
 import {
+  pessoaRemovivel,
   resumoPermissoes,
   rotuloDoPapel,
   type ConviteEquipe,
-  type MembroEquipe,
   type ModuloPermissivel,
+  type PessoaEquipe,
 } from "@/lib/socios-shared";
 import type { PermissaoModulo } from "@/lib/modulos/permissoes";
 
@@ -28,11 +29,13 @@ function nomesDosModulos(modulos: ModuloPermissivel[]): Record<string, string> {
 export function EquipeSection({
   modulos,
   membros,
+  qtdFundadores,
   convites,
   userId,
 }: {
   modulos: ModuloPermissivel[];
-  membros: MembroEquipe[];
+  membros: PessoaEquipe[];
+  qtdFundadores: number;
   convites: ConviteEquipe[];
   userId: string;
 }) {
@@ -43,12 +46,12 @@ export function EquipeSection({
   const [removendoId, setRemovendoId] = useState<string | null>(null);
   const nomes = nomesDosModulos(modulos);
 
-  function editar(m: MembroEquipe) {
+  function editar(m: PessoaEquipe) {
     setEditandoId(m.membroId);
     setRascunho(m.permissoes);
   }
 
-  function salvar(m: MembroEquipe) {
+  function salvar(m: PessoaEquipe) {
     startTransition(async () => {
       const r = await atualizarPermissoesMembro(m.membroId, rascunho);
       if ("error" in r) {
@@ -61,7 +64,7 @@ export function EquipeSection({
     });
   }
 
-  function remover(m: MembroEquipe) {
+  function remover(m: PessoaEquipe) {
     startTransition(async () => {
       const r = await removerMembro(m.membroId);
       setRemovendoId(null);
@@ -88,11 +91,11 @@ export function EquipeSection({
 
   return (
     <div className="space-y-6">
-      <ConvidarMembro modulos={modulos} />
+      <ConvidarMembro modulos={modulos} qtdFundadores={qtdFundadores} />
 
       <section className="space-y-2">
         <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-600">
-          Equipe ({membros.length})
+          Pessoas da empresa ({membros.length})
         </h2>
         {membros.length === 0 ? (
           <p className="rounded-xl border border-dashed border-zinc-800 px-4 py-8 text-center text-sm text-zinc-500">
@@ -100,12 +103,11 @@ export function EquipeSection({
           </p>
         ) : (
           membros.map((m) => {
-            const restrito = m.papel === "socio" || m.papel === "funcionario";
+            const restrito = (m.papel === "socio" || m.papel === "funcionario") && !m.semMembro;
             // Fundador e cofundador têm o mesmo nível: qualquer um pede a remoção de
             // sócio, funcionário ou cofundador (com 2+ fundadores, todos precisam aprovar).
-            // O vendedor se gerencia em /vendedores.
-            const podeRemover =
-              m.membroId !== userId && (restrito || m.papel === "cofundador");
+            // O fundador original não sai por esta tela; o vendedor se gerencia em /vendedores.
+            const podeRemover = pessoaRemovivel(m, userId);
             const editando = editandoId === m.membroId;
             return (
               <div
@@ -126,7 +128,9 @@ export function EquipeSection({
                   </StatusChip>
                 </div>
 
-                {m.papel === "cofundador" ? (
+                {m.papel === "dono" ? (
+                  <p className="text-xs text-zinc-500">Fundador original da empresa: não pode ser removido por esta tela.</p>
+                ) : m.papel === "cofundador" ? (
                   <p className="text-xs text-zinc-500">Mesmo nível do fundador.</p>
                 ) : restrito ? (
                   <p className="text-xs text-zinc-500">{resumoPermissoes(m.permissoes, nomes)}</p>
@@ -226,6 +230,12 @@ export function EquipeSection({
         {convites.length === 0 ? (
           <p className="text-xs text-zinc-600">Nenhum convite pendente.</p>
         ) : (
+          <p className="text-[11px] text-zinc-600">
+            O link de um convite só aparece na hora em que ele é criado (por segurança o app não o guarda). Para gerar outro
+            link, cancele o convite e convide de novo.
+          </p>
+        )}
+        {convites.length > 0 && (
           convites.map((c) => (
             <div
               key={c.id}

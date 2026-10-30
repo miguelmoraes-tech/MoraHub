@@ -43,6 +43,13 @@ export interface GrupoNavegacao<T = ItemNavegacao> {
   itens: T[];
 }
 
+/**
+ * Título do bloco fixo da administração da empresa (Módulos, Equipe e cofundadores, Aprovações,
+ * Configurações). Só fundador e cofundador o recebem, e a barra lateral o mantém sempre visível
+ * (fora da área que rola), seja qual for o conjunto de módulos ligados.
+ */
+export const GRUPO_EMPRESA = "Empresa";
+
 export const ITEM_VISAO_GERAL: ItemNavegacao = { label: "Visão Geral", href: "/dashboard" };
 export const ITENS_EMPRESA: ItemNavegacao[] = [
   { label: "Módulos", href: "/modulos" },
@@ -84,7 +91,7 @@ export function gruposDoMenu(
       itens: g.itens.map((i: ItemMenu) => ({ label: i.label, href: i.href, icone: i.icone, ...(i.badge ? { badge: i.badge } : {}) })),
     });
   }
-  if (painelCompleto) grupos.push({ titulo: "Empresa", itens: ITENS_EMPRESA });
+  if (painelCompleto) grupos.push({ titulo: GRUPO_EMPRESA, itens: ITENS_EMPRESA });
   return grupos;
 }
 

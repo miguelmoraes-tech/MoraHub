@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { Check, Copy, UserPlus } from "lucide-react";
 import { convidarMembro } from "@/app/(dashboard)/socios/actions";
 import { useToast } from "@/components/toast";
@@ -20,7 +21,7 @@ import type { PermissaoModulo } from "@/lib/modulos/permissoes";
  * fundador preferir. O token só existe neste momento — depois, o convite
  * pendente só pode ser cancelado e refeito.
  */
-export function ConvidarMembro({ modulos }: { modulos: ModuloPermissivel[] }) {
+export function ConvidarMembro({ modulos, qtdFundadores }: { modulos: ModuloPermissivel[]; qtdFundadores: number }) {
   const toast = useToast();
   const [aberto, setAberto] = useState(false);
   const [email, setEmail] = useState("");
@@ -29,6 +30,7 @@ export function ConvidarMembro({ modulos }: { modulos: ModuloPermissivel[] }) {
   const [link, setLink] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [enviadoParaAprovacao, setEnviadoParaAprovacao] = useState(false);
   const [enviando, startEnviar] = useTransition();
 
   const papeis: PapelConvidavel[] = ["socio", "funcionario", "cofundador"];
@@ -45,11 +47,13 @@ export function ConvidarMembro({ modulos }: { modulos: ModuloPermissivel[] }) {
       setEmail("");
       setPermissoes([]);
       if (r.pendente) {
-        // Nada foi criado ainda: sem link. Releia/acompanhe em /aprovacoes.
+        // Nada foi criado ainda (a RPC devolveu NULL): sem link. Ele aparece em /aprovacoes depois que todos aprovarem.
         setLink(null);
+        setEnviadoParaAprovacao(true);
         toast.aprovacao();
         return;
       }
+      setEnviadoParaAprovacao(false);
       setLink(`${window.location.origin}/convite/${r.token}`);
       toast.success("Convite criado. Copie o link e envie para a pessoa.");
     });
@@ -99,6 +103,7 @@ export function ConvidarMembro({ modulos }: { modulos: ModuloPermissivel[] }) {
             setAberto(false);
             setLink(null);
             setErro(null);
+            setEnviadoParaAprovacao(false);
           }}
           className="text-xs font-medium text-zinc-500 hover:text-zinc-200"
         >
@@ -106,11 +111,27 @@ export function ConvidarMembro({ modulos }: { modulos: ModuloPermissivel[] }) {
         </button>
       </div>
 
+      <p className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs text-zinc-400">
+        <strong className="text-zinc-300">Cofundador</strong> tem o mesmo poder do fundador.{" "}
+        {qtdFundadores >= 2
+          ? `Hoje a empresa tem ${qtdFundadores} fundadores: o convite não é criado na hora, vai para aprovação de todos em Aprovações, e o link só aparece lá depois que todos aprovarem.`
+          : "Hoje você é o único fundador: o convite é criado na hora e o link aparece aqui. Com 2 ou mais fundadores, as alterações da empresa passam pela aprovação de todos em Aprovações."}
+      </p>
+
+      {enviadoParaAprovacao && (
+        <div className="space-y-1 rounded-lg border border-amber-900/50 bg-amber-950/30 p-3 text-xs text-amber-300">
+          <p className="font-medium">Convite enviado para aprovação.</p>
+          <p>
+            Ainda não existe link. Quando todos os fundadores aprovarem em{" "}
+            <Link href="/aprovacoes" className="underline">Aprovações</Link>, o link do convite aparece lá.
+          </p>
+        </div>
+      )}
+
       {link && (
         <div className="space-y-2 rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-3">
           <p className="text-xs text-emerald-300">
-            Link do convite (vale por 7 dias). Ele só aparece agora; se perder, cancele e convide de
-            novo.
+            Link do convite (vale por 7 dias). Ele só aparece agora; se perder, cancele o convite e convide de novo.
           </p>
           <div className="flex items-center gap-2">
             <input
@@ -128,6 +149,9 @@ export function ConvidarMembro({ modulos }: { modulos: ModuloPermissivel[] }) {
               {copiado ? "Copiado" : "Copiar"}
             </button>
           </div>
+          <p className="text-xs text-emerald-200">
+            Envie este link para a pessoa. Ela precisa criar a conta com este mesmo e-mail e abrir o link. O app não envia e-mail.
+          </p>
         </div>
       )}
 

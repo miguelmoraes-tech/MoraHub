@@ -37,6 +37,7 @@ import type { EmpresaVinculo } from "@/lib/empresas";
 import { iconeDe } from "@/components/modulos/icones";
 import { CHAT_HABILITADO, rotaPermitida } from "@/lib/modulos/registry";
 import {
+  GRUPO_EMPRESA,
   aplicarPreferenciaMenu,
   gruposDoMenu,
   type ItemNavegacao,
@@ -206,6 +207,11 @@ export function Sidebar({
   const rotulos = useRotulos();
   const isPessoal = pathname.startsWith("/pessoal");
   const accent: Accent = isPessoal ? "petrol" : "copper";
+  // O bloco "Empresa" (Módulos, Equipe e cofundadores, Aprovações, Configurações) fica fixo, fora da
+  // área que rola: nunca some atrás de uma lista longa de módulos.
+  const gruposMenu = aplicarPreferenciaMenu(gruposDoMenu(modulosHabilitados, painelCompleto, restrito), preferencia);
+  const gruposRolaveis = gruposMenu.filter((g) => g.titulo !== GRUPO_EMPRESA);
+  const grupoEmpresa = gruposMenu.find((g) => g.titulo === GRUPO_EMPRESA) ?? null;
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
@@ -259,10 +265,7 @@ export function Sidebar({
             </>
           ) : (
             <>
-              {aplicarPreferenciaMenu(
-                gruposDoMenu(modulosHabilitados, painelCompleto, restrito),
-                preferencia
-              ).map((grupo) => (
+              {gruposRolaveis.map((grupo) => (
                 <NavGroup
                   key={grupo.titulo}
                   title={grupo.titulo}
@@ -275,6 +278,17 @@ export function Sidebar({
           )}
         </div>
       </nav>
+
+      {!isPessoal && grupoEmpresa && (
+        <div className="border-t border-zinc-900 px-3 py-3" data-menu-fixo="empresa">
+          <NavGroup
+            title={grupoEmpresa.titulo}
+            items={grupoEmpresa.itens.map((item) => itemDeMenu(item, rotulos))}
+            accent={accent}
+            habilitados={modulosHabilitados}
+          />
+        </div>
+      )}
 
       <div className="border-t border-zinc-900 p-3">
         {CHAT_HABILITADO && (

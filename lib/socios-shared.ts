@@ -144,6 +144,47 @@ export function paraMembros(data: unknown): MembroEquipe[] {
   }));
 }
 
+/** Uma pessoa da lista "Equipe": fundadores e cofundadores (fundadores_da_empresa) + membros (listar_membros_empresa). */
+export interface PessoaEquipe extends MembroEquipe {
+  /** Entrada que só existe em fundadores_da_empresa (sem linha de membro): não tem o que remover nem editar. */
+  semMembro: boolean;
+}
+
+/**
+ * Junta fundadores e membros numa lista só, sem repetir ninguém (pelo e-mail). Fundador original ('dono')
+ * nunca é removível; cofundador, sócio e funcionário são (a RPC confere de novo). Quem só aparece na
+ * lista de fundadores entra como "semMembro".
+ */
+export function montarPessoas(
+  fundadores: readonly { user_id: string; nome: string | null; email: string | null; papel: string }[],
+  membros: readonly MembroEquipe[]
+): PessoaEquipe[] {
+  const pessoas: PessoaEquipe[] = membros.map((m) => ({ ...m, semMembro: false }));
+  const emails = new Set(pessoas.flatMap((p) => (p.email ? [p.email.trim().toLowerCase()] : [])));
+  const ids = new Set(pessoas.map((p) => p.membroId));
+  for (const f of fundadores) {
+    const email = f.email?.trim().toLowerCase();
+    if ((email && emails.has(email)) || ids.has(f.user_id)) continue;
+    pessoas.push({
+      membroId: f.user_id,
+      email: f.email,
+      nome: f.nome,
+      papel: f.papel,
+      createdAt: "",
+      permissoes: [],
+      semMembro: true,
+    });
+  }
+  const ordem: Record<string, number> = { dono: 0, cofundador: 1, socio: 2, funcionario: 3, comercial: 4 };
+  return pessoas.sort((a, b) => (ordem[a.papel] ?? 9) - (ordem[b.papel] ?? 9));
+}
+
+/** O fundador original e quem não tem linha de membro não são removíveis pela tela; ninguém remove a si mesmo. */
+export function pessoaRemovivel(p: Pick<PessoaEquipe, "papel" | "semMembro" | "membroId">, meuId: string): boolean {
+  if (p.papel === "dono" || p.semMembro || p.membroId === meuId) return false;
+  return p.papel === "socio" || p.papel === "funcionario" || p.papel === "cofundador";
+}
+
 export function paraConvites(data: unknown): ConviteEquipe[] {
   return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: String(r.id),
@@ -204,19 +245,17 @@ export function filtrarPermissoesOferecidas(
   return permissoes.filter((p) => oferecidos.includes(p.modulo));
 }
 
-const SOCIOS_MENSAGENS: [trecho: string, texto: string][] = [
-  ["fundador", "Só os fundadores da empresa podem fazer isso."],
-  ["permiss", "Sem permissão para esta ação."],
-  ["already", "Esta pessoa já faz parte da empresa ou já tem um convite pendente."],
-  ["já ", "Esta pessoa já faz parte da empresa ou já tem um convite pendente."],
-  ["invalid", "Dados inválidos."],
-  ["inválid", "Dados inválidos."],
-  ["not_authenticated", "Sessão expirada. Faça login novamente."],
-];
+/** Quando a RPC não traz mensagem nenhuma. */
+const ERRO_SEM_MENSAGEM = "Não foi possível concluir a ação. Tente novamente.";
 
-/** Traduz o erro de uma RPC da tela de sócios; o que não conhece vira texto genérico. */
+/**
+ * Erro de uma RPC da tela de Equipe: o texto do banco é mostrado COMO VEIO (as RPCs levantam mensagens em
+ * português). Traduzir por trecho escondia a causa — ex.: qualquer erro que citasse "fundador" virava
+ * "Só os fundadores podem fazer isso", mesmo para o fundador. Só a sessão expirada ganha texto próprio.
+ */
 export function sociosErrorMessage(message: string | undefined | null): string {
-  const m = (message ?? "").toLowerCase();
-  const achada = SOCIOS_MENSAGENS.find(([trecho]) => m.includes(trecho));
-  return achada?.[1] ?? "Não foi possível concluir a ação. Tente novamente.";
+  const texto = (message ?? "").trim();
+  if (!texto) return ERRO_SEM_MENSAGEM;
+  if (texto.toLowerCase().includes("not_authenticated")) return "Sessão expirada. Faça login novamente.";
+  return texto;
 }

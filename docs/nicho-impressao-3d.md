@@ -781,3 +781,24 @@ Primeiros passos: filamento com valor do kg, 1ª entrada de estoque, 1ª impress
 `p3d_pecas_estoque.quantidade/custo_medio`, em `p3d_movimentos_pecas`, em `p3d_producao_materiais.peso_real_g`, em
 `p3d_pedido_itens.pecas_baixadas_em`, em uso de `p3d_concluir_producao` fora da action que confere os materiais e em
 preço ou saldo recalculados no cliente (`lib/impressao-3d/auditoria-preco.ts`).
+
+
+## Equipe e cofundadores (correção)
+
+- **Bloco fixo na barra lateral**: Módulos, **Equipe e cofundadores**, Aprovações e Configurações ficam num bloco
+  "Empresa" **fora da área que rola** (`GRUPO_EMPRESA`), sempre visível para fundador e cofundador, com qualquer
+  conjunto de módulos (inclusive nenhum). Sócio, funcionário e vendedor não recebem o bloco. O item `socios` está em
+  `ITENS_FIXOS` (não pode ser ocultado em Personalizar navegação, nem por preferência já gravada) e tem cartão em
+  Configurações.
+- **Tela** (`/socios`, rota livre, só painel): Convidar cofundador / Convidar sócio ou funcionário
+  (`convidar_membro`; sócio/funcionário com matriz por módulo ligado). Com 1 fundador a RPC devolve o token e a tela
+  mostra o link `/convite/<token>` com Copiar e a mensagem "Envie este link para a pessoa. Ela precisa criar a conta com
+  este mesmo e-mail e abrir o link. O app não envia e-mail."; com 2+ fundadores a RPC devolve NULL, o convite vai para
+  aprovação e o link só aparece em Aprovações depois que todos aprovarem (a tela explica). Convites pendentes (e-mail,
+  papel, expiração) com Cancelar (`cancelar_convite_empresa`); o link não pode ser mostrado de novo (a RPC de listagem
+  não devolve o token). Pessoas da empresa = `fundadores_da_empresa` + `listar_membros_empresa`, sem repetir: o fundador
+  original não é removível; cofundador, sócio e funcionário saem por `remover_membro` (com confirmação) e sócio/funcionário
+  editam permissões (`atualizar_permissoes_membro`).
+- **Erros das RPCs aparecem como vieram** (`sociosErrorMessage` só troca a sessão expirada). Antes, qualquer mensagem
+  que citasse "fundador" ou "permissão" virava um texto genérico ("Só os fundadores podem fazer isso"), inclusive para o
+  próprio fundador.
