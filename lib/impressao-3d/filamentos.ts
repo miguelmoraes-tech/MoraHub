@@ -101,8 +101,38 @@ export type MaterialEntrada =
 
 export interface MateriaisMontados {
   materiais: MaterialEntrada[];
+  /** `id` da linha da tela de cada item de `materiais` (mesma ordem): liga o custo devolvido pelo banco à linha. */
+  linhaIds: string[];
   erros: string[];
   avisos: string[];
+}
+
+/** As gramas digitadas são de UMA peça ou do projeto todo. */
+export type BaseGramas = "peca" | "projeto";
+export const BASE_GRAMAS_PADRAO: BaseGramas = "peca";
+export const BASE_GRAMAS_ROTULO: Record<BaseGramas, string> = { peca: "Por peça", projeto: "Do projeto todo" };
+
+/**
+ * Fator que leva o que foi digitado ao LOTE que a RPC recebe: "por peça" multiplica pela quantidade de
+ * peças; "do projeto todo" envia como informado (fator 1, nunca multiplica de novo).
+ */
+export function fatorDaBase(base: BaseGramas, quantidade: number): number {
+  return base === "peca" && Number.isInteger(quantidade) && quantidade > 0 ? quantidade : 1;
+}
+
+/** Gramas do lote e por peça (informativo, para o resumo da lista). */
+export function resumoPesos(materiais: readonly MaterialEntrada[], quantidade: number): { lote: number; porPeca: number } {
+  const lote = arredondar(materiais.reduce((s, m) => s + m.peso_g, 0), 3);
+  const q = Number.isInteger(quantidade) && quantidade > 0 ? quantidade : 1;
+  return { lote, porPeca: arredondar(lote / q, 3) };
+}
+
+/** Item de material do cálculo devolvido pelo banco, por linha da tela (só se a contagem bate com o enviado). */
+export function custosPorLinha<T>(linhaIds: readonly string[], itens: readonly T[]): Map<string, T> {
+  const mapa = new Map<string, T>();
+  if (linhaIds.length === 0 || itens.length !== linhaIds.length) return mapa;
+  linhaIds.forEach((id, i) => mapa.set(id, itens[i]));
+  return mapa;
 }
 
 /**
@@ -111,6 +141,7 @@ export interface MateriaisMontados {
  */
 export function montarMateriais(linhas: readonly LinhaFilamento[], fator = 1): MateriaisMontados {
   const materiais: MaterialEntrada[] = [];
+  const linhaIds: string[] = [];
   const erros: string[] = [];
   const avisos: string[] = [];
 
@@ -131,6 +162,7 @@ export function montarMateriais(linhas: readonly LinhaFilamento[], fator = 1): M
         return;
       }
       materiais.push({ material_id: l.material_id, peso_g: pesoLote });
+      linhaIds.push(l.id);
       return;
     }
 
@@ -147,9 +179,10 @@ export function montarMateriais(linhas: readonly LinhaFilamento[], fator = 1): M
       peso_g: pesoLote,
       preco_por_g: precoPorGDeValorKg(valorKg),
     });
+    linhaIds.push(l.id);
   });
 
-  return { materiais, erros, avisos };
+  return { materiais, linhaIds, erros, avisos };
 }
 
 /** Lista guardada na entrada (snapshot de item, rascunho) → linhas da tela. Pesos em g do LOTE. */

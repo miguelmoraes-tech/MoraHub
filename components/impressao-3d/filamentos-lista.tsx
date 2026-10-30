@@ -43,7 +43,10 @@ export function FilamentosLista({
   ajudaPeso,
   faltas = [],
   somenteEstoque = false,
+  custos,
 }: {
+  /** Custo e peso do LOTE de cada linha (do cálculo do banco, por `id` da linha): o preço aparece em destaque. */
+  custos?: ReadonlyMap<string, { custo: number; peso_g: number }>;
   linhas: LinhaFilamento[];
   aoMudar: (linhas: LinhaFilamento[]) => void;
   opcoes: OpcaoFilamento[];
@@ -66,6 +69,8 @@ export function FilamentosLista({
       {linhas.map((l, i) => {
         const origem = somenteEstoque ? "estoque" : podeEstoque ? l.origem : "manual";
         const falta = faltas.find((f) => f.material_id === l.material_id && origem === "estoque");
+        const escolhido = origem === "estoque" ? opcoes.find((o) => o.id === l.material_id) : undefined;
+        const custoLinha = custos?.get(l.id);
         return (
           <div key={l.id} className="space-y-2 rounded-lg border border-zinc-800 p-3">
             <div className="flex items-center justify-between gap-2">
@@ -99,16 +104,31 @@ export function FilamentosLista({
 
             {origem === "estoque" ? (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
-                <Seletor rotulo="Filamento" value={l.material_id} onChange={(e) => mudar(l.id, { material_id: e.target.value })}>
-                  <option value="">Escolha um filamento</option>
-                  {opcoes.map((o) => (
-                    <option key={o.id} value={o.id}>{rotuloOpcao(o)}</option>
-                  ))}
-                </Seletor>
+                <div className="space-y-1">
+                  <Seletor rotulo="Filamento" value={l.material_id} onChange={(e) => mudar(l.id, { material_id: e.target.value })}>
+                    <option value="">Escolha um filamento</option>
+                    {opcoes.map((o) => (
+                      <option key={o.id} value={o.id}>{rotuloOpcao(o)}</option>
+                    ))}
+                  </Seletor>
+                  {escolhido && (
+                    <p className="flex items-center gap-2 text-sm">
+                      <span
+                        className="h-4 w-4 shrink-0 rounded-full border border-zinc-700"
+                        style={escolhido.cor_hex ? { backgroundColor: escolhido.cor_hex } : undefined}
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 truncate text-zinc-300">{escolhido.nome}</span>
+                      {escolhido.custo_por_g != null && (
+                        <span className="shrink-0 font-semibold text-copper-300">{formatMoeda(custoPorKgDeG(escolhido.custo_por_g))}/kg</span>
+                      )}
+                    </p>
+                  )}
+                </div>
                 <Numero rotulo={rotuloPeso} value={l.peso_g} onChange={(e) => mudar(l.id, { peso_g: e.target.value })} ajuda={i === 0 ? ajudaPeso : undefined} />
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <Entrada rotulo="Nome" value={l.nome} onChange={(e) => mudar(l.id, { nome: e.target.value })} placeholder="PLA preto" />
                 <Entrada rotulo="Cor (opcional)" value={l.cor} onChange={(e) => mudar(l.id, { cor: e.target.value })} />
                 <Numero
@@ -121,8 +141,17 @@ export function FilamentosLista({
               </div>
             )}
 
+            {custoLinha && (
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 border-t border-zinc-800/70 pt-2">
+                <span className="text-xs text-zinc-500">Custo deste filamento</span>
+                <span>
+                  <span className="text-lg font-bold text-zinc-50">{formatMoeda(custoLinha.custo)}</span>
+                  <span className="ml-2 text-xs text-zinc-500">{formatNumero(custoLinha.peso_g, 1)} g no projeto</span>
+                </span>
+              </div>
+            )}
             {falta && (
-              <p className="text-[11px] font-medium text-amber-400">
+              <p className="text-xs font-medium text-amber-400">
                 Faltam {formatNumero(falta.falta, 1)} g: o projeto usa {formatNumero(falta.precisa, 1)} g e o saldo é{" "}
                 {formatNumero(falta.tem, 1)} g.
               </p>

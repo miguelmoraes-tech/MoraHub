@@ -18,9 +18,9 @@ import {
 } from "@/lib/impressao-3d/simulador";
 import { novaLinhaFilamento } from "@/lib/impressao-3d/filamentos";
 import { formatNumero } from "@/lib/impressao-3d/numeros";
-import { FilamentosLista } from "@/components/impressao-3d/filamentos-lista";
-import { montarMateriais } from "@/lib/impressao-3d/filamentos";
-import type { OpcaoImpressora, OpcaoMaterial, Opcoes } from "@/lib/impressao-3d/opcoes";
+import { BlocoFilamentos } from "@/components/impressao-3d/bloco-filamentos";
+import { faltaDeEstoque, type MaterialEntrada } from "@/lib/impressao-3d/filamentos";
+import type { OpcaoImpressora, OpcaoMaterial, OpcaoMaterialCusto, Opcoes } from "@/lib/impressao-3d/opcoes";
 import type { ConfigPrecificacao, ItemOrcamento } from "@/lib/impressao-3d/tipos";
 
 export interface ProdutoOpcao {
@@ -67,9 +67,13 @@ export function Simulador({ impressoras, materiais, config, verCustos, contexto,
   const router = useRouter();
   const toast = useToast();
   const item = orcamento?.item ?? null;
-  const [estado, setEstado] = useState<EstadoSimulador>(() =>
-    item ? estadoParaEdicao(item.entrada, config) : { ...ESTADO_VAZIO, modo_preco: config.modo_preco }
-  );
+  const [estado, setEstado] = useState<EstadoSimulador>(() => {
+    const base = item ? estadoParaEdicao(item.entrada, config) : { ...ESTADO_VAZIO, modo_preco: config.modo_preco };
+    // A lista de filamentos já nasce aberta, com uma linha vazia.
+    return base.filamentos.length > 0
+      ? base
+      : { ...base, filamentos: [novaLinhaFilamento({ origem: materiais.acessivel && materiais.itens.some((m) => m.unidade === "g") ? "estoque" : "manual" })] };
+  });
   const [resultado, setResultado] = useState<ResultadoSimulacao | null>(null);
   const [desatualizado, setDesatualizado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -87,6 +91,20 @@ export function Simulador({ impressoras, materiais, config, verCustos, contexto,
   const [descricaoLivre, setDescricaoLivre] = useState("");
 
   const impressora = impressoras.itens.find((i) => i.id === estado.impressora_id);
+  // Lista de filamentos: o que vai em p_entrada.materiais, as opções do estoque (com R$/kg e saldo quando a
+  // tela os recebe) e o "faltam X g".
+  const listaMontada = montarEntrada(estado, config);
+  const opcoesFilamento = materiais.itens
+    .filter((m) => m.unidade === "g")
+    .map((m) => {
+      const c = m as Partial<OpcaoMaterialCusto>;
+      return { id: m.id, nome: m.nome, cor: m.cor, cor_hex: m.cor_hex, custo_por_g: c.custo_por_g, saldo: c.estoque_atual };
+    });
+  const materiaisLista = Array.isArray(listaMontada.entrada.materiais) ? (listaMontada.entrada.materiais as MaterialEntrada[]) : [];
+  const faltas = faltaDeEstoque(
+    materiaisLista,
+    Object.fromEntries(materiais.itens.flatMap((m) => (typeof (m as Partial<OpcaoMaterialCusto>).estoque_atual === "number" ? [[m.id, (m as OpcaoMaterialCusto).estoque_atual]] : [])))
+  );
 
   function alterar(parcial: Partial<EstadoSimulador>) {
     setEstado((e) => ({ ...e, ...parcial }));
@@ -293,28 +311,26 @@ export function Simulador({ impressoras, materiais, config, verCustos, contexto,
             />
           </div>
 
-          <details className="rounded-lg border border-zinc-800" open={estado.filamentos.length > 0}>
-            <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200">
-              Vários filamentos no mesmo trabalho (opcional)
-            </summary>
-            <div className="space-y-3 border-t border-zinc-800 p-3">
-              <FilamentosLista
-                linhas={estado.filamentos.length > 0 ? estado.filamentos : [novaLinhaFilamento({ origem: materiais.itens.length > 0 ? "estoque" : "manual" })]}
-                aoMudar={(filamentos) => alterar({ filamentos })}
-                opcoes={materiais.itens
-                  .filter((m) => m.unidade === "g")
-                  .map((m) => ({ id: m.id, nome: m.nome, cor: m.cor, cor_hex: m.cor_hex }))}
-                estoqueAcessivel={materiais.acessivel}
-                rotuloPeso="Peso no lote (g)"
-                ajudaPeso="Peso do lote inteiro (todas as unidades)."
-              />
-              {montarMateriais(estado.filamentos, 1).materiais.length > 0 && (
-                <Aviso tom="info">
-                  Com a lista de filamentos, o peso e o preço do material vêm das linhas: o material único e os pesos abaixo são ignorados.
-                </Aviso>
-              )}
-            </div>
-          </details>
+          <BlocoFilamentos
+            linhas={estado.filamentos}
+            aoMudarLinhas={(filamentos) => alterar({ filamentos })}
+            base={estado.baseFilamentos}
+            aoMudarBase={(baseFilamentos) => alterar({ baseFilamentos })}
+            quantidade={Number(estado.quantidade)}
+            opcoes={opcoesFilamento}
+            estoqueAcessivel={materiais.acessivel}
+            materiais={materiaisLista}
+            linhaIds={listaMontada.linhaIds}
+            itensCusto={resultado && !desatualizado ? resultado.calculo.detalhes.material.itens : null}
+            faltas={faltas}
+            ajudaPeso="O fatiador (Bambu Studio, Cura, PrusaSlicer) mostra o peso de cada filamento."
+          />
+          {materiaisLista.length > 0 && (
+            <Aviso tom="info">
+              Com a lista de filamentos, o peso e o preço do material vêm das linhas: o material único e os pesos abaixo são ignorados.
+              O tempo de impressão e os demais campos são do lote inteiro.
+            </Aviso>
+          )}
 
           <div data-faixa-abas className="inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
             {([["detalhado", "Peso por componente"], ["total", "Total do fatiador"]] as const).map(([k, l]) => (

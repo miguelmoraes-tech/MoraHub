@@ -25,6 +25,7 @@ export const ARQUIVOS_CALCULADORA_RAPIDA = [
   "lib/impressao-3d/calculadora-rapida.ts",
   // Montam as linhas de filamento da entrada; só convertem unidade (valor do kg ÷ 1000), nunca preço.
   "components/impressao-3d/filamentos-lista.tsx",
+  "components/impressao-3d/bloco-filamentos.tsx",
   "lib/impressao-3d/filamentos.ts",
 ];
 
@@ -51,6 +52,7 @@ export const ARQUIVOS_SEM_SALDO_NO_CLIENTE = [
   "components/impressao-3d/producao-board.tsx",
   "components/impressao-3d/pedido-detalhe.tsx",
   "components/impressao-3d/filamentos-lista.tsx",
+  "components/impressao-3d/bloco-filamentos.tsx",
   "lib/impressao-3d/pecas.ts",
   "lib/impressao-3d/filamentos.ts",
 ];

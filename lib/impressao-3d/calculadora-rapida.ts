@@ -9,7 +9,9 @@
  * e só entra o que a pessoa marcar em "Incluir também".
  */
 import { parseNumero } from "@/lib/impressao-3d/numeros";
-import { montarMateriais, novaLinhaFilamento, type LinhaFilamento } from "@/lib/impressao-3d/filamentos";
+import {
+  BASE_GRAMAS_PADRAO, fatorDaBase, montarMateriais, novaLinhaFilamento, type BaseGramas, type LinhaFilamento,
+} from "@/lib/impressao-3d/filamentos";
 import type { ConfigPrecificacao } from "@/lib/impressao-3d/tipos";
 
 export const MULTIPLICADOR_PADRAO = 5;
@@ -86,8 +88,10 @@ export type ModoPrecoRapido = "multiplicador" | "margem";
 
 export interface EstadoRapido {
   nomePeca: string;
-  /** Filamentos usados no projeto (mínimo 1 linha); o peso de cada linha é POR PEÇA (o que o fatiador mostra). */
+  /** Filamentos usados no projeto (mínimo 1 linha). */
   filamentos: LinhaFilamento[];
+  /** As gramas (e o tempo) digitados são de UMA peça (padrão, o que o fatiador mostra) ou do projeto todo. */
+  base: BaseGramas;
   impressora_id: string;
   /** Por peça (o que o fatiador mostra). */
   horas: string;
@@ -191,6 +195,7 @@ export function estadoInicialRapido(config: ConfigPrecificacao | null): EstadoRa
   return {
     nomePeca: "",
     filamentos: [novaLinhaFilamento()],
+    base: BASE_GRAMAS_PADRAO,
     impressora_id: "",
     horas: "",
     minutos: "",
@@ -207,6 +212,8 @@ export function estadoInicialRapido(config: ConfigPrecificacao | null): EstadoRa
 // --- Montagem da entrada ------------------------------------------------------------------------
 
 export interface EntradaRapida {
+  /** `id` da linha da tela de cada item de entrada.materiais (para mostrar o custo por filamento). */
+  linhaIds?: string[];
   entrada: Record<string, unknown>;
   erros: string[];
   /** Avisos de tela sobre o que ficou de fora (não vêm da RPC). */
@@ -273,11 +280,14 @@ export function montarEntradaRapida(
     if (h === null && m === null) return null;
     return (h ?? 0) + (m ?? 0) / 60;
   })();
-  entrada.horas_impressao = arredondar((horasPeca ?? 0) * x);
+  // "Por peça": gramas e tempo digitados valem para UMA peça e viram os do lote (× quantidade).
+  // "Do projeto todo": vão como informados, sem multiplicar de novo.
+  const fator = fatorDaBase(e.base, x);
+  entrada.horas_impressao = arredondar((horasPeca ?? 0) * fator);
 
-  // Filamentos: o peso de cada linha é por peça; a RPC recebe o do LOTE (peso × quantidade). Com a
-  // lista, nada de material_id/preco_por_g/peso no topo (a lista é a fonte).
-  const mats = montarMateriais(e.filamentos, x);
+  // Filamentos: a RPC recebe o peso do LOTE. Com a lista, nada de material_id/preco_por_g/peso no
+  // topo (a lista é a fonte).
+  const mats = montarMateriais(e.filamentos, fator);
   erros.push(...mats.erros);
   avisos.push(...mats.avisos);
   if (mats.materiais.length > 0) {
@@ -340,7 +350,7 @@ export function montarEntradaRapida(
   }
 
   const pronta = temPeso || (horasPeca ?? 0) > 0;
-  return { entrada, erros, avisos, pronta };
+  return { entrada, erros, avisos, pronta, linhaIds: mats.linhaIds };
 }
 
 // --- Resumo para WhatsApp -----------------------------------------------------------------------

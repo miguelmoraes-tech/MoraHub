@@ -203,7 +203,7 @@ export function PrecificacaoBoard({
         <Cartao titulo="Simulador de preço" icone={<Calculator className="h-4 w-4" />}>
           <Simulador
             impressoras={impressoras}
-            materiais={materiais}
+            materiais={materiaisComCusto.acessivel ? materiaisComCusto : materiais}
             config={config}
             verCustos
             contexto="precificacao"

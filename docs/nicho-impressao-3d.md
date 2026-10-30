@@ -899,3 +899,21 @@ Ajustes vindos do uso real:
   `p3d_resumo_investimento`; a tela só mostra. Erro do banco aparece como veio.
 - **Auditoria**: falha se uma tela somar `total_investido`/`valor_em_estoque` ou calcular saldo × custo médio
   (`lib/impressao-3d/auditoria-estoque.ts`), além da regra de não escrever `estoque_atual`/`custo_medio` direto.
+
+## Calculadora de preço: filamentos usados neste projeto
+
+O bloco **"Filamentos usados neste projeto"** (`components/impressao-3d/bloco-filamentos.tsx`) é um só, usado na
+**Calculadora rápida**, no **simulador avançado** e no **orçamento** (que usa o simulador). Já vem aberto, com uma linha vazia:
+
+- **Uma linha por filamento**: do estoque (cor em bolinha, nome e "R$ X/kg" do cadastro, com o saldo na lista) **ou** "Informar
+  na hora" (nome, cor, valor do kg → preço por g = valor do kg ÷ 1000) e as **gramas** daquele filamento.
+  "+ Adicionar filamento" e remover linha.
+- **"As gramas são: por peça | do projeto todo"** (padrão: por peça). Em "por peça" as gramas viram as do lote
+  (`peso_g = gramas × quantidade`) ao montar `p_entrada.materiais`; em "projeto todo" vão como informadas. Na calculadora a mesma
+  chave vale para o **tempo** (por peça × quantidade, ou do projeto todo). No simulador, o tempo e os demais campos são sempre do
+  lote; um item salvo reabre como "projeto todo" (o lote guardado não é multiplicado de novo).
+- **Custo de cada filamento** (maior, em negrito) vem de `calculo.detalhes.material.itens` e só é mostrado quando a contagem
+  bate com o que foi enviado; as gramas, o total ("X g por peça × N peças") e o "faltam X g" (comparação informativa com o saldo)
+  ficam em texto secundário. Nada de preço é calculado na tela.
+- A lista vai em `p_entrada.materiais` (`[{material_id, peso_g}]` ou `[{nome, peso_g, preco_por_g}]`), **sem** `material_id`,
+  `preco_por_g` ou peso no topo quando há lista. A Produção continua com a própria lista (só filamentos do estoque).

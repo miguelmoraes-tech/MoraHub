@@ -12,7 +12,7 @@ import { simularPreco } from "@/app/(dashboard)/impressao-3d/precificacao/simula
 import { salvarTarifaPadrao } from "@/app/(dashboard)/impressao-3d/precificacao/actions";
 import { usarSimulacaoEmOrcamento } from "@/app/(dashboard)/impressao-3d/orcamentos/actions";
 import { COMPOSICAO_ROTULO, lerSimulacao, type ResultadoSimulacao } from "@/lib/impressao-3d/calculo";
-import { FilamentosLista } from "@/components/impressao-3d/filamentos-lista";
+import { BlocoFilamentos } from "@/components/impressao-3d/bloco-filamentos";
 import { faltaDeEstoque, type MaterialEntrada } from "@/lib/impressao-3d/filamentos";
 import {
   EXTRAS_RAPIDOS, estadoInicialRapido, explicarMargem, explicarMultiplicador, montarEntradaRapida,
@@ -234,18 +234,21 @@ export function CalculadoraRapida({ impressoras, materiais, config, podeEditar, 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
       <div className="space-y-5">
-        <fieldset className="space-y-3">
-          <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Filamentos usados neste projeto</legend>
-          <FilamentosLista
-            linhas={estado.filamentos}
-            aoMudar={(filamentos) => alterar({ filamentos })}
-            opcoes={opcoesFilamento}
-            estoqueAcessivel={materiais.acessivel}
-            rotuloPeso="Peso por peça (g)"
-            ajudaPeso="O fatiador (Bambu Studio, Cura, PrusaSlicer) mostra o peso de cada filamento."
-            faltas={faltas}
-          />
-        </fieldset>
+        <BlocoFilamentos
+          linhas={estado.filamentos}
+          aoMudarLinhas={(filamentos) => alterar({ filamentos })}
+          base={estado.base}
+          aoMudarBase={(base) => alterar({ base })}
+          quantidade={Number(estado.quantidade)}
+          opcoes={opcoesFilamento}
+          estoqueAcessivel={materiais.acessivel}
+          materiais={Array.isArray(montada.entrada.materiais) ? (montada.entrada.materiais as MaterialEntrada[]) : []}
+          linhaIds={montada.linhaIds ?? []}
+          itensCusto={sim ? sim.calculo.detalhes.material.itens : null}
+          faltas={faltas}
+          ajudaPeso="O fatiador (Bambu Studio, Cura, PrusaSlicer) mostra o peso de cada filamento."
+          comTempo
+        />
 
         <fieldset className="space-y-3">
           <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Impressora</legend>
@@ -298,7 +301,7 @@ export function CalculadoraRapida({ impressoras, materiais, config, podeEditar, 
               step="1"
               value={estado.horas}
               onChange={(e) => alterar({ horas: e.target.value })}
-              ajuda="Tempo de impressão de UMA peça, também no fatiador."
+              ajuda={estado.base === "peca" ? "Tempo de impressão de UMA peça, também no fatiador." : "Tempo de impressão do projeto todo."}
             />
             <Numero
               rotulo="Tempo — minutos"

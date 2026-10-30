@@ -7,7 +7,9 @@
 import { parseNumero } from "@/lib/impressao-3d/numeros";
 import { entradaParaRecalculo, limparOutrosCustos, type OutroCusto } from "@/lib/impressao-3d/regras";
 import { ROTULO_PARAMETRO } from "@/lib/impressao-3d/calculo";
-import { linhasDeEntrada, montarMateriais, type LinhaFilamento } from "@/lib/impressao-3d/filamentos";
+import {
+  BASE_GRAMAS_PADRAO, fatorDaBase, linhasDeEntrada, montarMateriais, type BaseGramas, type LinhaFilamento,
+} from "@/lib/impressao-3d/filamentos";
 import type { ConfigPrecificacao } from "@/lib/impressao-3d/tipos";
 
 export type PesoModo = "detalhado" | "total";
@@ -17,6 +19,8 @@ export interface EstadoSimulador {
   material_id: string;
   /** Vários filamentos (p_entrada.materiais), pesos do LOTE. Com alguma linha preenchida, a lista vale no lugar do material único. */
   filamentos: LinhaFilamento[];
+  /** As gramas da lista são de UMA peça (padrão em item novo) ou do projeto todo (itens salvos já guardam o lote). */
+  baseFilamentos: BaseGramas;
   quantidade: string;
   pesoModo: PesoModo;
   /** Campos numéricos por chave de p_entrada (texto do formulário). */
@@ -29,6 +33,7 @@ export const ESTADO_VAZIO: EstadoSimulador = {
   impressora_id: "",
   material_id: "",
   filamentos: [],
+  baseFilamentos: BASE_GRAMAS_PADRAO,
   quantidade: "1",
   pesoModo: "detalhado",
   campos: {},
@@ -64,6 +69,8 @@ export const PARAMETROS_AVANCADOS: { chave: string; grupo: string; passo?: strin
 export interface EntradaMontada {
   entrada: Record<string, unknown>;
   erros: string[];
+  /** `id` da linha da tela de cada item de entrada.materiais (para mostrar o custo por filamento). */
+  linhaIds: string[];
 }
 
 const CHAVES_PESO_DETALHADO = ["peso_peca_g", "peso_suporte_g", "peso_brim_g", "peso_purga_g"];
@@ -97,7 +104,9 @@ export function montarEntrada(e: EstadoSimulador, config: ConfigPrecificacao | n
 
   // Lista de filamentos: quando há linha com peso, ela é a fonte do material e do peso (nada de
   // material_id, preço do material nem pesos no topo).
-  const lista = montarMateriais(e.filamentos, 1);
+  // "Por peça" multiplica pela quantidade do lote; "do projeto todo" envia como informado.
+  const qtd = parseNumero(e.quantidade);
+  const lista = montarMateriais(e.filamentos, fatorDaBase(e.baseFilamentos, qtd ?? Number.NaN));
   erros.push(...lista.erros);
   const usaLista = lista.materiais.length > 0;
   if (usaLista) entrada.materiais = lista.materiais;
@@ -141,7 +150,7 @@ export function montarEntrada(e: EstadoSimulador, config: ConfigPrecificacao | n
     erros.push("Margem (%): use um valor menor que 100.");
   }
 
-  return { entrada, erros };
+  return { entrada, erros, linhaIds: lista.linhaIds };
 }
 
 /** Texto vazio → número ou "" para preencher o formulário. */
@@ -168,6 +177,8 @@ export function estadoDeEntrada(entrada: Record<string, unknown>): EstadoSimulad
     impressora_id: typeof entrada.impressora_id === "string" ? entrada.impressora_id : "",
     material_id: typeof entrada.material_id === "string" ? entrada.material_id : "",
     filamentos: linhasDeEntrada(entrada.materiais),
+    // A lista guardada na entrada já é do LOTE: não multiplica de novo ao reabrir.
+    baseFilamentos: Array.isArray(entrada.materiais) && entrada.materiais.length > 0 ? "projeto" : BASE_GRAMAS_PADRAO,
     quantidade: txt(entrada.quantidade) || "1",
     pesoModo: typeof entrada.peso_total_g === "number" && entrada.peso_total_g > 0 ? "total" : "detalhado",
     campos,

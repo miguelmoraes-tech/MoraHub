@@ -4,7 +4,7 @@ import { getAcessoEdicao, getAcessoModulo } from "@/lib/empresa-ativa";
 import { HOME_DONO } from "@/lib/modulos/registry";
 import { CONFIG_PADRAO, entradaParaRecalculo, podeVerCustos } from "@/lib/impressao-3d/regras";
 import { ocultarCustosDoCalculo } from "@/lib/impressao-3d/calculo";
-import { getOpcoesClientes, getOpcoesImpressoras, getOpcoesMateriais } from "@/lib/impressao-3d/opcoes";
+import { getOpcoesClientes, getOpcoesImpressoras, getOpcoesMateriaisComCusto } from "@/lib/impressao-3d/opcoes";
 import { OrcamentoDetalhe } from "@/components/impressao-3d/orcamento-detalhe";
 import type { ProdutoOpcao } from "@/components/impressao-3d/simulador";
 import type { ConfigPrecificacao, ItemOrcamento, Orcamento } from "@/lib/impressao-3d/tipos";
@@ -34,7 +34,10 @@ export default async function OrcamentoDetalhePage({ params }: { params: Promise
   if (!orcamentoBruto) notFound();
   const orcamento = { custo_total: 0, lucro_total: 0, ...(orcamentoBruto as unknown as Partial<Orcamento>) } as Orcamento;
 
-  const [{ data: itens }, clientes, impressoras, materiais, { data: config }] = await Promise.all([
+  // A configuração antes dos materiais: ela diz qual custo (cadastro ou médio) mostrar em "R$/kg".
+  const { data: config } = await supabase.from("p3d_config_precificacao").select(COLUNAS_CONFIG).eq("workspace_id", ws).maybeSingle();
+
+  const [{ data: itens }, clientes, impressoras, materiais] = await Promise.all([
     supabase
       .from("p3d_orcamento_itens")
       .select(verCustos ? `${COLUNAS_ITEM}, custo_total, lucro` : COLUNAS_ITEM)
@@ -43,8 +46,7 @@ export default async function OrcamentoDetalhePage({ params }: { params: Promise
       .order("ordem", { ascending: true }),
     getOpcoesClientes(),
     getOpcoesImpressoras(),
-    getOpcoesMateriais(),
-    supabase.from("p3d_config_precificacao").select(COLUNAS_CONFIG).eq("workspace_id", ws).maybeSingle(),
+    getOpcoesMateriaisComCusto(config?.base_custo_material === "medio" ? "medio" : "cadastro"),
   ]);
 
   // Produtos e variações para preencher um item (só para quem edita e vê o catálogo).
