@@ -9,7 +9,7 @@ import {
   limparCodigoAcesso,
 } from "@/lib/vendedor-shared";
 
-export function CodigoVendedorForm() {
+export function CodigoVendedorForm({ autoFocar = true }: { /** false quando há outro campo na tela que já pega o foco. */ autoFocar?: boolean }) {
   const [state, formAction, pending] = useActionState(
     solicitarAcesso,
     undefined
@@ -34,7 +34,7 @@ export function CodigoVendedorForm() {
           autoComplete="off"
           autoCapitalize="characters"
           spellCheck={false}
-          autoFocus
+          autoFocus={autoFocar}
           placeholder="XXXXX-XXXXX"
           className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-center font-mono text-lg uppercase tracking-[0.2em] text-zinc-100 placeholder:text-zinc-700 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
         />

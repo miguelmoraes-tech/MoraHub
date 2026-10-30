@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getDashboardHomeOverview } from "@/lib/dashboard-home/get-overview";
 import { DashboardHomeBoard } from "@/components/dashboard-home/dashboard-home-board";
 import { NOVA_EMPRESA } from "@/lib/empresa";
+import { ACESSO_VENDEDOR_CODIGO } from "@/lib/vendedor-access";
 import { tipoContaDaMetadata } from "@/lib/perfil";
 import { getEmpresaAtiva } from "@/lib/empresa-ativa";
 
@@ -37,12 +38,20 @@ export default async function DashboardHomePage() {
             <p className="text-sm font-medium text-zinc-100">Você ainda não tem uma empresa</p>
             <p className="text-sm text-zinc-500">Crie a sua para usar os módulos do Hub.</p>
           </div>
-          <Link
-            href={NOVA_EMPRESA}
-            className="rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
-          >
-            Criar minha empresa
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={NOVA_EMPRESA}
+              className="rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
+            >
+              Criar minha empresa
+            </Link>
+            <Link
+              href={ACESSO_VENDEDOR_CODIGO}
+              className="rounded-lg border border-zinc-700 px-3.5 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
+            >
+              Entrar numa empresa com código
+            </Link>
+          </div>
         </div>
       </div>
     );

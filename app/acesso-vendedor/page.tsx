@@ -7,10 +7,12 @@ import { CodigoVendedorForm } from "@/components/vendedor/codigo-vendedor-form";
 import { NOVA_EMPRESA } from "@/lib/empresa";
 import { getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 
-export default async function CodigoDoGestorPage() {
+export default async function CodigoDoGestorPage({ searchParams }: { searchParams: Promise<{ outro?: string }> }) {
+  const { outro } = await searchParams;
   const { email, ultima } = await requireUsuarioComSolicitacao();
   const temEmpresa = (await getEmpresasDoUsuario()).length > 0;
-  if (ultima?.status === "pendente") redirect(ACESSO_VENDEDOR_AGUARDANDO);
+  // Com pedido pendente vai para a espera, a não ser que a pessoa tenha pedido "Digitar outro código" (?outro=1).
+  if (ultima?.status === "pendente" && outro !== "1") redirect(ACESSO_VENDEDOR_AGUARDANDO);
 
   return (
     <div className="space-y-6">

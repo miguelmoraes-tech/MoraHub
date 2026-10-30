@@ -8,6 +8,7 @@ import { verificarSolicitacaoVendedor } from "@/lib/actions/vendedor-codigo";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/format";
 import { ACESSO_VENDEDOR_CODIGO } from "@/lib/vendedor-access";
+import { NOVA_EMPRESA } from "@/lib/empresa";
 import {
   SOLICITACAO_POLL_INTERVAL_MS,
   type SolicitacaoVendedorStatus,
@@ -103,7 +104,7 @@ export function AguardandoAprovacao({
         <h1 className="text-xl font-semibold tracking-tight text-zinc-50">
           Pedido enviado
         </h1>
-        <p className="mt-1 text-sm font-medium text-zinc-300">Aguarde a aprovação do fundador.</p>
+        <p className="mt-1 text-sm font-medium text-zinc-300">Aguarde a aprovação do fundador da empresa.</p>
         <p className="mt-1 text-sm text-zinc-500">
           Pedido enviado em{" "}
           {formatDate(enviadoEm.slice(0, 10))}
@@ -119,11 +120,27 @@ export function AguardandoAprovacao({
         <RefreshCw className={`h-4 w-4 ${verificando ? "animate-spin" : ""}`} />
         {verificando ? "Verificando..." : "Verificar"}
       </button>
-      {temEmpresa && (
-        <Link href="/" className="block text-xs font-medium text-zinc-400 hover:text-zinc-200">
-          Voltar para a minha empresa
+      <div className="space-y-2">
+        {!temEmpresa && (
+          <Link
+            href={NOVA_EMPRESA}
+            className="flex w-full items-center justify-center rounded-lg border border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
+          >
+            Criar minha própria empresa enquanto isso
+          </Link>
+        )}
+        <Link
+          href={`${ACESSO_VENDEDOR_CODIGO}?outro=1`}
+          className="flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:text-zinc-200"
+        >
+          Digitar outro código
         </Link>
-      )}
+        {temEmpresa && (
+          <Link href="/" className="block text-xs font-medium text-zinc-400 hover:text-zinc-200">
+            Voltar para a minha empresa
+          </Link>
+        )}
+      </div>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { LogOut } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
 
-/** Shell sem sidebar da tela de criação da primeira empresa. */
+/** Shell sem sidebar da tela "Como você quer começar?" (criar a empresa ou entrar numa com código). */
 export default function NovaEmpresaLayout({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
@@ -33,7 +33,7 @@ export default function NovaEmpresaLayout({ children }: { children: React.ReactN
           </form>
         </header>
         <div className="flex flex-1 items-center justify-center px-4 py-10">
-          <div className="w-full max-w-md">{children}</div>
+          <div className="w-full max-w-3xl">{children}</div>
         </div>
       </div>
     </ToastProvider>

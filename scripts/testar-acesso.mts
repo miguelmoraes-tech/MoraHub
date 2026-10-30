@@ -4303,7 +4303,7 @@ await teste("\"Entrar numa empresa com código\" é alcançável por QUALQUER us
   assert.ok(pagina.includes("Entrar numa empresa com código") && pagina.includes("cofundador"));
   assert.ok(!pagina.includes("tipo_conta_padrao") && !pagina.includes("comercial"), "a tela não exige conta de funcionário");
   const espera = lerFonte("components/vendedor/aguardando-aprovacao.tsx");
-  assert.ok(espera.includes("Pedido enviado") && espera.includes("Aguarde a aprovação do fundador.") && espera.includes("seletor de empresas"));
+  assert.ok(espera.includes("Pedido enviado") && espera.includes("Aguarde a aprovação do fundador da empresa.") && espera.includes("seletor de empresas"));
   const acao = lerFonte("lib/actions/vendedor-codigo.ts");
   assert.ok(acao.includes("gravarEmpresaAtiva(alvo.workspaceId)") && acao.includes("listarEmpresas(supabase)"), "ao aprovar, a empresa entra no seletor e vira a ativa");
 });
@@ -4323,6 +4323,77 @@ await teste("pessoas da empresa inclui pessoas_da_empresa sem repetir ninguém",
   assert.deepEqual(pessoas.map((p) => p.membroId), ["u1", "u9", "u3"], "u9 (só em pessoas_da_empresa) entra; vendedor fica fora; sem repetir");
   assert.equal(pessoas.find((p) => p.membroId === "u9")?.semMembro, true);
   assert.ok(lerFonte("app/(dashboard)/socios/page.tsx").includes('rpc("pessoas_da_empresa"'));
+});
+
+console.log("\nEmpreendedor sem empresa: criar a empresa OU entrar com código");
+await teste("a tela de empreendedor sem empresa oferece as duas opções lado a lado (empilhadas no mobile), com o componente e a ação de sempre", () => {
+  const tela = lerFonte("app/nova-empresa/page.tsx");
+  assert.ok(tela.includes('grid gap-4 md:grid-cols-2'), "lado a lado no desktop, empilhadas no mobile");
+  assert.ok(tela.includes("Criar minha empresa") && tela.includes("Entrar numa empresa com código"));
+  assert.ok(tela.includes("<NovaEmpresaForm nichos={nichos} />") && tela.includes("<CodigoVendedorForm autoFocar={false} />"), "mesmo formulário de criar e MESMO formulário de código");
+  assert.ok(tela.includes('import { CodigoVendedorForm } from "@/components/vendedor/codigo-vendedor-form"'));
+  assert.ok(tela.indexOf("Criar minha empresa") < tela.indexOf("Entrar numa empresa com código"));
+  assert.ok(tela.includes("Como você quer começar?"));
+  // Mostrada também a quem já tem empresa (a tela de "Criar minha empresa" por outro caminho): as duas opções sempre.
+  assert.ok(!/primeira\s*&&\s*\(\s*<section/.test(tela), "a opção de código não depende de ser a primeira empresa");
+  const form = lerFonte("components/vendedor/codigo-vendedor-form.tsx");
+  assert.ok(form.includes("solicitarAcesso") && form.includes("autoFocar"), "ação existente solicitarAcesso");
+  assert.equal((lerFonte("lib/actions/vendedor-codigo.ts").match(/rpc\("solicitar_acesso"/g) ?? []).length, 1, "uma única ação de código (solicitar_acesso)");
+  for (const arq of ["app/nova-empresa/page.tsx", "components/vendedor/codigo-vendedor-form.tsx", "components/vendedor/aguardando-aprovacao.tsx", "app/acesso-vendedor/page.tsx", "app/acesso-vendedor/aguardando/page.tsx"]) {
+    assert.ok(!/\.from\("(solicitacoes_vendedor|membros|convites)"\)\s*\.(insert|update|upsert|delete)\(/.test(lerFonte(arq)), `${arq} não escreve direto`);
+  }
+  assert.ok(lerFonte("app/(dashboard)/dashboard/page.tsx").includes("Entrar numa empresa com código"), "o cartão 'sem empresa' também oferece o código");
+  assert.ok(lerFonte("components/sidebar.tsx").includes("Entrar numa empresa com código"), "menu lateral");
+  const login = lerFonte("lib/actions/auth.ts");
+  assert.ok(login.includes("redirect(NOVA_EMPRESA)"), "o empreendedor sem empresa cai na tela de escolha");
+});
+await teste("depois de enviar o código: espera com 'Criar minha própria empresa enquanto isso' e 'Digitar outro código'; erros como vieram", () => {
+  const espera = lerFonte("components/vendedor/aguardando-aprovacao.tsx");
+  assert.ok(espera.includes("Pedido enviado") && espera.includes("Aguarde a aprovação do fundador da empresa."));
+  assert.ok(espera.includes("Criar minha própria empresa enquanto isso") && espera.includes("href={NOVA_EMPRESA}"));
+  assert.ok(espera.includes("Digitar outro código") && espera.includes("`${ACESSO_VENDEDOR_CODIGO}?outro=1`"));
+  assert.ok(espera.includes("!temEmpresa"), "'criar a própria' só para quem ainda não tem empresa");
+  const codigo = lerFonte("app/acesso-vendedor/page.tsx");
+  assert.ok(codigo.includes('ultima?.status === "pendente" && outro !== "1"'), "?outro=1 evita o redirecionamento para a espera");
+  for (const msg of ["Código inválido.", "Código já utilizado.", "Código expirado.", "Este é o seu próprio código.", "Você já tem acesso a esta empresa.", "Você já tem um pedido pendente."]) {
+    assert.equal(solicitarAcessoErrorMessage(msg), msg, msg);
+  }
+});
+await teste("o proxy não entra em loop com pedido pendente (sem empresa): escolha, código e espera sempre seguem; destinos estabilizam", () => {
+  const telas = [NOVA_EMPRESA, ACESSO_VENDEDOR_CODIGO, ACESSO_VENDEDOR_AGUARDANDO];
+  for (const funcionarioSemVinculo of [false, true]) {
+    for (const path of telas) {
+      const d = decidirAcesso({ path, resolucao: { status: "sem_empresa" }, habilitados: [], funcionarioSemVinculo });
+      assert.equal(d.tipo, "seguir", `${path} (funcionarioSemVinculo=${funcionarioSemVinculo})`);
+    }
+  }
+  // Quem não tem empresa e não é "funcionário": /dashboard segue (a página manda para a escolha) e nenhum destino aponta de volta ao ponto de partida.
+  const home = decidirAcesso({ path: "/dashboard", resolucao: { status: "sem_empresa" }, habilitados: [], funcionarioSemVinculo: false });
+  assert.equal(home.tipo, "seguir");
+  // Funcionário sem vínculo: qualquer outra rota vai ao código, e o código segue (ponto fixo em um salto).
+  const outra = decidirAcesso({ path: "/clientes", resolucao: { status: "sem_empresa" }, habilitados: [], funcionarioSemVinculo: true });
+  assert.deepEqual(outra, { tipo: "redirecionar", para: ACESSO_VENDEDOR_CODIGO });
+  assert.equal(decidirAcesso({ path: ACESSO_VENDEDOR_CODIGO, resolucao: { status: "sem_empresa" }, habilitados: [], funcionarioSemVinculo: true }).tipo, "seguir");
+  // As páginas não mandam de volta: a escolha nunca redireciona (só ao login), a espera nunca redireciona se pendente.
+  const nova = lerFonte("app/nova-empresa/page.tsx");
+  assert.deepEqual([...nova.matchAll(/redirect\(([^)]*)\)/g)].map((m) => m[1]), ['"/login"'], "a tela de escolha só redireciona para o login");
+  const espera = lerFonte("app/acesso-vendedor/aguardando/page.tsx");
+  assert.ok(espera.includes('if (ultima.status === "aprovado")') && !/pendente[^\n]*redirect/.test(espera), "pendente fica na espera");
+  assert.ok(nova.includes('ultima?.status === "pendente"') && nova.includes("ACESSO_VENDEDOR_AGUARDANDO"), "aviso de pedido pendente, sem redirecionar");
+});
+await teste("quando o pedido é aprovado a empresa entra no seletor e vira a ativa; o painel depende do PAPEL na empresa ativa", () => {
+  const acao = lerFonte("lib/actions/vendedor-codigo.ts");
+  assert.ok(acao.includes("listarEmpresas(supabase)") && acao.includes("gravarEmpresaAtiva(alvo.workspaceId)") && acao.includes('alvo.papel === "comercial" ? VENDEDOR_HOME : HOME_DONO'));
+  // Empreendedor que entra como cofundador/sócio: a decisão é pela empresa ativa, não pelo tipo de conta.
+  const base = { habilitados: MODULOS_MINIMOS, permissoes: ["p3d_estoque"], permiteMembros: MODULOS_MINIMOS, funcionarioSemVinculo: false } as const;
+  const em = (papel: "dono" | "cofundador" | "socio" | "funcionario" | "comercial", path: string) =>
+    decidirAcesso({ path, resolucao: { status: "ok", workspaceId: WS_A, papel, corrigirCookie: false }, ...base });
+  assert.equal(em("cofundador", "/dashboard").tipo, "seguir", "cofundador: painel completo");
+  assert.equal(em("cofundador", "/impressao-3d/estoque").tipo, "seguir");
+  assert.equal(em("socio", "/impressao-3d/estoque").tipo, "seguir", "sócio: módulos permitidos");
+  assert.equal(em("socio", "/impressao-3d/impressoras").tipo, "redirecionar", "sócio: só o que a permissão libera");
+  assert.deepEqual(em("comercial", "/dashboard"), { tipo: "redirecionar", para: VENDEDOR_HOME }, "vendedor: só /vendedor/*");
+  assert.equal(decidirAcesso({ path: "/dashboard", resolucao: { status: "ok", workspaceId: WS_B, papel: "dono", corrigirCookie: false }, ...base }).tipo, "seguir", "a mesma conta, em outra empresa, é dono");
 });
 
 console.log(`\n${total} testes`);
