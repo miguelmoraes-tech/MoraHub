@@ -62,7 +62,24 @@
   background-color: var(--scrollbar-polegar-hover);
 }
 
+/* Rede de segurança contra a rolagem horizontal "solta" no celular. O conteúdo que PRECISA rolar para o lado
+   (tabelas largas, abas, kanban) rola dentro do próprio contêiner, nunca a página. O fundo do html/body usa a
+   cor do tema para o efeito elástico nunca mostrar uma área branca/vazia. */
+html {
+  background-color: var(--background);
+  max-width: 100%;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
+  max-width: 100%;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+  background-color: var(--background);
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
@@ -86,4 +103,110 @@ body {
 
 .hub-mode-fade-in {
   animation: hub-mode-fade-in 220ms ease-out;
+}
+
+
+/* --- Celular e tablet (< 1024 px) --------------------------------------------------------------- */
+
+/* A gaveta aberta trava a rolagem do conteúdo (o fundo não anda por baixo). */
+html[data-menu-aberto] main {
+  overflow: hidden;
+}
+
+@media (max-width: 1023.98px) {
+  /* Campos com 16 px: o iOS não dá zoom ao focar. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Alvos de toque de pelo menos 44 px (botões, selects e campos). Só aparelhos de toque. */
+  @media (pointer: coarse) {
+    button,
+    select,
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+    [role="button"],
+    summary {
+      min-height: 44px;
+    }
+    button:not(:has(> :not(svg))):not([class*="px-"]),
+    [role="button"]:not([class*="px-"]) {
+      min-width: 44px;
+    }
+  }
+
+  /* Tabelas rolam dentro delas mesmas (nunca a página inteira). */
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 639.98px) {
+  /* Formulários em 1 coluna: campos de largura total. `col-span-2` vira auto para não criar coluna implícita. */
+  form .grid.grid-cols-2,
+  form .grid.grid-cols-3,
+  form .grid.grid-cols-4,
+  form .grid.grid-cols-5 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  form .grid.grid-cols-2 > .col-span-2,
+  form .grid.grid-cols-3 > .col-span-2,
+  form .grid.grid-cols-3 > .col-span-3,
+  form .grid.grid-cols-4 > .col-span-2,
+  form .grid.grid-cols-4 > .col-span-3,
+  form .grid.grid-cols-4 > .col-span-4,
+  form .grid.grid-cols-5 > .col-span-2 {
+    grid-column: auto;
+  }
+}
+
+/* Faixa de abas: rola na horizontal, sem quebrar linha, com encaixe suave. */
+.faixa-abas {
+  display: flex;
+  max-width: 100%;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.faixa-abas::-webkit-scrollbar {
+  display: none;
+}
+.faixa-abas > * {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  white-space: nowrap;
+}
+
+/* Diálogos (<dialog>): no celular viram folha de baixo, nunca maiores que a tela (100dvh), com o cabeçalho
+   parado e o conteúdo rolando. A busca global (alinhada ao topo) segue como está. */
+@media (max-width: 639.98px) {
+  dialog[open].items-center {
+    align-items: flex-end;
+    padding: 0;
+  }
+  dialog[open].items-center > div:first-child {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    max-height: 100dvh;
+    overflow: hidden;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  dialog[open].items-center > div:first-child > form,
+  dialog[open].items-center > div:first-child > div:not(:first-child) {
+    max-height: none;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }

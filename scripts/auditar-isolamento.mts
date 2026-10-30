@@ -774,3 +774,22 @@ if (navegacaoForaDoContrato.length) process.exitCode = 1;
   for (const s of problemas) console.log("  ! " + s);
   if (problemas.length) process.exitCode = 1;
 }
+
+// --- Celular: nada de w-screen/100vw em contêiner de página nem largura fixa > 360 px sem max-w ----------------
+// A rolagem horizontal "solta" no celular vem de larguras que passam da tela. Tabelas largas só podem ter
+// min-w-[N px] dentro de um contêiner com rolagem própria (overflow-x-auto no mesmo arquivo).
+{
+  const caminhoLayout = "../lib/auditoria-layout-mobile.ts";
+  const { achadosLayoutMobile } = (await import(caminhoLayout)) as typeof import("../lib/auditoria-layout-mobile");
+  const layoutRuim: string[] = [];
+  for (const pasta of ["app", "components"]) {
+    for (const arq of arquivos(join(raiz, pasta))) {
+      const rel = relative(raiz, arq).replace(/\\/g, "/");
+      if (!/\.tsx$/.test(rel) || /^app\/colaborador\//.test(rel) || /^components\/colaborador\//.test(rel)) continue;
+      for (const a of achadosLayoutMobile(readFileSync(arq, "utf8"))) layoutRuim.push(`${rel}: ${a.regra} (${a.trecho.slice(0, 80)})`);
+    }
+  }
+  console.log(`\nCelular: larguras que estouram a tela (w-screen/100vw/largura fixa > 360 px): ${layoutRuim.length}`);
+  for (const s of layoutRuim) console.log("  ! " + s);
+  if (layoutRuim.length) process.exitCode = 1;
+}

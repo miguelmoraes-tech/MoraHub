@@ -452,7 +452,7 @@ function Linha({
       </div>
       {aberto && (
         <div className="space-y-3 border-t border-zinc-800/80 p-3">
-          <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+          <div data-faixa-abas className="inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
             {([
               ["dados", "Dados"],
               ["pecas", `Peças de desgaste (${pecas.length})`],

@@ -101,7 +101,7 @@ export function SuporteBoard({
       <SuporteOverviewCards overview={overview} />
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="inline-flex flex-wrap rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+        <div data-faixa-abas className="inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
           {STATUS_TABS.map((tab) => (
             <button
               key={tab.value}

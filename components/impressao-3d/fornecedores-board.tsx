@@ -321,7 +321,7 @@ export function FornecedoresBoard({
       )}
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+        <div data-faixa-abas className="inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
           {([["compras", "Compras"], ["fornecedores", "Fornecedores"], ["precos", "Preços"]] as const).filter(([k]) => abas.includes(k)).map(([k, l]) => (
             <button
               key={k}

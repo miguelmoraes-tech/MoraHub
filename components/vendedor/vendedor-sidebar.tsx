@@ -28,8 +28,55 @@ export function VendedorSidebar({
 }) {
   const pathname = usePathname();
 
+  const barraMovel = (
+    <header className="shrink-0 border-b border-zinc-900 bg-zinc-950 pt-[env(safe-area-inset-top)] lg:hidden">
+      <div className="flex items-center gap-2 px-3 pt-2">
+        <Image src="/logo.png" alt="Mora HUB" width={53} height={28} className="h-6 w-auto shrink-0 object-contain" priority />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-zinc-50">
+          Mora <span className="text-copper-400">HUB</span>
+        </span>
+        <span className="rounded-full border border-teal-700/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-teal-400">
+          Vendedor
+        </span>
+        <form action={logout}>
+          <button
+            type="submit"
+            aria-label="Sair"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-zinc-400 outline-none hover:bg-zinc-900 hover:text-rose-300 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-500"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </form>
+      </div>
+      <div className="px-3 pb-2 pt-1">
+        <EmpresaSwitcher empresas={empresas} ativaId={empresaAtivaId} />
+      </div>
+      <nav aria-label="Menu do vendedor" className="faixa-abas px-3 pb-2">
+        {ITEMS.map((item) => {
+          const Icon = item.icon;
+          const active = pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={`flex h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium ${
+                active ? "bg-copper-600/15 text-copper-300" : "text-zinc-400 hover:bg-zinc-900"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+    </header>
+  );
+
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
+    <>
+    {barraMovel}
+    <aside className="hidden h-full w-60 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950 lg:flex">
       <div className="flex items-center gap-2.5 px-5 py-6">
         <Image
           src="/logo.png"
@@ -95,5 +142,6 @@ export function VendedorSidebar({
         </form>
       </div>
     </aside>
+    </>
   );
 }

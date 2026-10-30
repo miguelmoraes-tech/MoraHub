@@ -184,6 +184,11 @@ import { rotuloDoTipo as rotuloTipoAprovacao } from "@/lib/aprovacoes-shared";
 import { ACESSO_VENDEDOR_AGUARDANDO } from "@/lib/vendedor-access";
 import { GRUPO_EMPRESA } from "@/lib/modulos/preferencias";
 import { CHAVE_ROLAGEM_SIDEBAR, gravarRolagem, lerRolagem } from "@/lib/sidebar-rolagem";
+import {
+  LARGURA_BARRA_FIXA_PX, MEDIA_BARRA_FIXA, TITULO_PADRAO, ZONA_BORDA_PX, decidirGesto, deslocamentoGaveta, larguraDaGaveta,
+  modoSidebar, opacidadeDoFundo, tituloDaTela,
+} from "@/lib/sidebar-mobile";
+import { achadosLayoutMobile } from "@/lib/auditoria-layout-mobile";
 import { ARQUIVOS_CALCULADORA_RAPIDA, precoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
 import { FRASE_MODULO } from "@/lib/impressao-3d/frases-modulos";
 
@@ -4084,7 +4089,7 @@ await teste("barra lateral: só o rodapé é fixo; cabeçalho, busca, seletores 
   const iFimNav = side.indexOf("</nav>");
   const iRodape = side.indexOf("{/* Rodapé fixo");
   assert.ok(iAside > 0 && iRol > iAside && iNav > iRol && iFimNav > iNav && iRodape > iFimNav, "ordem: aside > área rolável > nav > rodapé");
-  assert.ok(/<aside className="flex h-dvh w-64 shrink-0 flex-col/.test(side), "aside: altura da tela (dvh) em coluna");
+  assert.ok(/<aside[\s\S]*?className=\{`fixed inset-y-0 left-0 z-50 flex h-dvh w-\[min\(86vw,320px\)\] flex-col[^`]*lg:static[^`]*lg:w-64/.test(side), "aside: altura da tela (dvh) em coluna; gaveta no celular e barra de 256 px no desktop");
   assert.ok(/className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"/.test(side), "área rolável: min-h-0 + flex-1 + overflow-y-auto");
   assert.equal((side.match(/overflow-y-auto/g) ?? []).length, 1, "uma única área rolável");
   const rolavel = side.slice(iRol, iRodape);
@@ -4094,7 +4099,7 @@ await teste("barra lateral: só o rodapé é fixo; cabeçalho, busca, seletores 
   assert.ok(/className="shrink-0 border-t border-zinc-900/.test(rodape), "rodapé shrink-0 com borda superior");
   for (const item of ["{userEmail}", "Personalizar navegação", "Entrar numa empresa com código", "Sair"]) assert.ok(rodape.includes(item), `rodapé tem ${item}`);
   for (const fora of ["<GlobalSearch", "gruposMenu.map(", "<EmpresaSwitcher"]) assert.ok(!rodape.includes(fora), `${fora} não está no rodapé`);
-  assert.ok(lerFonte("app/(dashboard)/layout.tsx").includes('<div className="flex h-dvh overflow-hidden">'), "layout em dvh");
+  assert.ok(lerFonte("app/(dashboard)/layout.tsx").includes('<div className="flex h-dvh flex-col overflow-hidden lg:flex-row">'), "layout em dvh");
 });
 await teste("barra de rolagem fina e discreta no tema escuro (tokens do app), sem layout shift", () => {
   const css = lerFonte("app/globals.css");
@@ -4394,6 +4399,135 @@ await teste("quando o pedido é aprovado a empresa entra no seletor e vira a ati
   assert.equal(em("socio", "/impressao-3d/impressoras").tipo, "redirecionar", "sócio: só o que a permissão libera");
   assert.deepEqual(em("comercial", "/dashboard"), { tipo: "redirecionar", para: VENDEDOR_HOME }, "vendedor: só /vendedor/*");
   assert.equal(decidirAcesso({ path: "/dashboard", resolucao: { status: "ok", workspaceId: WS_B, papel: "dono", corrigirCookie: false }, ...base }).tipo, "seguir", "a mesma conta, em outra empresa, é dono");
+});
+
+console.log("\nCelular: menu retrátil e rolagem horizontal");
+await teste("modo da barra lateral por largura: gaveta abaixo de 1024 px, fixa a partir dele (celular e tablet usam a gaveta)", () => {
+  assert.equal(LARGURA_BARRA_FIXA_PX, 1024);
+  assert.equal(MEDIA_BARRA_FIXA, "(min-width: 1024px)");
+  for (const w of [320, 360, 390, 414, 768, 820, 1023]) assert.equal(modoSidebar(w), "gaveta", String(w));
+  for (const w of [1024, 1280, 1920]) assert.equal(modoSidebar(w), "fixa", String(w));
+  assert.equal(larguraDaGaveta(360), 310, "86% de 360");
+  assert.equal(larguraDaGaveta(390), 320, "limitada a 320");
+  assert.equal(larguraDaGaveta(768), 320);
+});
+const p0 = (x: number, y: number, t = 0) => ({ x, y, t });
+await teste("gesto: abrir da borda esquerda (35% da largura ou velocidade), fechar arrastando para a esquerda; vertical e área rolável são ignorados", () => {
+  const L = 320;
+  const g = (inicio: ReturnType<typeof p0>, fim: ReturnType<typeof p0>, aberto: boolean, extra: object = {}) => decidirGesto({ inicio, fim, aberto, larguraGaveta: L, ...extra });
+  // Fechada: precisa começar na borda (≤ 24 px) e ir para a direita.
+  assert.equal(g(p0(10, 300, 0), p0(150, 310, 900), false), "abrir", "140 px ≥ 35% de 320 (112 px), devagar");
+  assert.equal(g(p0(24, 300, 0), p0(140, 300, 900), false), "abrir", "exatamente na borda de 24 px");
+  assert.equal(g(p0(25, 300, 0), p0(300, 300, 200), false), "ignorar", "começou fora da zona de borda");
+  assert.equal(g(p0(10, 300, 0), p0(100, 300, 900), false), "ignorar", "curto e lento: abaixo do limiar");
+  assert.equal(g(p0(10, 300, 0), p0(70, 300, 100), false), "abrir", "curto mas rápido (0,6 px/ms, ≥ 40 px)");
+  assert.equal(g(p0(10, 300, 0), p0(30, 300, 10), false), "ignorar", "rápido demais mas percurso < 40 px");
+  assert.equal(g(p0(10, 300, 0), p0(-100, 300, 500), false), "ignorar", "para o lado errado");
+  // Aberta: arrastar para a esquerda fecha.
+  assert.equal(g(p0(250, 300, 0), p0(100, 305, 800), true), "fechar");
+  assert.equal(g(p0(250, 300, 0), p0(60, 300, 100), true), "fechar", "rápido");
+  assert.equal(g(p0(250, 300, 0), p0(220, 300, 900), true), "ignorar", "curto e lento");
+  assert.equal(g(p0(100, 300, 0), p0(250, 300, 200), true), "ignorar", "para a direita com a gaveta aberta");
+  // Vertical (rolagem) e área rolável na horizontal.
+  assert.equal(g(p0(10, 300, 0), p0(60, 500, 300), false), "ignorar", "majoritariamente vertical");
+  assert.equal(g(p0(250, 100, 0), p0(150, 400, 300), true), "ignorar", "vertical com a gaveta aberta");
+  assert.equal(g(p0(10, 300, 0), p0(200, 300, 300), false, { iniciouEmRolavelHorizontal: true }), "ignorar", "começou numa tabela/abas");
+  assert.equal(ZONA_BORDA_PX, 24);
+  // Acompanhar o dedo: nunca sai do intervalo [-largura, 0] e o fundo escurece junto.
+  assert.equal(deslocamentoGaveta(100, false, L), -220);
+  assert.equal(deslocamentoGaveta(500, false, L), 0);
+  assert.equal(deslocamentoGaveta(-50, false, L), -L);
+  assert.equal(deslocamentoGaveta(-100, true, L), -100);
+  assert.equal(deslocamentoGaveta(80, true, L), 0);
+  assert.equal(opacidadeDoFundo(0, L), 1);
+  assert.equal(opacidadeDoFundo(-L, L), 0);
+  assert.equal(opacidadeDoFundo(-160, L), 0.5);
+  assert.equal(opacidadeDoFundo(0, 0), 0);
+});
+await teste("título da barra superior: item de menu mais específico; rota filha usa o pai; sem casar, o padrão", () => {
+  const itens = [
+    { href: "/dashboard", label: "Visão Geral" },
+    { href: "/impressao-3d/pedidos", label: "Pedidos e vendas" },
+    { href: "/impressao-3d", label: "Impressão 3D" },
+    { href: "/socios", label: "Equipe e cofundadores" },
+  ];
+  assert.equal(tituloDaTela("/dashboard", itens), "Visão Geral");
+  assert.equal(tituloDaTela("/impressao-3d/pedidos", itens), "Pedidos e vendas");
+  assert.equal(tituloDaTela("/impressao-3d/pedidos/abc", itens), "Pedidos e vendas", "o mais específico");
+  assert.equal(tituloDaTela("/impressao-3d/estoque", itens), "Impressão 3D");
+  assert.equal(tituloDaTela("/sociosx", itens), TITULO_PADRAO, "prefixo só em fronteira de segmento");
+  assert.equal(tituloDaTela("/qualquer", []), "Mora HUB");
+});
+await teste("menu retrátil: um só componente com dois modos, gaveta acessível e fechando como pedido", () => {
+  const side = lerFonte("components/sidebar.tsx");
+  assert.equal((side.match(/export function Sidebar\(/g) ?? []).length, 1, "um só componente");
+  assert.ok(side.includes("useModoSidebar()") && side.includes("decidirGesto(") && side.includes("tituloDaTela("));
+  // Barra superior: sanduíche ≥ 44 px, título truncado e sinos; só no celular/tablet.
+  assert.ok(side.includes('aria-label="Abrir menu"') && /h-11 w-11[^"]*"[\s\S]{0,40}>\s*<Menu/.test(side), "sanduíche 44×44");
+  assert.ok(side.includes("truncate text-sm font-semibold") && side.includes("lg:hidden"));
+  assert.ok(side.includes('aria-label="Fechar menu"') && side.includes('aria-controls="menu-lateral"') && side.includes("aria-expanded={aberto}"));
+  // Gaveta: dialog modal, largura min(86vw,320px), dvh, safe-area, translateX com redução de movimento.
+  assert.ok(side.includes('role={gaveta ? "dialog" : undefined}') && side.includes("aria-modal={gaveta ? true : undefined}"));
+  assert.ok(side.includes("w-[min(86vw,320px)]") && side.includes("h-dvh") && side.includes("-translate-x-full") && side.includes("motion-reduce:transition-none"));
+  assert.ok(side.includes("env(safe-area-inset-top)") && side.includes("env(safe-area-inset-bottom)"));
+  assert.ok(side.includes("lg:static") && side.includes("lg:translate-x-0") && side.includes("lg:w-64"), "no desktop a barra continua fixa de 256 px");
+  // Fechar: fundo, X, Esc, trocar de página (aberto preso à rota), arrastar; abrir: sanduíche e gesto.
+  assert.ok(side.includes("onClick={fechar}") && side.includes('e.key === "Escape"') && side.includes("abertoEm === pathname"));
+  // Foco preso, fundo travado, foco devolvido ao botão.
+  assert.ok(side.includes('e.key !== "Tab"') && side.includes("primeiro.focus()") && side.includes("ultimo.focus()") && side.includes("botao?.focus("));
+  assert.ok(side.includes('document.body.style.overflow = "hidden"') && side.includes('setAttribute("data-menu-aberto"') && side.includes("inert={gaveta && !aberto ? true : undefined}"));
+  // Gesto ignora área rolável na horizontal e acompanha o dedo.
+  assert.ok(side.includes("dentroDeRolavelHorizontal(e.target)") && side.includes("deslocamentoGaveta(arrasto.dx") && side.includes("opacidadeDoFundo("));
+  // Mesma estrutura de antes: área rolável + rodapé fixo; menu e rolagem preservados (o aside nunca desmonta).
+  assert.ok(side.includes("data-sidebar-scroll") && side.includes("Rodapé fixo") && side.includes("lerRolagem(window.sessionStorage)"));
+  const css = lerFonte("app/globals.css");
+  assert.ok(css.includes("html[data-menu-aberto] main"));
+});
+await teste("layout: viewport-fit=cover, fundo do tema sem área vazia e nada de rolagem horizontal da página", () => {
+  const raiz = lerFonte("app/layout.tsx");
+  assert.ok(raiz.includes("export const viewport: Viewport") && raiz.includes('width: "device-width"') && raiz.includes("initialScale: 1") && raiz.includes('viewportFit: "cover"'));
+  const css = lerFonte("app/globals.css");
+  assert.ok(/html \{[^}]*overflow-x: clip[^}]*overscroll-behavior-x: none[^}]*overscroll-behavior-y: none/.test(css.replace(/\n/g, " ")), "html: overflow-x clip e sem efeito elástico");
+  assert.ok(/body \{[^}]*max-width: 100%[^}]*overflow-x: clip/.test(css.replace(/\n/g, " ")));
+  assert.ok(/html \{[^}]*background-color: var\(--background\)/.test(css.replace(/\n/g, " ")) && /body \{[^}]*background-color: var\(--background\)/.test(css.replace(/\n/g, " ")), "fundo do tema");
+  const dash = lerFonte("app/(dashboard)/layout.tsx");
+  assert.ok(dash.includes('<div className="flex h-dvh flex-col overflow-hidden lg:flex-row">'));
+  assert.ok(dash.includes("min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-clip overscroll-y-none"), "conteúdo principal: min-w-0 + overflow-x clip");
+  assert.ok(dash.includes("<RolagemAbasAtiva />"));
+  const vend = lerFonte("app/vendedor/layout.tsx");
+  assert.ok(vend.includes("h-dvh flex-col overflow-hidden lg:flex-row") && vend.includes("min-w-0") && !vend.includes("h-screen"));
+});
+await teste("telas no celular: campos 16 px, alvos 44 px, formulários em 1 coluna, tabelas e abas rolam dentro delas, diálogos viram folha de baixo", () => {
+  const css = lerFonte("app/globals.css");
+  assert.ok(/max-width: 1023\.98px\) \{\s*\/\* Campos com 16 px[\s\S]*font-size: 16px !important/.test(css), "16 px para o iOS não dar zoom");
+  assert.ok(css.includes("(pointer: coarse)") && css.includes("min-height: 44px"));
+  assert.ok(/form \.grid\.grid-cols-2[\s\S]*grid-template-columns: minmax\(0, 1fr\)/.test(css) && css.includes("grid-column: auto"), "formulário em 1 coluna sem coluna implícita");
+  assert.ok(/table \{\s*display: block;[^}]*overflow-x: auto/.test(css.replace(/\n/g, " ")), "tabela rola dentro dela");
+  assert.ok(css.includes(".faixa-abas") && css.includes("scroll-snap-type: x proximity"));
+  assert.ok(css.includes("dialog[open].items-center") && css.includes("max-height: 100dvh") && css.includes("border-bottom-left-radius: 0"), "diálogo = folha de baixo");
+  // As faixas de abas do app rolam e mantêm a aba ativa visível.
+  const comFaixa = ["components/impressao-3d/estoque-board.tsx", "components/impressao-3d/precificacao-board.tsx", "components/impressao-3d/producao-board.tsx"];
+  for (const arq of comFaixa) assert.ok(lerFonte(arq).includes('data-faixa-abas className="') && lerFonte(arq).includes("overflow-x-auto"), arq);
+  const abas = lerFonte("components/rolagem-abas.tsx");
+  assert.ok(abas.includes('scrollIntoView({') && abas.includes('inline: "nearest"') && abas.includes("[data-faixa-abas]"));
+  // Barra do vendedor no celular: cabeçalho compacto, abas em faixa, sair com 44 px.
+  const vs = lerFonte("components/vendedor/vendedor-sidebar.tsx");
+  assert.ok(vs.includes('className="hidden h-full w-60') && vs.includes("lg:hidden") && vs.includes("faixa-abas") && vs.includes('aria-label="Sair"'));
+});
+await teste("auditoria de layout: w-screen/100vw em contêiner e largura fixa > 360 px sem max-w falham (tabela só com rolagem própria)", () => {
+  assert.deepEqual(achadosLayoutMobile('<div className="w-screen p-4" />').map((a) => a.regra), ["w-screen em contêiner"]);
+  assert.deepEqual(achadosLayoutMobile('<div className="min-w-screen" />').map((a) => a.regra), ["w-screen em contêiner"]);
+  assert.equal(achadosLayoutMobile('<div className="w-[100vw]" />').length, 1);
+  assert.equal(achadosLayoutMobile('<div style={{ width: "100vw" }} />').length, 1);
+  assert.equal(achadosLayoutMobile('<div className="w-[480px] p-4" />').length, 1, "largura fixa > 360 sem max-w");
+  assert.equal(achadosLayoutMobile('<div className="w-[480px] max-w-full p-4" />').length, 0, "com max-w-full passa");
+  assert.equal(achadosLayoutMobile('<div className="w-[320px]" />').length, 0, "até 360 px passa");
+  assert.equal(achadosLayoutMobile('<table className="min-w-[640px]" />').length, 1, "tabela larga sem rolagem própria");
+  assert.equal(achadosLayoutMobile('<div className="overflow-x-auto"><table className="min-w-[640px]" /></div>').length, 0, "com contêiner rolável passa");
+  assert.equal(achadosLayoutMobile('<div className="fixed w-80 max-w-[calc(100vw-1.5rem)]" />').length, 0, "calc(100vw − …) de popover passa");
+  assert.equal(achadosLayoutMobile('// w-screen\n<div className="p-4" />').length, 0, "comentário não conta");
+  const audit = lerFonte("scripts/auditar-isolamento.mts");
+  assert.ok(audit.includes("achadosLayoutMobile") && audit.includes("if (layoutRuim.length) process.exitCode = 1;"));
 });
 
 console.log(`\n${total} testes`);

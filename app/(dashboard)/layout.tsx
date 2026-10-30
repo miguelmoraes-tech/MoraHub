@@ -20,6 +20,7 @@ import { configDoSino } from "@/lib/impressao-3d/sino";
 import { getPreferenciasNavegacao } from "@/lib/modulos/preferencias-servidor";
 import { getEmpresaAtiva, getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 import { ToastProvider } from "@/components/toast";
+import { RolagemAbasAtiva } from "@/components/rolagem-abas";
 import { RotulosProvider } from "@/components/rotulos-provider";
 import { getConfigEmpresa } from "@/lib/rotulos";
 import { getAprovacoes } from "@/lib/aprovacoes";
@@ -112,7 +113,7 @@ export default async function DashboardLayout({
   const aprovacoesIniciais = workspacePedidosId ? await getAprovacoes(workspacePedidosId) : [];
 
   const conteudo = (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="flex h-dvh flex-col overflow-hidden lg:flex-row">
       <Sidebar
         userEmail={user.email ?? ""}
         userId={user.id}
@@ -127,9 +128,10 @@ export default async function DashboardLayout({
         sinoAlertas={sinoAlertas}
         preferencia={preferencias.efetiva}
       />
-      <main className="flex flex-1 flex-col overflow-y-auto">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-clip overscroll-y-none">
         {VENCIMENTOS_HABILITADO && <VencimentosBanner alertas={alertas} />}
         <WelcomeBanner />
+        <RolagemAbasAtiva />
         <PageTransition>{children}</PageTransition>
       </main>
     </div>

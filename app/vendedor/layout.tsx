@@ -15,13 +15,13 @@ export default async function VendedorLayout({
 
   return (
     <ToastProvider>
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-dvh flex-col overflow-hidden lg:flex-row">
         <VendedorSidebar
           userEmail={ctx.email}
           empresas={empresas}
           empresaAtivaId={ctx.workspaceId}
         />
-        <main className="flex flex-1 flex-col overflow-y-auto">{children}</main>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-clip overscroll-y-none">{children}</main>
       </div>
     </ToastProvider>
   );

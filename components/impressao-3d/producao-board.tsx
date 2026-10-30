@@ -755,7 +755,7 @@ export function ProducaoBoard({
         </div>
       )}
 
-      <div className="mb-6 inline-flex flex-wrap rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+      <div data-faixa-abas className="mb-6 inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
         {[...ABAS, "produtividade" as const].filter((k) => abas.includes(k)).map((k) => (
           <button
             key={k}

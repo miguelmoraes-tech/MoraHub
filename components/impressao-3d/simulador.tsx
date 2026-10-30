@@ -316,7 +316,7 @@ export function Simulador({ impressoras, materiais, config, verCustos, contexto,
             </div>
           </details>
 
-          <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+          <div data-faixa-abas className="inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
             {([["detalhado", "Peso por componente"], ["total", "Total do fatiador"]] as const).map(([k, l]) => (
               <button
                 key={k}
@@ -402,7 +402,7 @@ export function Simulador({ impressoras, materiais, config, verCustos, contexto,
 
         <fieldset className="space-y-3">
           <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Preço de venda</legend>
-          <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+          <div data-faixa-abas className="inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
             {([["margem", "Margem"], ["markup", "Markup"]] as const).map(([k, l]) => (
               <button
                 key={k}

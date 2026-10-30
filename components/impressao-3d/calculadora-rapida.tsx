@@ -44,7 +44,7 @@ function Alternador<T extends string>({
   aoMudar: (v: T) => void;
 }) {
   return (
-    <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+    <div data-faixa-abas className="inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
       {opcoes.map(([k, l]) => (
         <button
           key={k}

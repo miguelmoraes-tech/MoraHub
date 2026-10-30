@@ -385,7 +385,7 @@ export function BibliotecaSection({
         </div>
       )}
 
-      <div className="mb-6 inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+      <div data-faixa-abas className="mb-6 inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
         {LIBRARY_STATUSES.map((status) => (
           <button
             key={status.value}

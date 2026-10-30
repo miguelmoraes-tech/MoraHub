@@ -362,7 +362,7 @@ export function AgendaView({
           </p>
         </div>
 
-        <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+        <div data-faixa-abas className="inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
           {(
             [
               ["lista", "Lista", List],

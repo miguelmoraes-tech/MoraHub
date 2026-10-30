@@ -341,7 +341,7 @@ export function QualidadeBoard({
         </div>
       )}
 
-      <div className="mb-6 inline-flex rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
+      <div data-faixa-abas className="mb-6 inline-flex max-w-full overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
         {([["pendentes", "Para inspecionar"], ["historico", "Histórico"], ["indicadores", "Indicadores"]] as const).filter(([k]) => abas.includes(k)).map(([k, l]) => (
           <button
             key={k}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -24,6 +24,8 @@ import {
   LogOut,
   SlidersHorizontal,
   KeyRound,
+  Menu,
+  X,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
@@ -40,6 +42,11 @@ import { iconeDe } from "@/components/modulos/icones";
 import { CHAT_HABILITADO, rotaPermitida } from "@/lib/modulos/registry";
 import { ACESSO_VENDEDOR_CODIGO } from "@/lib/vendedor-access";
 import { gravarRolagem, lerRolagem } from "@/lib/sidebar-rolagem";
+import { useModoSidebar } from "@/lib/hooks/use-modo-sidebar";
+import {
+  ZONA_BORDA_PX, decidirGesto, deslocamentoGaveta, larguraDaGaveta, opacidadeDoFundo, tituloDaTela,
+  type PontoToque,
+} from "@/lib/sidebar-mobile";
 import {
   aplicarPreferenciaMenu,
   gruposDoMenu,
@@ -100,6 +107,20 @@ const ORGANIZACAO_ITEMS: NavItem[] = [
   { label: "Inbox", href: "/pessoal/inbox", icon: Inbox },
   { label: "Jurídico", href: "/pessoal/juridico", icon: Scale },
 ];
+
+/** O toque começou dentro de algo que rola na horizontal (tabela, abas, kanban)? Então o gesto é da rolagem. */
+function dentroDeRolavelHorizontal(alvo: EventTarget | null): boolean {
+  let el = alvo instanceof Element ? alvo : null;
+  while (el && el !== document.body) {
+    const { overflowX } = getComputedStyle(el);
+    if ((overflowX === "auto" || overflowX === "scroll") && el.scrollWidth > el.clientWidth + 1) return true;
+    el = el.parentElement;
+  }
+  return false;
+}
+
+const FOCAVEIS =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function NavGroup({
   title,
@@ -241,8 +262,181 @@ export function Sidebar({
     });
   }
 
+  // --- Gaveta (celular e tablet, < 1024 px) -----------------------------------------------------
+  // Um só componente, dois modos: em "fixa" nada disto liga; em "gaveta" o menu abre por cima da tela.
+  const modo = useModoSidebar();
+  const gaveta = modo === "gaveta";
+  const asideRef = useRef<HTMLElement>(null);
+  const botaoMenuRef = useRef<HTMLButtonElement>(null);
+  // A gaveta aberta fica presa à rota em que abriu: trocar de página a fecha, sem efeito colateral.
+  const [abertoEm, setAbertoEm] = useState<string | null>(null);
+  const aberto = gaveta && abertoEm === pathname;
+  const abertoRef = useRef(false);
+  const [arrasto, setArrasto] = useState<{ dx: number; largura: number } | null>(null);
+  const abrir = useCallback(() => setAbertoEm(pathname), [pathname]);
+  const fechar = useCallback(() => setAbertoEm(null), []);
+
+  useEffect(() => {
+    abertoRef.current = aberto;
+  }, [aberto]);
+
+  // Esc fecha; Tab fica preso dentro da gaveta; o fundo não rola; o foco volta ao botão ao fechar.
+  useEffect(() => {
+    if (!aberto) return;
+    const aside = asideRef.current;
+    const botao = botaoMenuRef.current;
+    aside?.querySelector<HTMLElement>(FOCAVEIS)?.focus();
+    document.documentElement.setAttribute("data-menu-aberto", "");
+    const overflowAnterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function aoTeclar(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        fechar();
+        return;
+      }
+      if (e.key !== "Tab" || !aside) return;
+      const itens = [...aside.querySelectorAll<HTMLElement>(FOCAVEIS)].filter((el) => el.offsetParent !== null);
+      if (itens.length === 0) return;
+      const primeiro = itens[0];
+      const ultimo = itens[itens.length - 1];
+      if (e.shiftKey && document.activeElement === primeiro) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && document.activeElement === ultimo) {
+        e.preventDefault();
+        primeiro.focus();
+      }
+    }
+    document.addEventListener("keydown", aoTeclar);
+    return () => {
+      document.removeEventListener("keydown", aoTeclar);
+      document.documentElement.removeAttribute("data-menu-aberto");
+      document.body.style.overflow = overflowAnterior;
+      botao?.focus({ preventScroll: true });
+    };
+  }, [aberto, fechar]);
+
+  // Gesto: arrastar a partir da borda esquerda abre; arrastar para a esquerda sobre o menu fecha. A decisão
+  // é a função pura `decidirGesto`; aqui só se acompanha o dedo.
+  useEffect(() => {
+    if (!gaveta) return;
+    let inicio: PontoToque | null = null;
+    let rolavel = false;
+    let largura = 320;
+
+    function aoIniciar(e: TouchEvent) {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dentro = asideRef.current?.contains(e.target as Node) ?? false;
+      if (!abertoRef.current && t.clientX > ZONA_BORDA_PX) return;
+      if (abertoRef.current && !dentro) return;
+      inicio = { x: t.clientX, y: t.clientY, t: e.timeStamp };
+      rolavel = dentroDeRolavelHorizontal(e.target);
+      largura = asideRef.current?.offsetWidth ?? larguraDaGaveta(window.innerWidth);
+    }
+    function aoMover(e: TouchEvent) {
+      if (!inicio || rolavel) return;
+      const t = e.touches[0];
+      const dx = t.clientX - inicio.x;
+      const dy = t.clientY - inicio.y;
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
+        inicio = null;
+        setArrasto(null);
+        return;
+      }
+      if (Math.abs(dx) > 6) setArrasto({ dx, largura });
+    }
+    function aoTerminar(e: TouchEvent) {
+      if (!inicio) return;
+      const t = e.changedTouches[0];
+      const decisao = decidirGesto({
+        inicio,
+        fim: { x: t.clientX, y: t.clientY, t: e.timeStamp },
+        aberto: abertoRef.current,
+        larguraGaveta: largura,
+        iniciouEmRolavelHorizontal: rolavel,
+      });
+      inicio = null;
+      setArrasto(null);
+      if (decisao === "abrir") setAbertoEm(window.location.pathname);
+      else if (decisao === "fechar") setAbertoEm(null);
+    }
+    function aoCancelar() {
+      inicio = null;
+      setArrasto(null);
+    }
+    document.addEventListener("touchstart", aoIniciar, { passive: true });
+    document.addEventListener("touchmove", aoMover, { passive: true });
+    document.addEventListener("touchend", aoTerminar, { passive: true });
+    document.addEventListener("touchcancel", aoCancelar, { passive: true });
+    return () => {
+      document.removeEventListener("touchstart", aoIniciar);
+      document.removeEventListener("touchmove", aoMover);
+      document.removeEventListener("touchend", aoTerminar);
+      document.removeEventListener("touchcancel", aoCancelar);
+    };
+  }, [gaveta]);
+
+  const itensDoMenu = isPessoal
+    ? [...PAINEL_ITEMS, ...FINANCAS_ITEMS, ...ORGANIZACAO_ITEMS]
+    : gruposMenu.flatMap((g) => g.itens.map((item) => itemDeMenu(item, rotulos)));
+  const titulo = tituloDaTela(pathname, itensDoMenu);
+  const deslocamento = arrasto ? deslocamentoGaveta(arrasto.dx, aberto, arrasto.largura) : null;
+  const sinos = !isPessoal && (
+    <>
+      {sinoAlertas && empresaAtivaId && (
+        <SinoAlertas key={empresaAtivaId} empresaId={empresaAtivaId} config={sinoAlertas} />
+      )}
+      <SolicitacoesBell />
+    </>
+  );
+
   return (
-    <aside className="flex h-dvh w-64 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950">
+    <>
+      {/* Barra superior (só celular/tablet): sanduíche, título da tela e os sinos. */}
+      <header
+        data-sidebar-header
+        className="relative z-30 flex h-[calc(3rem+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-zinc-900 bg-zinc-950 px-1.5 pt-[env(safe-area-inset-top)] lg:hidden"
+      >
+        <button
+          ref={botaoMenuRef}
+          type="button"
+          onClick={abrir}
+          aria-label="Abrir menu"
+          aria-expanded={aberto}
+          aria-controls="menu-lateral"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-zinc-300 outline-none transition-colors hover:bg-zinc-900 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-500"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-100">{titulo}</span>
+        {gaveta && <div className="flex shrink-0 items-center">{sinos}</div>}
+      </header>
+
+      {/* Fundo escurecido: toque fecha; acompanha o dedo quando se arrasta. */}
+      <div
+        aria-hidden
+        onClick={fechar}
+        style={arrasto ? { opacity: opacidadeDoFundo(deslocamento ?? 0, arrasto.largura), transition: "none" } : undefined}
+        className={`fixed inset-0 z-40 touch-none bg-black/60 transition-opacity duration-200 motion-reduce:transition-none lg:hidden ${
+          aberto ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      />
+
+    <aside
+      id="menu-lateral"
+      ref={asideRef}
+      role={gaveta ? "dialog" : undefined}
+      aria-modal={gaveta ? true : undefined}
+      aria-label={gaveta ? "Menu" : undefined}
+      inert={gaveta && !aberto ? true : undefined}
+      style={deslocamento !== null ? { transform: `translateX(${deslocamento}px)`, transition: "none" } : undefined}
+      className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-[min(86vw,320px)] flex-col border-r border-zinc-900 bg-zinc-950 transition-transform duration-200 ease-out motion-reduce:transition-none lg:static lg:z-auto lg:w-64 lg:shrink-0 lg:translate-x-0 lg:transition-none ${
+        aberto ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
       {/* Única área rolável: min-h-0 deixa o flex encolher e o overflow funcionar de verdade. */}
       <div
         ref={rolagemRef}
@@ -250,7 +444,10 @@ export function Sidebar({
         data-sidebar-scroll
         className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
       >
-      <div data-sidebar-header className="relative flex items-center gap-2.5 px-5 py-6">
+      <div
+        data-sidebar-header={gaveta ? undefined : ""}
+        className="relative flex items-center gap-2.5 px-5 py-6 pt-[max(1.5rem,env(safe-area-inset-top))]"
+      >
         <Image
           src="/logo.png"
           alt="Mora HUB"
@@ -267,14 +464,16 @@ export function Sidebar({
             HUB
           </span>
         </span>
-        {!isPessoal && (
-          <div className="ml-auto flex items-center gap-0.5">
-            {sinoAlertas && empresaAtivaId && (
-              <SinoAlertas key={empresaAtivaId} empresaId={empresaAtivaId} config={sinoAlertas} />
-            )}
-            <SolicitacoesBell />
-          </div>
-        )}
+        {!gaveta && <div className="ml-auto flex items-center gap-0.5">{sinos}</div>}
+        {/* Só na gaveta: fechar. (Os sinos ficam na barra superior.) */}
+        <button
+          type="button"
+          onClick={fechar}
+          aria-label="Fechar menu"
+          className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-zinc-400 outline-none transition-colors hover:bg-zinc-900 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-500 lg:hidden"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
       <div className="space-y-3 border-b border-zinc-900 px-3 pb-4">
@@ -317,7 +516,7 @@ export function Sidebar({
       </div>
 
       {/* Rodapé fixo: fora da área rolável. */}
-      <div className="shrink-0 border-t border-zinc-900 bg-zinc-950 p-3">
+      <div className="shrink-0 border-t border-zinc-900 bg-zinc-950 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {CHAT_HABILITADO && (
           <GlobalChatBadge
             href={chatHref}
@@ -356,5 +555,6 @@ export function Sidebar({
         </form>
       </div>
     </aside>
+    </>
   );
 }
