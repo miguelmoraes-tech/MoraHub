@@ -11,6 +11,7 @@ import {
   extrasDoCatalogo,
   modulosOferecidos,
   paraConvites,
+  codigoAtivo,
   montarPessoas,
   paraMembros,
   paraSetores,
@@ -38,6 +39,7 @@ export default async function SociosPage() {
     getModulosPermiteMembros(),
   ]);
   const chaves = modulosOferecidos(habilitados, permiteMembros);
+  const agoraIso = new Date().toISOString();
 
   const [
     { data: catalogo },
@@ -46,6 +48,9 @@ export default async function SociosPage() {
     { data: setores },
     { data: codigoVendedor },
     fundadores,
+    { data: codigos },
+    { data: pedidosCofundador },
+    { data: pessoasDaEmpresa },
   ] = await Promise.all([
     chaves.length
       ? supabase.from("modulos").select("chave, nome, permissoes_extras").in("chave", chaves)
@@ -59,6 +64,25 @@ export default async function SociosPage() {
       .order("created_at", { ascending: true }),
     supabase.rpc("meu_codigo_vendedor", { p_workspace_id: ws }),
     getFundadores(ws),
+    // Códigos de cofundador (somente leitura): o ativo é não usado, não cancelado e dentro da validade.
+    supabase
+      .from("workspace_codigos_cofundador")
+      .select("id, codigo, expira_em, usado_em, cancelado_em")
+      .eq("workspace_id", ws)
+      .is("usado_em", null)
+      .is("cancelado_em", null)
+      .gt("expira_em", agoraIso)
+      .order("expira_em", { ascending: false })
+      .limit(5),
+    // Pedidos feitos com código de cofundador, esperando a minha resposta.
+    supabase
+      .from("solicitacoes_vendedor")
+      .select("id, email, created_at")
+      .eq("workspace_id", ws)
+      .eq("status", "pendente")
+      .eq("papel_solicitado", "cofundador")
+      .order("created_at", { ascending: true }),
+    supabase.rpc("pessoas_da_empresa", { p_workspace_id: ws }),
   ]);
   const regra = fraseDaRegra(fundadores.length);
 
@@ -83,18 +107,28 @@ export default async function SociosPage() {
         <div className="mb-6">
           <h1 className="text-lg font-semibold text-zinc-100">Equipe e cofundadores</h1>
           <p className="text-sm text-zinc-500">
-            Convide cofundadores, sócios e funcionários e escolha o que cada um vê e edita. Os
-            setores dão um código para a pessoa pedir acesso sozinha.
+            Adicione cofundadores por código, convide sócios e funcionários e escolha o que cada um vê e edita. Os setores dão um
+            código para a pessoa pedir acesso sozinha.
           </p>
           <p className="mt-2 text-xs text-zinc-500">
             <strong className="text-zinc-300">Cofundador</strong> tem o mesmo poder do fundador.{" "}
             {regra ??
-              "Hoje você é o único fundador: suas alterações valem na hora. Com 2 ou mais fundadores, as alterações da empresa passam pela aprovação de todos em Aprovações."}
+              "Com 2 ou mais fundadores, as alterações da empresa passam pela aprovação de todos em Aprovações. Hoje você é o único fundador: suas alterações valem na hora."}
           </p>
         </div>
         <SociosBoard
           modulos={modulos}
-          membros={montarPessoas(fundadores, paraMembros(membros))}
+          membros={montarPessoas(
+            fundadores,
+            paraMembros(membros),
+            ((pessoasDaEmpresa ?? []) as { pessoa_id: string; nome: string | null; papel: string }[])
+          )}
+          codigoCofundador={codigoAtivo((codigos ?? []) as Parameters<typeof codigoAtivo>[0], agoraIso)}
+          pedidosCofundador={((pedidosCofundador ?? []) as { id: string; email: string | null; created_at: string }[]).map((p) => ({
+            id: p.id,
+            email: p.email,
+            createdAt: p.created_at,
+          }))}
           qtdFundadores={fundadores.length}
           convites={paraConvites(convites)}
           setores={paraSetores(setores)}

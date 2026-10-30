@@ -96,7 +96,7 @@ export default async function DashboardLayout({
     const [{ data }, { data: setores }] = await Promise.all([
       supabase
         .from("solicitacoes_vendedor")
-        .select("id, email, created_at, perfil_acesso_id")
+        .select("id, email, created_at, perfil_acesso_id, papel_solicitado")
         .eq("workspace_id", workspacePedidosId)
         .eq("status", "pendente")
         .order("created_at", { ascending: true }),

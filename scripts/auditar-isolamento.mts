@@ -52,6 +52,8 @@ const MODULOS_NOVOS: Record<string, string[]> = {
   ],
   // Etapa D: preferências de navegação (padrão da empresa e pessoal).
   navegacao: ["menu_preferencias"],
+  // Cofundador por código: a tabela de códigos só é lida, sempre por workspace_id.
+  equipe: ["workspace_codigos_cofundador"],
 };
 const ESTRITAS = Object.values(MODULOS_NOVOS).flat();
 
@@ -277,7 +279,9 @@ if (rhSemGuard.length) process.exitCode = 1;
 // cancelar_convite_empresa, ...), que carregam a porta de aprovação entre
 // fundadores. Qualquer insert/update/delete/upsert direto nessas tabelas é
 // listado; só as exceções conhecidas (sem RPC equivalente) passam.
-const TABELAS_DE_EQUIPE = ["membros", "convites", "perfis_tipos_ativos"];
+// A tela de Equipe e cofundadores escreve só por RPC (convidar_membro, gerar_codigo_cofundador,
+// responder_solicitacao_acesso...): solicitacoes_vendedor e workspace_codigos_cofundador também são somente leitura.
+const TABELAS_DE_EQUIPE = ["membros", "convites", "perfis_tipos_ativos", "solicitacoes_vendedor", "workspace_codigos_cofundador"];
 const ESCRITAS_PERMITIDAS = new Set([
   // Registra o tipo de conta (pessoal, empreendedor...) no cadastro e no seletor de modos;
   // não existe RPC para isso (a empresa nasce por criar_empresa).
@@ -289,7 +293,7 @@ for (const pasta of ["app", "components", "lib", "proxy.ts"]) {
     const rel = relative(raiz, arq).replace(/\\/g, "/");
     const linhas = readFileSync(arq, "utf8").split(/\r?\n/);
     linhas.forEach((linha, i) => {
-      const m = linha.match(/\.from\(\s*["'`](membros|convites|perfis_tipos_ativos)["'`]/);
+      const m = linha.match(/\.from\(\s*["'`](membros|convites|perfis_tipos_ativos|solicitacoes_vendedor|workspace_codigos_cofundador)["'`]/);
       if (!m || !TABELAS_DE_EQUIPE.includes(m[1])) return;
       const trecho = linhas.slice(i, i + 8).join(" ");
       const escrita = trecho.match(/\.(insert|update|delete|upsert)\(/);
@@ -298,7 +302,7 @@ for (const pasta of ["app", "components", "lib", "proxy.ts"]) {
   }
 }
 const naoPermitidas = escritasDiretas.filter((s) => !ESCRITAS_PERMITIDAS.has(s.split(":")[0]));
-console.log(`\nEscritas diretas em membros/convites/perfis_tipos_ativos: ${escritasDiretas.length}`);
+console.log(`\nEscritas diretas em membros/convites/perfis_tipos_ativos/solicitacoes_vendedor/workspace_codigos_cofundador: ${escritasDiretas.length}`);
 for (const s of escritasDiretas) console.log(`  ${ESCRITAS_PERMITIDAS.has(s.split(":")[0]) ? "-" : "!"} ${s}`);
 console.log(`Fora das exceções conhecidas: ${naoPermitidas.length}`);
 if (naoPermitidas.length) process.exitCode = 1;

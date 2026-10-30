@@ -3,9 +3,13 @@
 import { useState } from "react";
 import { EquipeSection } from "@/components/socios/equipe-section";
 import { SetoresSection } from "@/components/socios/setores-section";
+import { CofundadorCodigo } from "@/components/socios/cofundador-codigo";
+import { PedidosCofundador } from "@/components/socios/pedidos-cofundador";
 import type {
+  CodigoCofundador,
   ConviteEquipe,
   ModuloPermissivel,
+  PedidoCofundador,
   PessoaEquipe,
   SetorAcesso,
 } from "@/lib/socios-shared";
@@ -16,6 +20,8 @@ export function SociosBoard({
   modulos,
   membros,
   qtdFundadores,
+  codigoCofundador,
+  pedidosCofundador,
   convites,
   setores,
   codigoVendedor,
@@ -25,6 +31,10 @@ export function SociosBoard({
   membros: PessoaEquipe[];
   /** Quantos fundadores (fundador + cofundadores) a empresa tem hoje. */
   qtdFundadores: number;
+  /** Código de cofundador ainda ativo (lido da tabela), se houver. */
+  codigoCofundador: CodigoCofundador | null;
+  /** Pedidos feitos com código de cofundador, pendentes. */
+  pedidosCofundador: PedidoCofundador[];
   convites: ConviteEquipe[];
   setores: SetorAcesso[];
   codigoVendedor: string | null;
@@ -55,6 +65,9 @@ export function SociosBoard({
       </div>
 
       {aba === "equipe" ? (
+        <div className="space-y-6">
+        <CofundadorCodigo ativo={codigoCofundador} />
+        <PedidosCofundador pedidos={pedidosCofundador} qtdFundadores={qtdFundadores} />
         <EquipeSection
           modulos={modulos}
           membros={membros}
@@ -62,6 +75,7 @@ export function SociosBoard({
           convites={convites}
           userId={userId}
         />
+        </div>
       ) : (
         <SetoresSection modulos={modulos} setores={setores} codigoVendedor={codigoVendedor} />
       )}

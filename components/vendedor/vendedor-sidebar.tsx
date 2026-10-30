@@ -3,10 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Target, CalendarDays, LogOut } from "lucide-react";
+import { Target, CalendarDays, LogOut, KeyRound } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { EmpresaSwitcher } from "@/components/empresa/empresa-switcher";
 import type { EmpresaVinculo } from "@/lib/empresas";
+import { ACESSO_VENDEDOR_CODIGO } from "@/lib/vendedor-access";
 
 // The vendedor menu is intentionally just these two entries. Route blocking
 // for everything else lives in the proxy (lib/supabase/proxy.ts), not here.
@@ -76,6 +77,13 @@ export function VendedorSidebar({
 
       <div className="border-t border-zinc-900 p-3">
         <div className="mb-2 truncate px-2 text-xs text-zinc-500">{userEmail}</div>
+        <Link
+          href={ACESSO_VENDEDOR_CODIGO}
+          className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+        >
+          <KeyRound className="h-4 w-4" />
+          Entrar numa empresa com código
+        </Link>
         <form action={logout}>
           <button
             type="submit"

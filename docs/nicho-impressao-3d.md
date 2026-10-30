@@ -802,3 +802,30 @@ preço ou saldo recalculados no cliente (`lib/impressao-3d/auditoria-preco.ts`).
 - **Erros das RPCs aparecem como vieram** (`sociosErrorMessage` só troca a sessão expirada). Antes, qualquer mensagem
   que citasse "fundador" ou "permissão" virava um texto genérico ("Só os fundadores podem fazer isso"), inclusive para o
   próprio fundador.
+
+
+## Cofundador por código (substitui o convite de cofundador por link)
+
+O fundador **não** convida cofundador por e-mail/link: ele gera um **código**, a pessoa digita e o fundador **aprova**.
+O convite por link continua só para sócio e funcionário (a opção "Cofundador" saiu do formulário e a action recusa).
+
+- **Gerar** (`gerar_codigo_cofundador(p_ws, p_validade_horas)` → `{ codigo, expira_em }`): validade de 1 h, 24 h, 72 h
+  (padrão) ou 7 dias (a RPC aceita de 1 a 168 h); invalida o código anterior ainda não usado; máximo de 4 cofundadores
+  ativos (mensagem do banco, como veio). **Cancelar** = `cancelar_codigo_cofundador(p_ws)`. O código **ativo** é lido de
+  `workspace_codigos_cofundador` (somente leitura): `usado_em` nulo, `cancelado_em` nulo e `expira_em` no futuro; uso único.
+- **Digitar**: a pessoa abre **"Entrar numa empresa com código"** (`/acesso-vendedor`, alcançável por QUALQUER conta
+  logada: rodapé da barra lateral para todos os papéis e do menu do vendedor, e cartão em Configurações) e usa a RPC
+  existente `solicitar_acesso`, que reconhece o código de cofundador (maiúsculas/minúsculas e traços/espaços ignorados).
+  O pedido nasce em `solicitacoes_vendedor` com `papel_solicitado = 'cofundador'` e status `pendente`; a tela mostra
+  "Pedido enviado. Aguarde a aprovação do fundador." Aprovado, a empresa vira a ativa e aparece no seletor de empresas.
+- **Aprovar** (`responder_solicitacao_acesso`): bloco **Pedidos de cofundador pendentes** na tela *Equipe e cofundadores*
+  (e no sino, rotulado **COFUNDADOR**), com confirmação: "Cofundador tem o MESMO poder do fundador: pode alterar a empresa,
+  convidar e remover pessoas. Confirme que o e-mail … é a pessoa certa." Com 1 fundador é imediato; com 2+ a RPC retorna
+  sem executar e o pedido vai para **/aprovacoes** (rotulado "Pedido de acesso (COFUNDADOR)"), executando só quando TODOS
+  os fundadores aprovarem. A página de Vendedores e a contagem da Visão Geral **não** listam pedidos de cofundador.
+- **Erros** de `solicitar_acesso`, `responder_solicitacao_acesso` e das RPCs de equipe aparecem **como vieram** (código usado,
+  expirado, cancelado, "este é o seu próprio código", "já é cofundador", "já tem pedido pendente").
+- **Pessoas da empresa**: `fundadores_da_empresa` + `listar_membros_empresa` + `pessoas_da_empresa`, sem repetir; o fundador
+  original não é removível; cofundador, sócio e funcionário saem por `remover_membro` (com confirmação).
+- **Auditoria**: falha em escrita direta em `membros`, `convites`, `perfis_tipos_ativos`, `solicitacoes_vendedor` e
+  `workspace_codigos_cofundador` (a tela de equipe só usa RPC); as leituras do código são sempre por `workspace_id`.

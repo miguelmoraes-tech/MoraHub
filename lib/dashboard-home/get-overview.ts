@@ -146,6 +146,8 @@ export async function getDashboardHomeOverview(): Promise<DashboardHomeOverview>
           .select("id", { count: "exact", head: true })
           .eq("workspace_id", workspaceId)
           .eq("status", "pendente")
+          // Pedido de cofundador não é pedido de vendedor.
+          .or("papel_solicitado.is.null,papel_solicitado.neq.cofundador")
       : nada,
     com("vendedores")
       ? supabase.rpc("relatorio_atividade_vendedores", {

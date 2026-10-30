@@ -19,11 +19,11 @@ export default async function CodigoDoGestorPage() {
           <KeyRound className="h-5 w-5" />
         </span>
         <h1 className="text-xl font-semibold tracking-tight text-zinc-50">
-          Entrar numa empresa
+          Entrar numa empresa com código
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Digite o código que a empresa te passou (de vendedor ou de setor). O
-          responsável aprova o seu acesso em seguida.
+          Digite o código que a empresa te passou (de cofundador, de vendedor ou de setor). O
+          fundador aprova o seu acesso em seguida e a empresa passa a aparecer no seu seletor de empresas.
         </p>
       </div>
 

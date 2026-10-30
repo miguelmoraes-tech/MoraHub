@@ -310,9 +310,12 @@ const TIPOS: [trecho: string, rotulo: string][] = [
   ["renomear", "Empresa"],
 ];
 
-export function rotuloDoTipo(tipo: string): string {
+export function rotuloDoTipo(tipo: string, resumo?: string | null): string {
   const t = tipo.toLowerCase();
-  return TIPOS.find(([trecho]) => t.includes(trecho))?.[1] ?? "Alteração";
+  const rotulo = TIPOS.find(([trecho]) => t.includes(trecho))?.[1] ?? "Alteração";
+  // O resumo gravado pelo banco diz "como COFUNDADOR": o tipo do pedido de acesso é mostrado assim.
+  if (rotulo === "Pedido de acesso" && /cofundador/i.test(resumo ?? "")) return "Pedido de acesso (COFUNDADOR)";
+  return rotulo;
 }
 
 /** Mensagem do voto, a partir do status que aprovar_alteracao devolve. */

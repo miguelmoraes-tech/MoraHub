@@ -7,8 +7,12 @@ import { getEmpresaPainel } from "@/lib/empresa-ativa";
 import { exigeAprovacao } from "@/lib/aprovacoes";
 import { getModulosPermiteMembros } from "@/lib/modulos/habilitados";
 import {
+  lerCodigoGerado,
   sanearPermissoes,
   sociosErrorMessage,
+  validadeValida,
+  VALIDADE_MAX_HORAS,
+  VALIDADE_MIN_HORAS,
   type PapelConvidavel,
 } from "@/lib/socios-shared";
 import type { PermissaoModulo } from "@/lib/modulos/permissoes";
@@ -65,7 +69,8 @@ async function lerPermissoes(bruto: unknown): Promise<PermissaoModulo[] | null> 
 
 const ConviteSchema = z.object({
   email: z.email({ error: "Informe um e-mail válido." }),
-  papel: z.enum(["socio", "funcionario", "cofundador"], { error: "Escolha o papel." }),
+  // Cofundador não se convida por link: entra por código (gerarCodigoCofundador) e o fundador aprova.
+  papel: z.enum(["socio", "funcionario"], { error: "Escolha o papel (sócio ou funcionário). Cofundador entra por código." }),
 });
 
 export async function convidarMembro(entrada: {
@@ -84,11 +89,7 @@ export async function convidarMembro(entrada: {
 
   const empresa = await getEmpresaPainel();
   if (!empresa) return { error: SEM_PAINEL };
-  // Fundador e cofundador têm o mesmo nível: convidar cofundador também exige a
-  // aprovação de todos os fundadores (regra do banco), não ser o fundador original.
-
-  // Cofundador tem o mesmo nível do fundador: não leva matriz.
-  const permissoes = papel === "cofundador" ? [] : await lerPermissoes(entrada.permissoes);
+  const permissoes = await lerPermissoes(entrada.permissoes);
   if (!permissoes) return { error: "Permissões inválidas." };
 
   const supabase = await createClient();
@@ -258,4 +259,47 @@ export async function regenerarCodigoSetor(id: string): Promise<ResultadoSocios<
   // NULL = enviado para aprovação: o código novo só aparece depois (em Aprovações).
   if (typeof data !== "string" || !data) return ENVIADO;
   return { ok: true, codigo: data };
+}
+
+// --- Cofundador por código ---
+
+/**
+ * Gera o código de cofundador (RPC gerar_codigo_cofundador, validade de 1 a 168 h): invalida o anterior ainda
+ * não usado e vale uma única vez. Quem digita o código usa solicitar_acesso; o pedido chega à tela de Equipe e
+ * o fundador aprova (responder_solicitacao_acesso). Erros do banco aparecem como vieram (ex.: limite de
+ * cofundadores ativos).
+ */
+export async function gerarCodigoCofundador(
+  validadeHoras: number
+): Promise<ResultadoSocios<{ codigo: string; expiraEm: string }>> {
+  if (!validadeValida(validadeHoras)) {
+    return { error: `Validade: escolha de ${VALIDADE_MIN_HORAS} a ${VALIDADE_MAX_HORAS} horas.` };
+  }
+  const empresa = await getEmpresaPainel();
+  if (!empresa) return { error: SEM_PAINEL };
+
+  const { data, error } = await (await createClient()).rpc("gerar_codigo_cofundador", {
+    p_ws: empresa.workspaceId,
+    p_validade_horas: validadeHoras,
+  });
+  if (error) return { error: sociosErrorMessage(error.message) };
+
+  const gerado = lerCodigoGerado(data);
+  if (!gerado) return { error: "O banco não devolveu o código. Tente novamente." };
+  aposEscrita();
+  return { ok: true, ...gerado };
+}
+
+/** Cancela o código de cofundador ainda ativo (devolve quantos cancelou). */
+export async function cancelarCodigoCofundador(): Promise<ResultadoSocios<{ cancelados: number }>> {
+  const empresa = await getEmpresaPainel();
+  if (!empresa) return { error: SEM_PAINEL };
+
+  const { data, error } = await (await createClient()).rpc("cancelar_codigo_cofundador", {
+    p_ws: empresa.workspaceId,
+  });
+  if (error) return { error: sociosErrorMessage(error.message) };
+
+  aposEscrita();
+  return { ok: true, cancelados: typeof data === "number" ? data : Number(data) || 0 };
 }

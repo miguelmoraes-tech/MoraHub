@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ACESSO_VENDEDOR_CODIGO } from "@/lib/vendedor-access";
 import { requireUsuarioComSolicitacao } from "@/lib/vendedor";
+import { getEmpresasDoUsuario } from "@/lib/empresa-ativa";
 import { entrarSeAprovado } from "@/lib/actions/vendedor-codigo";
 import { AguardandoAprovacao } from "@/components/vendedor/aguardando-aprovacao";
 
@@ -18,6 +19,11 @@ export default async function AguardandoAprovacaoPage() {
   }
 
   return (
-    <AguardandoAprovacao userId={userId} status={ultima.status} enviadoEm={ultima.created_at} />
+    <AguardandoAprovacao
+      userId={userId}
+      status={ultima.status}
+      enviadoEm={ultima.created_at}
+      temEmpresa={(await getEmpresasDoUsuario()).length > 0}
+    />
   );
 }

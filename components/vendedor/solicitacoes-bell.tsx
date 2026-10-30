@@ -8,6 +8,7 @@ import { useToast } from "@/components/toast";
 import Link from "next/link";
 import { useSolicitacoes } from "@/components/vendedor/solicitacoes-provider";
 import { useAprovacoes } from "@/components/aprovacoes/aprovacoes-provider";
+import { ehPedidoCofundador, rotuloDoPedidoAcesso, textoConfirmarCofundador } from "@/lib/socios-shared";
 
 /**
  * Bell with the pending vendedor access requests (dono). Hidden when there is
@@ -46,6 +47,9 @@ export function SolicitacoesBell() {
   const total = pendentes.length + aprovacoesMinhas;
 
   function responder(id: string, aprovar: boolean) {
+    // Cofundador tem o mesmo poder do fundador: confirma antes de aprovar.
+    const pedido = pendentes.find((p) => p.id === id);
+    if (aprovar && pedido && ehPedidoCofundador(pedido) && !window.confirm(textoConfirmarCofundador(pedido.email))) return;
     setRespondendoId(id);
     startResponder(async () => {
       const resultado = await responderSolicitacaoAcesso(id, aprovar);
@@ -138,7 +142,11 @@ export function SolicitacoesBell() {
                     {s.email ?? "Sem e-mail"}
                   </p>
                   <p className="text-xs text-zinc-500">
-                    {s.perfil_acesso_id ? (setores[s.perfil_acesso_id] ?? "Setor") : "Vendedor"}
+                    {ehPedidoCofundador(s) ? (
+                      <strong className="text-copper-300">{rotuloDoPedidoAcesso(s, setores)}</strong>
+                    ) : (
+                      rotuloDoPedidoAcesso(s, setores)
+                    )}
                     {" · "}pediu acesso em {formatDate(s.created_at.slice(0, 10))}
                   </p>
                   <div className="mt-2 flex items-center gap-2">

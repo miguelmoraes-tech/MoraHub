@@ -35,6 +35,8 @@ export default async function VendedoresPage() {
           .eq("status", "pendente")
           // Pedidos de setor têm o próprio fluxo (sino e /socios); aqui só os de vendedor.
           .is("perfil_acesso_id", null)
+          // Pedidos de cofundador (código de cofundador) são aprovados na tela Equipe e cofundadores.
+          .or("papel_solicitado.is.null,papel_solicitado.neq.cofundador")
           .order("created_at", { ascending: true }),
       ])
     : [{ data: null }, { data: null }];

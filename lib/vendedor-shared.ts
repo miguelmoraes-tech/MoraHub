@@ -80,6 +80,8 @@ export interface SolicitacaoVendedor {
   respondido_em: string | null;
   /** null = pedido de vendedor; senão, o setor (perfis_acesso) cujo código foi usado. */
   perfil_acesso_id?: string | null;
+  /** 'cofundador' = pedido feito com um código de cofundador (coluna só de leitura). */
+  papel_solicitado?: string | null;
 }
 
 /** How often the "aguardando aprovação" screen asks whether the gestor answered. */
@@ -105,7 +107,7 @@ export function formatarCodigoVendedor(raw: string): string {
  * (10 caracteres) e o de setor. Só limpa e põe em maiúsculas; o banco confere.
  */
 export const CODIGO_ACESSO_MIN = 6;
-export const CODIGO_ACESSO_MAX = 16;
+export const CODIGO_ACESSO_MAX = 32;
 
 export function limparCodigoAcesso(raw: string): string {
   return raw
@@ -120,35 +122,18 @@ export function formatarCodigoAcesso(raw: string): string {
   return limpo.length > 5 ? `${limpo.slice(0, 5)}-${limpo.slice(5)}` : limpo;
 }
 
-/** Raised by solicitar_acesso / solicitar_acesso_vendedor already worded for the user. */
-const CODIGO_USER_MESSAGES = [
-  "Código inválido",
-  "Este é o seu próprio código",
-  "Você já tem acesso a este workspace",
-  "Você já tem acesso a esta empresa",
-];
-
 export function solicitarAcessoErrorMessage(message: string | undefined | null): string {
-  const known = CODIGO_USER_MESSAGES.find((m) => message?.includes(m));
-  return known ?? "Não foi possível enviar o código. Tente novamente.";
+  // As RPCs levantam texto claro em português (código usado, expirado, cancelado, "este é o seu próprio
+  // código", "já é cofundador", "já tem pedido pendente"...): mostrado COMO VEIO.
+  return erroDaRpc(message, "Não foi possível enviar o código. Tente novamente.");
 }
 
-/** Raised by the owner-side RPCs (código / responder solicitação). */
-const GESTOR_USER_MESSAGES: [match: string, text: string][] = [
-  ["Sem permissão", "Sem permissão para esta ação."],
-  ["Solicitação já respondida", "Esta solicitação já foi respondida."],
-  ["Solicitação não encontrada", "Solicitação não encontrada."],
-  [
-    "Limite de 5 vínculos ativos",
-    "Este vendedor já atingiu o limite de 5 vínculos ativos.",
-  ],
-  [
-    "só existe para o perfil empresarial",
-    "O código de vendedor só existe para o perfil empresarial.",
-  ],
-];
-
 export function gestorErrorMessage(message: string | undefined | null): string {
-  const known = GESTOR_USER_MESSAGES.find(([m]) => message?.includes(m));
-  return known?.[1] ?? "Não foi possível concluir a ação. Tente novamente.";
+  return erroDaRpc(message, "Não foi possível concluir a ação. Tente novamente.");
+}
+
+/** Texto do erro da RPC como veio; só vazio cai no texto padrão. */
+export function erroDaRpc(message: string | undefined | null, padrao: string): string {
+  const texto = (message ?? "").trim();
+  return texto || padrao;
 }

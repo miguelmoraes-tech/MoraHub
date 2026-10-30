@@ -51,7 +51,19 @@ export default async function ConfiguracoesPage() {
       >
         <p className="text-sm font-semibold text-zinc-100">Equipe e cofundadores</p>
         <p className="mt-1 text-xs text-zinc-500">
-          Convide cofundadores, sócios e funcionários por link e escolha o que cada um acessa. Cofundador tem o mesmo poder do fundador.
+          Gere um código para adicionar cofundadores (eles digitam e você aprova), convide sócios e funcionários por link e escolha
+          o que cada um acessa. Cofundador tem o mesmo poder do fundador.
+        </p>
+      </Link>
+
+      <Link
+        href="/acesso-vendedor"
+        className="block rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 transition-colors hover:border-zinc-700 hover:bg-zinc-900"
+      >
+        <p className="text-sm font-semibold text-zinc-100">Entrar numa empresa com código</p>
+        <p className="mt-1 text-xs text-zinc-500">
+          Recebeu um código de cofundador, de setor ou de vendedor de outra empresa? Digite aqui. O responsável aprova o seu acesso e a
+          empresa passa a aparecer no seletor de empresas.
         </p>
       </Link>
 

@@ -45,7 +45,7 @@ import {
   type MapaRotulos,
 } from "@/lib/rotulos-shared";
 import { erroDeNicho, resumoModulos } from "@/lib/nichos-shared";
-import { MODULO_ROTULO, sanearPermissoes, sociosErrorMessage } from "@/lib/socios-shared";
+import { MODULO_ROTULO, PAPEL_CONVIDAVEL_ROTULO, sanearPermissoes, sociosErrorMessage } from "@/lib/socios-shared";
 import {
   AVISO_ATIVE_FINANCEIRO,
   AVISO_SEM_FINANCEIRO,
@@ -175,7 +175,13 @@ import {
 } from "@/lib/impressao-3d/pecas";
 import { avisosConclusaoMulti, lerConclusaoMulti } from "@/lib/impressao-3d/regras-operacao";
 import { ARQUIVOS_SEM_SALDO_NO_CLIENTE, saldoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
-import { montarPessoas, pessoaRemovivel } from "@/lib/socios-shared";
+import {
+  VALIDADES_CODIGO_COFUNDADOR, VALIDADE_PADRAO_HORAS, codigoAtivo, ehPedidoCofundador, lerCodigoGerado, montarPessoas,
+  pessoaRemovivel, rotuloDoPedidoAcesso, textoConfirmarCofundador, validadeValida,
+} from "@/lib/socios-shared";
+import { erroDaRpc, gestorErrorMessage, solicitarAcessoErrorMessage, limparCodigoAcesso, CODIGO_ACESSO_MAX } from "@/lib/vendedor-shared";
+import { rotuloDoTipo as rotuloTipoAprovacao } from "@/lib/aprovacoes-shared";
+import { ACESSO_VENDEDOR_AGUARDANDO } from "@/lib/vendedor-access";
 import { GRUPO_EMPRESA } from "@/lib/modulos/preferencias";
 import { ARQUIVOS_CALCULADORA_RAPIDA, precoCalculadoNoCliente } from "@/lib/impressao-3d/auditoria-preco";
 import { FRASE_MODULO } from "@/lib/impressao-3d/frases-modulos";
@@ -3825,7 +3831,7 @@ await teste("Equipe e cofundadores: item visível e fixo, cartão em Configuraç
   const pagina = lerFonte("app/(dashboard)/socios/page.tsx");
   assert.ok(pagina.includes("Equipe e cofundadores") && pagina.includes("mesmo poder do fundador") && pagina.includes("Aprovações"));
   const convite = lerFonte("components/socios/convidar-membro.tsx");
-  assert.ok(convite.includes("Convidar cofundador") && convite.includes("/convite/${r.token}") && convite.includes("Copiar"));
+  assert.ok(!convite.includes("Convidar cofundador") && convite.includes("/convite/${r.token}") && convite.includes("Copiar"), "cofundador não se convida por link");
   assert.ok(lerFonte("app/(dashboard)/socios/actions.ts").includes('"convidar_membro"'));
   assert.ok(lerFonte("components/socios/equipe-section.tsx").includes("Convites pendentes") && lerFonte("components/socios/equipe-section.tsx").includes("cancelarConvite") && lerFonte("components/socios/equipe-section.tsx").includes("removerMembro"));
 });
@@ -4112,7 +4118,7 @@ await teste("convite: com 1 fundador mostra o link /convite/<token> (copiar + me
   assert.ok(f.includes("qtdFundadores >= 2") && f.includes("vai para aprovação de todos em Aprovações") && f.includes("Convite enviado para aprovação"));
   const acao = lerFonte("app/(dashboard)/socios/actions.ts");
   assert.ok(acao.includes('typeof data !== "string" || !data) return ENVIADO'), "RPC devolveu NULL = pendente; token = link");
-  assert.ok(f.includes("Convidar cofundador") && f.includes("Convidar sócio ou funcionário"));
+  assert.ok(!f.includes("Convidar cofundador") && f.includes("Convidar sócio ou funcionário por link"));
   const eq = lerFonte("components/socios/equipe-section.tsx");
   assert.ok(eq.includes("Convites pendentes") && eq.includes("cancelarConvite") && eq.includes("expira em") && eq.includes("Pessoas da empresa") && eq.includes("removerMembro") && eq.includes("atualizarPermissoesMembro"));
   assert.ok(lerFonte("components/socios/matriz-permissoes.tsx").includes("nenhum módulo ligado nesta empresa aceita permissão".replace("nenhum", "Nenhum")) || lerFonte("components/socios/matriz-permissoes.tsx").includes("Nenhum módulo ligado nesta empresa"), "matriz vazia não cita Leads/Agenda");
@@ -4120,9 +4126,138 @@ await teste("convite: com 1 fundador mostra o link /convite/<token> (copiar + me
 });
 await teste("a auditoria falha em escrita direta em membros/convites (todas as pastas, só a exceção conhecida)", () => {
   const audit = lerFonte("scripts/auditar-isolamento.mts");
-  assert.ok(audit.includes('const TABELAS_DE_EQUIPE = ["membros", "convites", "perfis_tipos_ativos"]'));
+  assert.ok(audit.includes('const TABELAS_DE_EQUIPE = ["membros", "convites", "perfis_tipos_ativos", "solicitacoes_vendedor", "workspace_codigos_cofundador"]'));
   assert.ok(audit.includes('for (const pasta of ["app", "components", "lib", "proxy.ts"])') && audit.includes("if (naoPermitidas.length) process.exitCode = 1;"));
   assert.ok(audit.includes('"lib/perfil.ts"') && !audit.includes('"components/socios'), "a tela de equipe não tem exceção");
+});
+
+console.log("\nCofundador por código — gerar, digitar, aprovar");
+await teste("validade do código: 1 h, 24 h, 72 h (padrão) e 7 dias; a RPC aceita de 1 a 168", () => {
+  assert.deepEqual(VALIDADES_CODIGO_COFUNDADOR.map((v) => v.horas), [1, 24, 72, 168]);
+  assert.equal(VALIDADE_PADRAO_HORAS, 72);
+  for (const h of [1, 24, 72, 168]) assert.equal(validadeValida(h), true, String(h));
+  for (const h of [0, -1, 169, 1.5, NaN, "72", null, undefined]) assert.equal(validadeValida(h), false, String(h));
+});
+await teste("retorno de gerar_codigo_cofundador ({ codigo, expira_em }) e código ativo lido da tabela", () => {
+  assert.deepEqual(lerCodigoGerado({ codigo: "ABCDE-12345", expira_em: "2026-11-02T10:00:00Z" }), { codigo: "ABCDE-12345", expiraEm: "2026-11-02T10:00:00Z" });
+  for (const ruim of [null, undefined, "x", [], {}, { codigo: "" , expira_em: "x" }, { codigo: "A" }]) assert.equal(lerCodigoGerado(ruim), null);
+  const agora = "2026-11-01T12:00:00Z";
+  const linha = (o: Record<string, unknown>) => ({ id: "i", codigo: "C", expira_em: "2026-11-02T00:00:00Z", usado_em: null, cancelado_em: null, ...o }) as Parameters<typeof codigoAtivo>[0][number];
+  assert.equal(codigoAtivo([linha({})], agora)?.codigo, "C", "ativo: não usado, não cancelado, dentro da validade");
+  assert.equal(codigoAtivo([linha({ usado_em: "2026-11-01T00:00:00Z" })], agora), null, "usado (uso único)");
+  assert.equal(codigoAtivo([linha({ cancelado_em: "2026-11-01T00:00:00Z" })], agora), null, "cancelado");
+  assert.equal(codigoAtivo([linha({ expira_em: "2026-11-01T11:59:59Z" })], agora), null, "expirado");
+  assert.equal(codigoAtivo([], agora), null);
+  assert.equal(codigoAtivo([linha({ id: "a", codigo: "VELHO", expira_em: "2026-11-01T13:00:00Z" }), linha({ id: "b", codigo: "NOVO", expira_em: "2026-11-03T00:00:00Z" })], agora)?.codigo, "NOVO", "o de maior validade");
+});
+await teste("tela: Adicionar cofundador por código (gerar, validade, copiar, cancelar, gerar novo) e instrução", () => {
+  const t = lerFonte("components/socios/cofundador-codigo.tsx");
+  assert.ok(t.includes("Adicionar cofundador por código") && t.includes("Gerar código") && t.includes("Gerar novo código") && t.includes("Cancelar código") && t.includes("Copiar"));
+  assert.ok(t.includes("VALIDADES_CODIGO_COFUNDADOR") && t.includes("VALIDADE_PADRAO_HORAS") && t.includes("gerarCodigoCofundador(horas)") && t.includes("cancelarCodigoCofundador()"));
+  assert.ok(t.includes("Passe este código para a pessoa. Ela entra no Hub (cria a conta, se não tiver), abre") && t.includes("Entrar numa empresa com") && t.includes("O código vale uma única vez e expira."));
+  assert.ok(t.includes("invalida o código atual"), "gerar novo invalida o anterior");
+  const acao = lerFonte("app/(dashboard)/socios/actions.ts");
+  const gerar = acao.slice(acao.indexOf("export async function gerarCodigoCofundador"));
+  assert.ok(gerar.includes('rpc("gerar_codigo_cofundador"') && gerar.includes("p_ws: empresa.workspaceId") && gerar.includes("p_validade_horas: validadeHoras") && gerar.includes('rpc("cancelar_codigo_cofundador"'));
+  assert.ok(gerar.includes("getEmpresaPainel()") && gerar.includes("sociosErrorMessage(error.message)"), "só painel; erro do banco como veio");
+  const pagina = lerFonte("app/(dashboard)/socios/page.tsx");
+  assert.ok(pagina.includes('.from("workspace_codigos_cofundador")') && pagina.includes('.eq("workspace_id", ws)') && pagina.includes('.is("usado_em", null)') && pagina.includes('.is("cancelado_em", null)') && pagina.includes('.gt("expira_em", agoraIso)'), "código ativo lido da tabela, por empresa");
+});
+await teste("cofundador NÃO se convida por link/e-mail: formulário e action só aceitam sócio e funcionário", () => {
+  const f = lerFonte("components/socios/convidar-membro.tsx");
+  assert.ok(f.includes('const papeis: PapelConvidavel[] = ["socio", "funcionario"]'));
+  assert.ok(!/value="cofundador"|"cofundador"\]/.test(f), "sem a opção Cofundador");
+  assert.ok(f.includes("não há convite por link para cofundador"));
+  const acao = lerFonte("app/(dashboard)/socios/actions.ts");
+  assert.ok(acao.includes('z.enum(["socio", "funcionario"]') && !acao.includes('z.enum(["socio", "funcionario", "cofundador"]'));
+  assert.deepEqual(Object.keys(PAPEL_CONVIDAVEL_ROTULO), ["socio", "funcionario"]);
+});
+await teste("pedidos de cofundador pendentes: lista com e-mail e data, Aprovar com confirmação, Recusar, aviso de 2+ fundadores", () => {
+  assert.equal(textoConfirmarCofundador("ana@x.com"), "Cofundador tem o MESMO poder do fundador: pode alterar a empresa, convidar e remover pessoas. Confirme que o e-mail ana@x.com é a pessoa certa.");
+  assert.match(textoConfirmarCofundador(null), /\(sem e-mail\)/);
+  const t = lerFonte("components/socios/pedidos-cofundador.tsx");
+  assert.ok(t.includes("Pedidos de cofundador pendentes") && t.includes("Aprovar") && t.includes("Recusar") && t.includes("textoConfirmarCofundador(p.email)") && t.includes("Confirmar e aprovar"));
+  assert.ok(t.includes("qtdFundadores >= 2") && t.includes("/aprovacoes") && t.includes("responderSolicitacaoAcesso(p.id, aprovar)"));
+  const pagina = lerFonte("app/(dashboard)/socios/page.tsx");
+  assert.ok(pagina.includes('.from("solicitacoes_vendedor")') && pagina.includes('.eq("papel_solicitado", "cofundador")') && pagina.includes('.eq("status", "pendente")') && pagina.includes('.eq("workspace_id", ws)'));
+  const resp = lerFonte("lib/actions/vendedor-codigo.ts");
+  assert.ok(resp.includes('rpc("responder_solicitacao_acesso"') && resp.includes("exigeAprovacao(supabase, workspaceId)") && resp.includes("pendente ? { ok: true, pendente: true }"), "2+ fundadores: vira aprovação em /aprovacoes");
+});
+await teste("sino, Vendedores e Visão Geral: pedido de cofundador aparece como COFUNDADOR e não como vendedor", () => {
+  assert.equal(ehPedidoCofundador({ papel_solicitado: "cofundador" }), true);
+  assert.equal(ehPedidoCofundador({ papel_solicitado: null }), false);
+  assert.equal(rotuloDoPedidoAcesso({ papel_solicitado: "cofundador", perfil_acesso_id: null }, {}), "COFUNDADOR");
+  assert.equal(rotuloDoPedidoAcesso({ papel_solicitado: null, perfil_acesso_id: null }, {}), "Vendedor");
+  assert.equal(rotuloDoPedidoAcesso({ perfil_acesso_id: "s1" }, { s1: "Financeiro" }), "Financeiro");
+  assert.equal(rotuloDoPedidoAcesso({ perfil_acesso_id: "zz" }, {}), "Setor");
+  assert.equal(rotuloTipoAprovacao("responder_solicitacao_acesso", "Aprovar pedido de acesso como COFUNDADOR de x@y.com"), "Pedido de acesso (COFUNDADOR)");
+  assert.equal(rotuloTipoAprovacao("responder_solicitacao_acesso", "Aprovar pedido de acesso como vendedor"), "Pedido de acesso");
+  assert.equal(rotuloTipoAprovacao("convidar_membro"), "Convite");
+  const bell = lerFonte("components/vendedor/solicitacoes-bell.tsx");
+  assert.ok(bell.includes("rotuloDoPedidoAcesso(s, setores)") && bell.includes("textoConfirmarCofundador(pedido.email)"), "sino rotula e confirma");
+  const prov = lerFonte("components/vendedor/solicitacoes-provider.tsx");
+  assert.equal((prov.match(/papel_solicitado/g) ?? []).length >= 4, true, "provider carrega o papel pedido (carga, busca e realtime)");
+  assert.ok(lerFonte("app/(dashboard)/layout.tsx").includes("perfil_acesso_id, papel_solicitado"));
+  assert.ok(lerFonte("app/(dashboard)/vendedores/page.tsx").includes('papel_solicitado.neq.cofundador'), "Vendedores não lista pedido de cofundador");
+  assert.ok(lerFonte("lib/dashboard-home/get-overview.ts").includes('papel_solicitado.neq.cofundador'), "contagem de pedidos de vendedor sem cofundador");
+  assert.ok(lerFonte("components/aprovacoes/aprovacoes-view.tsx").includes("rotuloDoTipo(a.tipo, a.resumo)"));
+});
+await teste("erros de solicitar_acesso e responder_solicitacao_acesso aparecem como vieram", () => {
+  for (const msg of ["Código já utilizado.", "Código expirado.", "Código cancelado.", "Este é o seu próprio código.", "Você já é cofundador desta empresa.", "Você já tem um pedido pendente para esta empresa."]) {
+    assert.equal(solicitarAcessoErrorMessage(msg), msg);
+  }
+  assert.equal(gestorErrorMessage("  Limite de 4 cofundadores ativos.  "), "Limite de 4 cofundadores ativos.");
+  assert.match(solicitarAcessoErrorMessage(""), /Não foi possível enviar o código/);
+  assert.equal(erroDaRpc(undefined, "padrão"), "padrão");
+  assert.equal(erroDaRpc("x", "padrão"), "x");
+  const acao = lerFonte("lib/actions/vendedor-codigo.ts");
+  assert.ok(acao.includes('rpc("solicitar_acesso", { p_codigo: codigo })') && acao.includes("solicitarAcessoErrorMessage(error.message)"));
+});
+await teste("o código digitado: maiúsculas/minúsculas e traços/espaços ignorados; cabe um código maior que 16", () => {
+  assert.equal(limparCodigoAcesso(" abcde-12345 "), "ABCDE12345");
+  assert.equal(limparCodigoAcesso("ab cd-ef_gh"), "ABCDEFGH");
+  assert.ok(CODIGO_ACESSO_MAX >= 24);
+  assert.equal(limparCodigoAcesso("A".repeat(24)).length, 24);
+});
+await teste("\"Entrar numa empresa com código\" é alcançável por QUALQUER usuário logado (todos os papéis, com ou sem empresa)", () => {
+  for (const path of [ACESSO_VENDEDOR_CODIGO, ACESSO_VENDEDOR_AGUARDANDO]) {
+    for (const papel of ["dono", "cofundador", "socio", "funcionario", "comercial"] as const) {
+      const d = decidirAcesso({ path, resolucao: { status: "ok", workspaceId: WS_A, papel, corrigirCookie: false }, habilitados: MODULOS_MINIMOS, permissoes: MODULOS_MINIMOS, permiteMembros: MODULOS_MINIMOS, funcionarioSemVinculo: false });
+      assert.equal(d.tipo, "seguir", `${papel} abre ${path}`);
+    }
+    assert.equal(decidirAcesso({ path, resolucao: { status: "sem_empresa" }, habilitados: [], funcionarioSemVinculo: false }).tipo, "seguir", "conta sem empresa");
+    assert.equal(decidirAcesso({ path, resolucao: { status: "sem_empresa" }, habilitados: [], funcionarioSemVinculo: true }).tipo, "seguir", "funcionário sem empresa");
+    assert.equal(rotaPermitida(path, []), true);
+  }
+  const side = lerFonte("components/sidebar.tsx");
+  assert.ok(side.includes("Entrar numa empresa com código") && side.includes("href={ACESSO_VENDEDOR_CODIGO}"), "menu lateral");
+  assert.ok(!side.slice(side.indexOf("Entrar numa empresa com código") - 400, side.indexOf("Entrar numa empresa com código")).includes("painelCompleto &&"), "não depende de papel");
+  assert.ok(lerFonte("components/vendedor/vendedor-sidebar.tsx").includes("Entrar numa empresa com código"), "vendedor também");
+  assert.ok(lerFonte("app/(dashboard)/configuracoes/page.tsx").includes('href="/acesso-vendedor"') && lerFonte("app/(dashboard)/configuracoes/page.tsx").includes("Entrar numa empresa com código"), "Configurações");
+  const pagina = lerFonte("app/acesso-vendedor/page.tsx");
+  assert.ok(pagina.includes("Entrar numa empresa com código") && pagina.includes("cofundador"));
+  assert.ok(!pagina.includes("tipo_conta_padrao") && !pagina.includes("comercial"), "a tela não exige conta de funcionário");
+  const espera = lerFonte("components/vendedor/aguardando-aprovacao.tsx");
+  assert.ok(espera.includes("Pedido enviado") && espera.includes("Aguarde a aprovação do fundador.") && espera.includes("seletor de empresas"));
+  const acao = lerFonte("lib/actions/vendedor-codigo.ts");
+  assert.ok(acao.includes("gravarEmpresaAtiva(alvo.workspaceId)") && acao.includes("listarEmpresas(supabase)"), "ao aprovar, a empresa entra no seletor e vira a ativa");
+});
+await teste("a auditoria cobre solicitacoes_vendedor e workspace_codigos_cofundador (só RPC) e a tela de equipe não escreve direto", () => {
+  const audit = lerFonte("scripts/auditar-isolamento.mts");
+  assert.ok(audit.includes("solicitacoes_vendedor|workspace_codigos_cofundador"));
+  assert.ok(audit.includes('equipe: ["workspace_codigos_cofundador"]'), "leituras do código sempre por workspace_id");
+  const telas = ["components/socios/cofundador-codigo.tsx", "components/socios/pedidos-cofundador.tsx", "components/socios/equipe-section.tsx", "components/socios/convidar-membro.tsx", "app/(dashboard)/socios/page.tsx", "app/(dashboard)/socios/actions.ts", "lib/actions/vendedor-codigo.ts"];
+  for (const arq of telas) assert.ok(!/\.from\("(membros|convites|solicitacoes_vendedor|workspace_codigos_cofundador)"\)\s*\.(insert|update|upsert|delete)\(/.test(lerFonte(arq)), `${arq} escreve direto`);
+});
+await teste("pessoas da empresa inclui pessoas_da_empresa sem repetir ninguém", () => {
+  const pessoas = montarPessoas(
+    [{ user_id: "u1", nome: "Miguel", email: "m@x.com", papel: "dono" }],
+    [{ membroId: "u3", email: "so@x.com", nome: "So", papel: "socio", createdAt: "", permissoes: [] }],
+    [{ pessoa_id: "u1", nome: "Miguel", papel: "dono" }, { pessoa_id: "u3", nome: "So", papel: "socio" }, { pessoa_id: "u9", nome: "Cofundadora", papel: "cofundador" }, { pessoa_id: "v1", nome: "Vendedor", papel: "comercial" }]
+  );
+  assert.deepEqual(pessoas.map((p) => p.membroId), ["u1", "u9", "u3"], "u9 (só em pessoas_da_empresa) entra; vendedor fica fora; sem repetir");
+  assert.equal(pessoas.find((p) => p.membroId === "u9")?.semMembro, true);
+  assert.ok(lerFonte("app/(dashboard)/socios/page.tsx").includes('rpc("pessoas_da_empresa"'));
 });
 
 console.log(`\n${total} testes`);

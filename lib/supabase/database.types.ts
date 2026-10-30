@@ -5852,6 +5852,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          papel_solicitado: string | null
           perfil_acesso_id: string | null
           respondido_em: string | null
           status: string
@@ -5862,6 +5863,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          papel_solicitado?: string | null
           perfil_acesso_id?: string | null
           respondido_em?: string | null
           status?: string
@@ -5872,6 +5874,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          papel_solicitado?: string | null
           perfil_acesso_id?: string | null
           respondido_em?: string | null
           status?: string
@@ -6133,6 +6136,53 @@ export type Database = {
           },
         ]
       }
+      workspace_codigos_cofundador: {
+        Row: {
+          cancelado_em: string | null
+          codigo: string
+          created_at: string
+          criado_por: string
+          expira_em: string
+          id: string
+          solicitacao_id: string | null
+          usado_em: string | null
+          usado_por: string | null
+          workspace_id: string
+        }
+        Insert: {
+          cancelado_em?: string | null
+          codigo: string
+          created_at?: string
+          criado_por?: string
+          expira_em: string
+          id?: string
+          solicitacao_id?: string | null
+          usado_em?: string | null
+          usado_por?: string | null
+          workspace_id: string
+        }
+        Update: {
+          cancelado_em?: string | null
+          codigo?: string
+          created_at?: string
+          criado_por?: string
+          expira_em?: string
+          id?: string
+          solicitacao_id?: string | null
+          usado_em?: string | null
+          usado_por?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_codigos_cofundador_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "perfis_tipos_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_config: {
         Row: {
           config: Json
@@ -6313,6 +6363,7 @@ export type Database = {
         Returns: undefined
       }
       cancelar_alteracao: { Args: { p_id: string }; Returns: undefined }
+      cancelar_codigo_cofundador: { Args: { p_ws: string }; Returns: number }
       cancelar_convite_empresa: { Args: { p_id: string }; Returns: undefined }
       converter_lead_em_cliente: {
         Args: { p_lead_id: string }
@@ -6357,6 +6408,10 @@ export type Database = {
           papel: string
           user_id: string
         }[]
+      }
+      gerar_codigo_cofundador: {
+        Args: { p_validade_horas?: number; p_ws: string }
+        Returns: Json
       }
       gerar_codigo_vendedor: { Args: never; Returns: string }
       get_colaboradores_do_dono: {

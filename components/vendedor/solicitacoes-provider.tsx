@@ -22,6 +22,8 @@ export type SolicitacaoPendente = Pick<
 > & {
   /** null = pedido de vendedor; senão, o setor (perfis_acesso) cujo código foi usado. */
   perfil_acesso_id: string | null;
+  /** 'cofundador' = pedido feito com código de cofundador (aparece como COFUNDADOR). */
+  papel_solicitado?: string | null;
 };
 
 type SolicitacoesApi = {
@@ -162,7 +164,7 @@ export function SolicitacoesVendedorProvider({
     async function buscarPendentes() {
       const { data } = await supabase
         .from("solicitacoes_vendedor")
-        .select("id, email, created_at, perfil_acesso_id")
+        .select("id, email, created_at, perfil_acesso_id, papel_solicitado")
         .eq("workspace_id", workspaceId)
         .eq("status", "pendente")
         .order("created_at", { ascending: true });
@@ -199,6 +201,7 @@ export function SolicitacoesVendedorProvider({
                       email: row.email,
                       created_at: row.created_at,
                       perfil_acesso_id: row.perfil_acesso_id ?? null,
+                      papel_solicitado: row.papel_solicitado ?? null,
                     },
                   ])
             );

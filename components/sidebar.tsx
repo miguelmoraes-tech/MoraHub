@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   LogOut,
   SlidersHorizontal,
+  KeyRound,
 } from "lucide-react";
 import { logout } from "@/lib/actions/auth";
 import { ModeSwitcher } from "@/components/mode-switcher";
@@ -36,6 +37,7 @@ import type { AccountType } from "@/lib/hub-mode";
 import type { EmpresaVinculo } from "@/lib/empresas";
 import { iconeDe } from "@/components/modulos/icones";
 import { CHAT_HABILITADO, rotaPermitida } from "@/lib/modulos/registry";
+import { ACESSO_VENDEDOR_CODIGO } from "@/lib/vendedor-access";
 import {
   GRUPO_EMPRESA,
   aplicarPreferenciaMenu,
@@ -310,6 +312,14 @@ export function Sidebar({
             Personalizar navegação
           </Link>
         )}
+        {/* Qualquer conta logada (fundador, cofundador, sócio, funcionário) pode entrar noutra empresa com um código. */}
+        <Link
+          href={ACESSO_VENDEDOR_CODIGO}
+          className="mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+        >
+          <KeyRound className="h-4 w-4" />
+          Entrar numa empresa com código
+        </Link>
         <form action={logout}>
           <button
             type="submit"

@@ -10,14 +10,85 @@ import {
  * dependência de servidor, para os componentes client e as actions usarem.
  */
 
-/** Papéis que se convida pela tela. 'cofundador' só o fundador (a RPC também confere). */
-export type PapelConvidavel = "socio" | "funcionario" | "cofundador";
+/**
+ * Papéis que se convida por e-mail/link. Cofundador NÃO está aqui: entra por código (a pessoa digita o
+ * código, o pedido chega à tela de Equipe e o fundador aprova).
+ */
+export type PapelConvidavel = "socio" | "funcionario";
 
 export const PAPEL_CONVIDAVEL_ROTULO: Record<PapelConvidavel, string> = {
   socio: "Sócio",
   funcionario: "Funcionário",
-  cofundador: "Cofundador",
 };
+
+// --- Cofundador por código ---------------------------------------------------------------------
+
+/** Validades oferecidas ao gerar o código (a RPC aceita de 1 a 168 h). */
+export const VALIDADES_CODIGO_COFUNDADOR: { horas: number; rotulo: string }[] = [
+  { horas: 1, rotulo: "1 hora" },
+  { horas: 24, rotulo: "24 horas" },
+  { horas: 72, rotulo: "72 horas (padrão)" },
+  { horas: 168, rotulo: "7 dias" },
+];
+export const VALIDADE_PADRAO_HORAS = 72;
+export const VALIDADE_MIN_HORAS = 1;
+export const VALIDADE_MAX_HORAS = 168;
+
+export function validadeValida(horas: unknown): horas is number {
+  return typeof horas === "number" && Number.isInteger(horas) && horas >= VALIDADE_MIN_HORAS && horas <= VALIDADE_MAX_HORAS;
+}
+
+/** Código de cofundador ainda ativo (lido da tabela workspace_codigos_cofundador). */
+export interface CodigoCofundador {
+  id: string;
+  codigo: string;
+  expiraEm: string;
+}
+
+/** Retorno de gerar_codigo_cofundador: { codigo, expira_em }. Qualquer outra forma vira null. */
+export function lerCodigoGerado(bruto: unknown): { codigo: string; expiraEm: string } | null {
+  if (!bruto || typeof bruto !== "object" || Array.isArray(bruto)) return null;
+  const o = bruto as Record<string, unknown>;
+  return typeof o.codigo === "string" && o.codigo && typeof o.expira_em === "string"
+    ? { codigo: o.codigo, expiraEm: o.expira_em }
+    : null;
+}
+
+/** Linha de código ativa: não usada, não cancelada e ainda dentro da validade. */
+export function codigoAtivo(
+  linhas: readonly { id: string; codigo: string; expira_em: string; usado_em: string | null; cancelado_em: string | null }[],
+  agoraIso: string
+): CodigoCofundador | null {
+  const ativo = linhas
+    .filter((l) => !l.usado_em && !l.cancelado_em && l.expira_em > agoraIso)
+    .sort((a, b) => b.expira_em.localeCompare(a.expira_em))[0];
+  return ativo ? { id: ativo.id, codigo: ativo.codigo, expiraEm: ativo.expira_em } : null;
+}
+
+/** Pedido de acesso feito com código de cofundador (solicitacoes_vendedor.papel_solicitado = 'cofundador'). */
+export interface PedidoCofundador {
+  id: string;
+  email: string | null;
+  createdAt: string;
+}
+
+export function ehPedidoCofundador(r: { papel_solicitado?: string | null }): boolean {
+  return r.papel_solicitado === "cofundador";
+}
+
+/** Rótulo do tipo de pedido de acesso no sino e na lista: COFUNDADOR, o setor ou Vendedor. */
+export function rotuloDoPedidoAcesso(
+  p: { papel_solicitado?: string | null; perfil_acesso_id?: string | null },
+  setores: Readonly<Record<string, string>>
+): string {
+  if (ehPedidoCofundador(p)) return "COFUNDADOR";
+  return p.perfil_acesso_id ? (setores[p.perfil_acesso_id] ?? "Setor") : "Vendedor";
+}
+
+/** Confirmação antes de aprovar: cofundador tem o mesmo poder do fundador. */
+export function textoConfirmarCofundador(email: string | null): string {
+  return `Cofundador tem o MESMO poder do fundador: pode alterar a empresa, convidar e remover pessoas. Confirme que o e-mail ${email ?? "(sem e-mail)"} é a pessoa certa.`;
+}
 
 /** Rótulo de qualquer papel que aparece na lista da equipe (inclui os legados). */
 export const PAPEL_EQUIPE_ROTULO: Record<string, string> = {
@@ -157,7 +228,9 @@ export interface PessoaEquipe extends MembroEquipe {
  */
 export function montarPessoas(
   fundadores: readonly { user_id: string; nome: string | null; email: string | null; papel: string }[],
-  membros: readonly MembroEquipe[]
+  membros: readonly MembroEquipe[],
+  /** pessoas_da_empresa: garante que ninguém da empresa fique de fora da lista (sem e-mail). */
+  pessoasDaEmpresa: readonly { pessoa_id: string; nome: string | null; papel: string }[] = []
 ): PessoaEquipe[] {
   const pessoas: PessoaEquipe[] = membros.map((m) => ({ ...m, semMembro: false }));
   const emails = new Set(pessoas.flatMap((p) => (p.email ? [p.email.trim().toLowerCase()] : [])));
@@ -174,6 +247,11 @@ export function montarPessoas(
       permissoes: [],
       semMembro: true,
     });
+  }
+  const idsFinais = new Set(pessoas.map((p) => p.membroId));
+  for (const x of pessoasDaEmpresa) {
+    if (idsFinais.has(x.pessoa_id) || !["dono", "cofundador", "socio", "funcionario"].includes(x.papel)) continue;
+    pessoas.push({ membroId: x.pessoa_id, email: null, nome: x.nome, papel: x.papel, createdAt: "", permissoes: [], semMembro: true });
   }
   const ordem: Record<string, number> = { dono: 0, cofundador: 1, socio: 2, funcionario: 3, comercial: 4 };
   return pessoas.sort((a, b) => (ordem[a.papel] ?? 9) - (ordem[b.papel] ?? 9));

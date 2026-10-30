@@ -151,13 +151,13 @@ function CartaoPendente({ a, meuId, agora }: { a: Aprovacao; meuId: string; agor
     <div className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-zinc-100">{a.resumo || rotuloDoTipo(a.tipo)}</p>
+          <p className="text-sm font-semibold text-zinc-100">{a.resumo || rotuloDoTipo(a.tipo, a.resumo)}</p>
           <p className="text-xs text-zinc-500">
             Proposto por {a.proposto_por_nome || "um fundador"} em {quando(a.created_at)} · expira em{" "}
             {quando(a.expira_em)}
           </p>
         </div>
-        <StatusChip tone="amber">{rotuloDoTipo(a.tipo)}</StatusChip>
+        <StatusChip tone="amber">{rotuloDoTipo(a.tipo, a.resumo)}</StatusChip>
       </div>
 
       <Votos a={a} />
@@ -209,9 +209,9 @@ function CartaoHistorico({ a, agora }: { a: Aprovacao; agora: Date }) {
     <div className="space-y-2 rounded-lg border border-zinc-800/80 px-3 py-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm text-zinc-200">{a.resumo || rotuloDoTipo(a.tipo)}</p>
+          <p className="text-sm text-zinc-200">{a.resumo || rotuloDoTipo(a.tipo, a.resumo)}</p>
           <p className="text-xs text-zinc-500">
-            {rotuloDoTipo(a.tipo)} · proposto por {a.proposto_por_nome || "um fundador"} ·{" "}
+            {rotuloDoTipo(a.tipo, a.resumo)} · proposto por {a.proposto_por_nome || "um fundador"} ·{" "}
             {quando(a.decidido_em ?? a.expira_em ?? a.created_at)}
           </p>
         </div>

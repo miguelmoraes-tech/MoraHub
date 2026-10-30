@@ -33,7 +33,7 @@ export function ConvidarMembro({ modulos, qtdFundadores }: { modulos: ModuloPerm
   const [enviadoParaAprovacao, setEnviadoParaAprovacao] = useState(false);
   const [enviando, startEnviar] = useTransition();
 
-  const papeis: PapelConvidavel[] = ["socio", "funcionario", "cofundador"];
+  const papeis: PapelConvidavel[] = ["socio", "funcionario"];
 
   function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -72,31 +72,21 @@ export function ConvidarMembro({ modulos, qtdFundadores }: { modulos: ModuloPerm
 
   if (!aberto) {
     return (
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => { setPapel("cofundador"); setAberto(true); }}
-          className="flex items-center gap-1.5 rounded-lg bg-copper-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-copper-500"
-        >
-          <UserPlus className="h-4 w-4" />
-          Convidar cofundador
-        </button>
-        <button
-          type="button"
-          onClick={() => { setPapel("socio"); setAberto(true); }}
-          className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3.5 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
-        >
-          <UserPlus className="h-4 w-4" />
-          Convidar sócio ou funcionário
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3.5 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
+      >
+        <UserPlus className="h-4 w-4" />
+        Convidar sócio ou funcionário por link
+      </button>
     );
   }
 
   return (
     <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-zinc-100">Convidar para a empresa</h2>
+        <h2 className="text-sm font-semibold text-zinc-100">Convidar sócio ou funcionário</h2>
         <button
           type="button"
           onClick={() => {
@@ -112,10 +102,10 @@ export function ConvidarMembro({ modulos, qtdFundadores }: { modulos: ModuloPerm
       </div>
 
       <p className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs text-zinc-400">
-        <strong className="text-zinc-300">Cofundador</strong> tem o mesmo poder do fundador.{" "}
         {qtdFundadores >= 2
           ? `Hoje a empresa tem ${qtdFundadores} fundadores: o convite não é criado na hora, vai para aprovação de todos em Aprovações, e o link só aparece lá depois que todos aprovarem.`
-          : "Hoje você é o único fundador: o convite é criado na hora e o link aparece aqui. Com 2 ou mais fundadores, as alterações da empresa passam pela aprovação de todos em Aprovações."}
+          : "Hoje você é o único fundador: o convite é criado na hora e o link aparece aqui. Com 2 ou mais fundadores, as alterações da empresa passam pela aprovação de todos em Aprovações."}{" "}
+        Para adicionar um <strong className="text-zinc-300">cofundador</strong>, use o código (bloco acima): não há convite por link para cofundador.
       </p>
 
       {enviadoParaAprovacao && (
@@ -190,17 +180,10 @@ export function ConvidarMembro({ modulos, qtdFundadores }: { modulos: ModuloPerm
           </div>
         </div>
 
-        {papel === "cofundador" ? (
-          <p className="rounded-lg border border-amber-900/50 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
-            O cofundador tem o mesmo nível de acesso do fundador: vê todo o painel da empresa e
-            gerencia a equipe. Não há permissões para escolher.
-          </p>
-        ) : (
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium text-zinc-400">O que essa pessoa acessa</p>
-            <MatrizPermissoes modulos={modulos} valor={permissoes} onChange={setPermissoes} />
-          </div>
-        )}
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-zinc-400">O que essa pessoa acessa</p>
+          <MatrizPermissoes modulos={modulos} valor={permissoes} onChange={setPermissoes} />
+        </div>
 
         {erro && (
           <p className="rounded-lg border border-rose-900/50 bg-rose-950/40 px-3 py-2 text-xs text-rose-300">

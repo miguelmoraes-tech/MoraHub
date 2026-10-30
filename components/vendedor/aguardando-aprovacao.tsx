@@ -17,7 +17,10 @@ export function AguardandoAprovacao({
   userId,
   status,
   enviadoEm,
+  temEmpresa = false,
 }: {
+  /** A conta já tem empresa: oferece voltar para ela enquanto espera. */
+  temEmpresa?: boolean;
   userId: string;
   status: Exclude<SolicitacaoVendedorStatus, "aprovado">;
   enviadoEm: string;
@@ -98,12 +101,13 @@ export function AguardandoAprovacao({
       </span>
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-zinc-50">
-          Aguardando aprovação
+          Pedido enviado
         </h1>
+        <p className="mt-1 text-sm font-medium text-zinc-300">Aguarde a aprovação do fundador.</p>
         <p className="mt-1 text-sm text-zinc-500">
           Pedido enviado em{" "}
           {formatDate(enviadoEm.slice(0, 10))}
-          . Esta tela se atualiza sozinha quando ele responder.
+          . Esta tela se atualiza sozinha quando ele responder; quando for aprovado, a empresa aparece no seu seletor de empresas.
         </p>
       </div>
       <button
@@ -115,6 +119,11 @@ export function AguardandoAprovacao({
         <RefreshCw className={`h-4 w-4 ${verificando ? "animate-spin" : ""}`} />
         {verificando ? "Verificando..." : "Verificar"}
       </button>
+      {temEmpresa && (
+        <Link href="/" className="block text-xs font-medium text-zinc-400 hover:text-zinc-200">
+          Voltar para a minha empresa
+        </Link>
+      )}
     </div>
   );
 }
